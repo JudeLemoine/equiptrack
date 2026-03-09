@@ -123,6 +123,7 @@ export default function AdminRentalsPage() {
                       })
                     }
                     size="sm"
+                    variant="success"
                   >
                     Approve
                   </Button>
@@ -136,7 +137,7 @@ export default function AdminRentalsPage() {
                       })
                     }
                     size="sm"
-                    variant="default"
+                    variant="destructive"
                   >
                     Reject
                   </Button>
@@ -153,7 +154,7 @@ export default function AdminRentalsPage() {
                     })
                   }
                   size="sm"
-                  variant="secondary"
+                  variant="default"
                 >
                   Mark returned
                 </Button>

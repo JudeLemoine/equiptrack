@@ -2,6 +2,8 @@
 @import "tailwindcss";
 
 :root {
+  --brand-navy-rgb: 3 62 140;
+  --brand-navy-dark-rgb: 2 52 117;
   color: #0f172a;
   background-color: #f1f5f9;
   font-family: Manrope, 'IBM Plex Sans', 'Avenir Next', sans-serif;

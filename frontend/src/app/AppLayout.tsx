@@ -1,18 +1,17 @@
 import { useMemo, useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { Building2, HardHat, LayoutDashboard, Menu, Package, Users, ClipboardList, LogOut, Wrench } from 'lucide-react'
+import { LayoutDashboard, Menu, Package, Users, ClipboardList, LogOut, Wrench } from 'lucide-react'
 import { clearSession, getSession } from '../lib/auth'
 import { Avatar, AvatarFallback } from '../components/ui/avatar'
 import { Button } from '../components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu'
 import { cn } from '../lib/utils'
+import iconColor from '../assets/logos/icon_color.png'
 
 type NavItem = {
   to: string
@@ -82,34 +81,26 @@ export default function AppLayout() {
 
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-30 w-72 border-r border-slate-200 bg-white p-5 transition-transform md:translate-x-0',
+          'fixed inset-y-0 left-0 z-30 flex w-72 flex-col border-r border-slate-200 bg-white p-5 transition-transform md:translate-x-0',
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
         <Link className="flex items-center gap-2" to="/">
-          <div className="rounded-md bg-slate-900 p-2 text-white">
-            {session?.user.role === 'admin' ? (
-              <Building2 className="h-4 w-4" />
-            ) : session?.user.role === 'maintenance' ? (
-              <Wrench className="h-4 w-4" />
-            ) : (
-              <HardHat className="h-4 w-4" />
-            )}
-          </div>
+          <img alt="EquipTrack brand icon" className="h-9 w-9 rounded-md object-contain" src={iconColor} />
           <div>
             <p className="font-semibold">EquipTrack</p>
             <p className="text-xs text-slate-500">{roleLabel} Portal</p>
           </div>
         </Link>
 
-        <nav className="mt-8 space-y-1">
+        <nav className="mt-8 flex-1 space-y-1">
           {navItems.map((item) => (
             <NavLink
               className={({ isActive }) =>
                 cn(
                   'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                   isActive
-                    ? 'bg-slate-900 text-white'
+                    ? 'bg-[rgb(var(--brand-navy-rgb))] text-white'
                     : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900',
                 )
               }
@@ -122,6 +113,19 @@ export default function AppLayout() {
             </NavLink>
           ))}
         </nav>
+
+        <Button
+          className="mt-4 w-full justify-start"
+          onClick={() => {
+            setSidebarOpen(false)
+            handleLogout()
+          }}
+          type="button"
+          variant="ghost"
+        >
+          <LogOut className="mr-2 h-4 w-4" />
+          Logout
+        </Button>
       </aside>
 
       <div className="md:pl-72">
@@ -153,11 +157,6 @@ export default function AppLayout() {
                 <p className="text-sm">{session?.user.email}</p>
                 <p className="text-xs text-slate-500">{roleLabel}</p>
               </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout}>
-                <LogOut className="mr-2 h-4 w-4" />
-                Logout
-              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </header>

@@ -6,7 +6,7 @@ import {
   type ColumnDef,
   type SortingState,
 } from '@tanstack/react-table'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { ArrowDown, ArrowUp, ArrowUpDown, Search } from 'lucide-react'
 import { Input } from './ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
@@ -43,7 +43,7 @@ export default function DataTable<TData>({
     getSortedRowModel: getSortedRowModel(),
   })
 
-  const hasRows = useMemo(() => table.getRowModel().rows.length > 0, [table])
+  const hasRows = table.getRowModel().rows.length > 0
 
   return (
     <div className="space-y-4">
@@ -60,59 +60,61 @@ export default function DataTable<TData>({
       ) : null}
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
-                  const canSort = header.column.getCanSort()
-                  return (
-                    <TableHead key={header.id}>
-                      {header.isPlaceholder ? null : canSort ? (
-                        <Button
-                          className="h-auto px-0 text-slate-600 hover:text-slate-900"
-                          onClick={header.column.getToggleSortingHandler()}
-                          type="button"
-                          variant="secondary"
-                        >
-                          {flexRender(header.column.columnDef.header, header.getContext())}
-                          {header.column.getIsSorted() === 'asc' ? (
-                            <ArrowUp className="ml-2 h-4 w-4" />
-                          ) : header.column.getIsSorted() === 'desc' ? (
-                            <ArrowDown className="ml-2 h-4 w-4" />
-                          ) : (
-                            <ArrowUpDown className="ml-2 h-4 w-4" />
-                          )}
-                        </Button>
-                      ) : (
-                        flexRender(header.column.columnDef.header, header.getContext())
-                      )}
-                    </TableHead>
-                  )
-                })}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {hasRows ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
+        <div className="w-full overflow-x-auto">
+          <Table className="min-w-[720px]">
+            <TableHeader>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => {
+                    const canSort = header.column.getCanSort()
+                    return (
+                      <TableHead key={header.id}>
+                        {header.isPlaceholder ? null : canSort ? (
+                          <Button
+                            className="h-auto px-0 text-slate-600 hover:text-slate-900"
+                            onClick={header.column.getToggleSortingHandler()}
+                            type="button"
+                            variant="secondary"
+                          >
+                            {flexRender(header.column.columnDef.header, header.getContext())}
+                            {header.column.getIsSorted() === 'asc' ? (
+                              <ArrowUp className="ml-2 h-4 w-4" />
+                            ) : header.column.getIsSorted() === 'desc' ? (
+                              <ArrowDown className="ml-2 h-4 w-4" />
+                            ) : (
+                              <ArrowUpDown className="ml-2 h-4 w-4" />
+                            )}
+                          </Button>
+                        ) : (
+                          flexRender(header.column.columnDef.header, header.getContext())
+                        )}
+                      </TableHead>
+                    )
+                  })}
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell className="py-10" colSpan={columns.length}>
-                  <EmptyState description={emptyDescription} title={emptyTitle} />
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {hasRows ? (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow key={row.id}>
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id}>
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell className="py-10" colSpan={columns.length}>
+                    <EmptyState description={emptyDescription} title={emptyTitle} />
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
     </div>
   )

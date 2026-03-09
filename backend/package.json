@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "dev": "ts-node-dev src/server.ts"
+    "dev": "node ./node_modules/ts-node-dev/lib/bin.js src/server.ts"
   },
   "keywords": [],
   "author": "",

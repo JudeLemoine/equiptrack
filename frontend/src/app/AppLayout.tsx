@@ -7,7 +7,9 @@ import { Button } from '../components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu'
 import { cn } from '../lib/utils'
@@ -88,7 +90,10 @@ export default function AppLayout() {
         <Link className="flex items-center gap-2" to="/">
           <img alt="EquipTrack brand icon" className="h-9 w-9 rounded-md object-contain" src={iconColor} />
           <div>
-            <p className="font-semibold">EquipTrack</p>
+            <p className="font-semibold">
+              <span className="text-[rgb(var(--brand-navy-rgb))]">Equip</span>
+              <span className="text-[rgb(var(--brand-yellow-rgb))]">Track</span>
+            </p>
             <p className="text-xs text-slate-500">{roleLabel} Portal</p>
           </div>
         </Link>
@@ -114,18 +119,6 @@ export default function AppLayout() {
           ))}
         </nav>
 
-        <Button
-          className="mt-4 w-full justify-start"
-          onClick={() => {
-            setSidebarOpen(false)
-            handleLogout()
-          }}
-          type="button"
-          variant="ghost"
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          Logout
-        </Button>
       </aside>
 
       <div className="md:pl-72">
@@ -142,7 +135,7 @@ export default function AppLayout() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-3 rounded-md px-2 py-1 hover:bg-slate-100">
+              <button className="ml-auto flex items-center gap-3 rounded-md px-2 py-1 hover:bg-slate-100">
                 <Avatar className="h-8 w-8">
                   <AvatarFallback>{initials}</AvatarFallback>
                 </Avatar>
@@ -157,6 +150,11 @@ export default function AppLayout() {
                 <p className="text-sm">{session?.user.email}</p>
                 <p className="text-xs text-slate-500">{roleLabel}</p>
               </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Logout
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </header>

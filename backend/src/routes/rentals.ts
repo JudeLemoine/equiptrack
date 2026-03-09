@@ -1,53 +1,125 @@
+import { Prisma, RentalStatus } from "@prisma/client"
 import { Router } from "express"
 import {
-  equipment,
-  getEquipmentById,
-  getRentalById,
-  getUserById,
-  newId,
-  rentalTimelines,
-  rentals,
-  type Rental,
-  type RentalDetail,
-  type RentalStatus,
-} from "../db/store"
+  mapApiRentalStatusToPrisma,
+  mapPrismaRentalStatusToApi,
+  toIsoDate,
+  toIsoDateTime,
+  type ApiRentalStatus,
+} from "../db/mappers"
+import { prisma } from "../db/prisma"
 
 const router = Router()
 
-function pushTimeline(rentalId: string, label: string) {
-  if (!rentalTimelines[rentalId]) rentalTimelines[rentalId] = []
-  rentalTimelines[rentalId].push({ label, at: new Date().toISOString() })
+type ApiRental = {
+  id: string
+  equipmentId: string
+  equipmentName: string
+  requestedBy: string
+  requestedByName: string
+  status: ApiRentalStatus
+  startDate: string
+  endDate?: string
+  notes?: string
+  createdAt: string
+  updatedAt: string
 }
 
-router.get("/", (req, res) => {
-  const status = typeof req.query.status === "string" ? (req.query.status as RentalStatus) : undefined
+type ApiRentalDetail = ApiRental & {
+  timeline: Array<{ label: string; at: string }>
+}
+
+const rentalInclude = {
+  equipmentUnit: {
+    include: {
+      equipmentType: true,
+    },
+  },
+  requester: true,
+} satisfies Prisma.RentalInclude
+
+function toApiRental(rental: Prisma.RentalGetPayload<{ include: typeof rentalInclude }>): ApiRental {
+  return {
+    id: rental.id,
+    equipmentId: rental.equipmentUnitId ?? "",
+    equipmentName: rental.equipmentUnit?.equipmentType.name ?? "Equipment",
+    requestedBy: rental.requesterId,
+    requestedByName: rental.requester.name,
+    status: mapPrismaRentalStatusToApi(rental.status),
+    startDate: toIsoDate(rental.requestedStart) ?? "",
+    endDate: toIsoDate(rental.requestedEnd),
+    notes: rental.reason,
+    createdAt: rental.createdAt.toISOString(),
+    updatedAt: rental.updatedAt.toISOString(),
+  }
+}
+
+function statusFilterToWhere(status?: ApiRentalStatus): Prisma.RentalWhereInput {
+  if (!status) return {}
+
+  if (status === "pending") {
+    return { status: { in: [RentalStatus.PENDING, RentalStatus.APPROVED, RentalStatus.RESERVED] } }
+  }
+
+  if (status === "active") {
+    return { status: { in: [RentalStatus.CHECKED_OUT, RentalStatus.OVERDUE] } }
+  }
+
+  if (status === "returned") {
+    return { status: RentalStatus.RETURNED }
+  }
+
+  return { status: { in: [RentalStatus.REJECTED, RentalStatus.CANCELLED] } }
+}
+
+router.get("/", async (req, res) => {
+  const status = typeof req.query.status === "string" ? (req.query.status as ApiRentalStatus) : undefined
   const requestedBy = typeof req.query.requestedBy === "string" ? req.query.requestedBy : undefined
 
-  let list = rentals.slice()
+  const list = await prisma.rental.findMany({
+    where: {
+      ...statusFilterToWhere(status),
+      ...(requestedBy ? { requesterId: requestedBy } : {}),
+    },
+    include: rentalInclude,
+    orderBy: { createdAt: "desc" },
+  })
 
-  if (status) list = list.filter((r) => r.status === status)
-  if (requestedBy) list = list.filter((r) => r.requestedBy === requestedBy)
-
-  res.json(list)
+  res.json(list.map(toApiRental))
 })
 
-router.get("/:id", (req, res) => {
-  const rental = getRentalById(req.params.id)
+router.get("/:id", async (req, res) => {
+  const rental = await prisma.rental.findUnique({
+    where: { id: req.params.id },
+    include: rentalInclude,
+  })
 
   if (!rental) {
     res.status(404).json({ message: "Rental not found" })
     return
   }
 
-  const detail: RentalDetail = {
-    ...rental,
-    timeline: rentalTimelines[rental.id] ?? [],
+  const timeline = await prisma.auditLog.findMany({
+    where: { rentalId: rental.id },
+    orderBy: { createdAt: "asc" },
+    select: {
+      message: true,
+      createdAt: true,
+    },
+  })
+
+  const detail: ApiRentalDetail = {
+    ...toApiRental(rental),
+    timeline: timeline.map((item) => ({
+      label: item.message,
+      at: item.createdAt.toISOString(),
+    })),
   }
 
   res.json(detail)
 })
 
-router.post("/", (req, res) => {
+router.post("/", async (req, res) => {
   const equipmentId = req.body?.equipmentId as string | undefined
   const requestedBy = req.body?.requestedBy as string | undefined
   const startDate = req.body?.startDate as string | undefined
@@ -59,98 +131,144 @@ router.post("/", (req, res) => {
     return
   }
 
-  const eq = getEquipmentById(equipmentId)
-  const user = getUserById(requestedBy)
+  const equipment = await prisma.equipmentUnit.findFirst({
+    where: { id: equipmentId, isActive: true },
+    include: {
+      equipmentType: true,
+    },
+  })
 
-  if (!eq) {
+  if (!equipment) {
     res.status(404).json({ message: "Equipment not found" })
     return
   }
+
+  const user = await prisma.user.findUnique({
+    where: { id: requestedBy },
+  })
 
   if (!user) {
     res.status(404).json({ message: "User not found" })
     return
   }
 
-  if (eq.status === "maintenance") {
+  if (equipment.status === "IN_MAINTENANCE" || equipment.status === "OUT_OF_SERVICE") {
     res.status(400).json({ message: "Equipment is under maintenance and cannot be rented" })
     return
   }
 
-  if (eq.status === "in_use") {
+  if (equipment.status === "CHECKED_OUT" || equipment.status === "RESERVED" || equipment.status === "OVERDUE") {
     res.status(400).json({ message: "Equipment already in use" })
     return
   }
 
-  if (eq.nextServiceDueDate) {
-    const today = new Date()
-    const serviceDate = new Date(eq.nextServiceDueDate)
-
-    if (serviceDate <= today) {
-      res.status(400).json({
-        message: "Equipment service overdue and must be maintained before rental",
-      })
-      return
-    }
+  if (equipment.nextMaintenanceDue && equipment.nextMaintenanceDue <= new Date()) {
+    res.status(400).json({ message: "Equipment service overdue and must be maintained before rental" })
+    return
   }
 
-  const now = new Date().toISOString()
+  const requestedStart = new Date(startDate)
+  const requestedEnd = new Date(endDate ?? startDate)
 
-  const rental: Rental = {
-    id: newId(),
-    equipmentId: eq.id,
-    equipmentName: eq.name,
-    requestedBy: user.id,
-    requestedByName: user.name,
-    status: "pending",
-    startDate,
-    endDate,
-    notes,
-    createdAt: now,
-    updatedAt: now,
-  }
+  const rental = await prisma.$transaction(async (tx) => {
+    const created = await tx.rental.create({
+      data: {
+        equipmentUnitId: equipment.id,
+        equipmentTypeId: equipment.equipmentTypeId,
+        requesterId: user.id,
+        locationId: equipment.locationId,
+        status: "PENDING",
+        reason: notes ?? "Rental requested",
+        requestedStart,
+        requestedEnd,
+      },
+      include: rentalInclude,
+    })
 
-  rentals.unshift(rental)
+    await tx.auditLog.create({
+      data: {
+        action: "REQUEST_SUBMITTED",
+        actorId: user.id,
+        rentalId: created.id,
+        equipmentUnitId: equipment.id,
+        message: "Pending",
+      },
+    })
 
-  rentalTimelines[rental.id] = [
-    { label: "Created", at: now },
-    { label: "Pending", at: now },
-  ]
+    return created
+  })
 
-  res.status(201).json(rental)
+  res.status(201).json(toApiRental(rental))
 })
 
-router.patch("/:id/status", (req, res) => {
-  const rental = getRentalById(req.params.id)
+router.patch("/:id/status", async (req, res) => {
+  const rental = await prisma.rental.findUnique({ where: { id: req.params.id } })
 
   if (!rental) {
     res.status(404).json({ message: "Rental not found" })
     return
   }
 
-  const status = req.body?.status as Extract<RentalStatus, "active" | "returned" | "rejected"> | undefined
+  const status = req.body?.status as Extract<ApiRentalStatus, "active" | "returned" | "rejected"> | undefined
 
   if (!status) {
     res.status(400).json({ message: "status is required" })
     return
   }
 
-  rental.status = status
-  rental.updatedAt = new Date().toISOString()
+  const mappedStatus = mapApiRentalStatusToPrisma(status)
 
-  if (status === "active") {
-    const eq = getEquipmentById(rental.equipmentId)
-    if (eq) eq.status = "in_use"
-    pushTimeline(rental.id, "Active")
-  } else if (status === "returned") {
-    const eq = getEquipmentById(rental.equipmentId)
-    if (eq) eq.status = "available"
-    pushTimeline(rental.id, "Returned")
-  } else if (status === "rejected") {
-    pushTimeline(rental.id, "Rejected")
-  }
+  const updated = await prisma.$transaction(async (tx) => {
+    const nextData: Prisma.RentalUpdateInput = {
+      status: mappedStatus,
+    }
 
-  res.json(rental)
+    if (status === "active") {
+      nextData.checkedOutAt = new Date()
+    } else if (status === "returned") {
+      nextData.returnedAt = new Date()
+    } else {
+      nextData.rejectedReason = "Rejected"
+    }
+
+    const nextRental = await tx.rental.update({
+      where: { id: rental.id },
+      data: nextData,
+      include: rentalInclude,
+    })
+
+    if (rental.equipmentUnitId) {
+      if (status === "active") {
+        await tx.equipmentUnit.update({
+          where: { id: rental.equipmentUnitId },
+          data: { status: "CHECKED_OUT" },
+        })
+      }
+
+      if (status === "returned") {
+        await tx.equipmentUnit.update({
+          where: { id: rental.equipmentUnitId },
+          data: { status: "AVAILABLE" },
+        })
+      }
+    }
+
+    await tx.auditLog.create({
+      data: {
+        action: status === "active" ? "CHECKED_OUT" : status === "returned" ? "RETURNED" : "REQUEST_REJECTED",
+        rentalId: rental.id,
+        equipmentUnitId: rental.equipmentUnitId,
+        message: status === "active" ? "Active" : status === "returned" ? "Returned" : "Rejected",
+      },
+    })
+
+    return nextRental
+  })
+
+  res.json({
+    ...toApiRental(updated),
+    updatedAt: toIsoDateTime(updated.updatedAt) ?? new Date().toISOString(),
+  })
 })
 
 export default router

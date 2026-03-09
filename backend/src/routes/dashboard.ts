@@ -1,33 +1,79 @@
 import { Router } from "express"
-import { equipment, rentals, type EquipmentStatus } from "../db/store"
+import { EquipmentStatus, RentalStatus } from "@prisma/client"
+import { prisma } from "../db/prisma"
 
 const router = Router()
 
-router.get("/admin-summary", (req, res) => {
-  const byStatus: Record<EquipmentStatus, number> = {
+router.get("/admin-summary", async (req, res) => {
+  const byStatus: Record<"available" | "in_use" | "maintenance", number> = {
     available: 0,
     in_use: 0,
     maintenance: 0,
   }
 
-  for (const e of equipment) byStatus[e.status]++
+  const units = await prisma.equipmentUnit.findMany({
+    select: { status: true },
+  })
 
-  const pendingRentalRequests = rentals.filter((r) => r.status === "pending").length
-  const activeRentals = rentals.filter((r) => r.status === "active").length
+  for (const unit of units) {
+    if (unit.status === EquipmentStatus.AVAILABLE) {
+      byStatus.available++
+      continue
+    }
+
+    if (
+      unit.status === EquipmentStatus.CHECKED_OUT ||
+      unit.status === EquipmentStatus.RESERVED ||
+      unit.status === EquipmentStatus.OVERDUE
+    ) {
+      byStatus.in_use++
+      continue
+    }
+
+    byStatus.maintenance++
+  }
+
+  const pendingRentalRequests = await prisma.rental.count({
+    where: {
+      status: { in: [RentalStatus.PENDING, RentalStatus.APPROVED, RentalStatus.RESERVED] },
+    },
+  })
+  const activeRentals = await prisma.rental.count({
+    where: {
+      status: { in: [RentalStatus.CHECKED_OUT, RentalStatus.OVERDUE] },
+    },
+  })
 
   res.json({
-    totalEquipment: equipment.length,
+    totalEquipment: units.length,
     byStatus,
     pendingRentalRequests,
     activeRentals,
   })
 })
 
-router.get("/field-summary", (req, res) => {
+router.get("/field-summary", async (req, res) => {
   const userId = typeof req.query.userId === "string" ? req.query.userId : ""
-  const myPendingRequests = rentals.filter((r) => r.requestedBy === userId && r.status === "pending").length
-  const myActiveRentals = rentals.filter((r) => r.requestedBy === userId && r.status === "active").length
-  const recommendedEquipmentIds = equipment.filter((e) => e.status === "available").slice(0, 3).map((e) => e.id)
+  const myPendingRequests = await prisma.rental.count({
+    where: {
+      requesterId: userId,
+      status: { in: [RentalStatus.PENDING, RentalStatus.APPROVED, RentalStatus.RESERVED] },
+    },
+  })
+  const myActiveRentals = await prisma.rental.count({
+    where: {
+      requesterId: userId,
+      status: { in: [RentalStatus.CHECKED_OUT, RentalStatus.OVERDUE] },
+    },
+  })
+  const recommendedEquipmentIds = (
+    await prisma.equipmentUnit.findMany({
+      where: { status: EquipmentStatus.AVAILABLE, isActive: true },
+      select: { id: true },
+      take: 3,
+      orderBy: { createdAt: "desc" },
+    })
+  ).map((e) => e.id)
 
   res.json({
     myPendingRequests,
@@ -36,10 +82,32 @@ router.get("/field-summary", (req, res) => {
   })
 })
 
-router.get("/maintenance-summary", (req, res) => {
-  const maintenanceEquipment = equipment.filter((e) => e.status === "maintenance").length
-  const availableEquipment = equipment.filter((e) => e.status === "available").length
-  const inUseEquipment = equipment.filter((e) => e.status === "in_use").length
+router.get("/maintenance-summary", async (req, res) => {
+  const units = await prisma.equipmentUnit.findMany({
+    select: { status: true },
+  })
+
+  let maintenanceEquipment = 0
+  let availableEquipment = 0
+  let inUseEquipment = 0
+
+  for (const unit of units) {
+    if (unit.status === EquipmentStatus.AVAILABLE) {
+      availableEquipment++
+      continue
+    }
+
+    if (
+      unit.status === EquipmentStatus.CHECKED_OUT ||
+      unit.status === EquipmentStatus.RESERVED ||
+      unit.status === EquipmentStatus.OVERDUE
+    ) {
+      inUseEquipment++
+      continue
+    }
+
+    maintenanceEquipment++
+  }
 
   res.json({
     maintenanceEquipment,

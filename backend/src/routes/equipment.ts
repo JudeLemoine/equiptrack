@@ -1,118 +1,340 @@
+import { randomUUID } from "crypto"
+import { Prisma } from "@prisma/client"
 import { Router } from "express"
 import {
-  activityEvents,
-  equipment,
-  getEquipmentById,
-  getUserById,
-  newId,
-  serviceLogs,
-  type ActivityEvent,
-  type Equipment,
-  type EquipmentStatus,
-} from "../db/store"
-
+  mapApiEquipmentStatusToPrisma,
+  mapAuditActionToActivityType,
+  mapPrismaEquipmentStatusToApi,
+  toIsoDate,
+  type ApiEquipmentStatus,
+} from "../db/mappers"
+import { prisma } from "../db/prisma"
 import { requireRole } from "../middleware/requireRole"
 
 const router = Router()
 
-function addActivity(equipmentId: string, type: ActivityEvent["type"], actorUserId: string, summary: string) {
-  activityEvents.unshift({
-    id: newId(),
-    equipmentId,
-    type,
-    timestamp: new Date().toISOString(),
-    actorUserId,
-    summary,
-  })
+type ApiEquipment = {
+  id: string
+  name: string
+  category: string
+  status: ApiEquipmentStatus
+  qrCode: string
+  lastServiceDate: string
+  maintenanceIntervalDays?: number
+  nextServiceDueDate?: string
+  notes?: string
 }
 
-router.get("/", (req, res) => {
-  const search = typeof req.query.search === "string" ? req.query.search.toLowerCase() : ""
-  const status = typeof req.query.status === "string" ? (req.query.status as EquipmentStatus) : undefined
-  const category = typeof req.query.category === "string" ? req.query.category : undefined
+type ServiceLogEntry = {
+  id: string
+  equipmentId: string
+  date: string
+  note: string
+  performedByUserId: string
+}
 
-  let list = equipment.slice()
+const equipmentInclude = {
+  equipmentType: {
+    include: {
+      category: true,
+    },
+  },
+} satisfies Prisma.EquipmentUnitInclude
 
-  if (search) {
-    list = list.filter((e) => e.name.toLowerCase().includes(search) || e.qrCode.toLowerCase().includes(search))
+function slugifyCode(value: string) {
+  return value
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 32)
+}
+
+function toApiEquipment(unit: Prisma.EquipmentUnitGetPayload<{ include: typeof equipmentInclude }>): ApiEquipment {
+  return {
+    id: unit.id,
+    name: unit.equipmentType.name,
+    category: unit.equipmentType.category.name,
+    status: mapPrismaEquipmentStatusToApi(unit.status),
+    qrCode: unit.assetTag,
+    lastServiceDate: toIsoDate(unit.lastMaintenanceAt) ?? "",
+    maintenanceIntervalDays: unit.equipmentType.defaultMaintenanceDays ?? undefined,
+    nextServiceDueDate: toIsoDate(unit.nextMaintenanceDue),
+    notes: unit.notesSummary ?? undefined,
   }
-  if (status) {
-    list = list.filter((e) => e.status === status)
-  }
-  if (category) {
-    list = list.filter((e) => e.category === category)
+}
+
+async function ensureUserExists(userId: string) {
+  return prisma.user.findUnique({ where: { id: userId }, select: { id: true } })
+}
+
+function statusFilterToWhere(status?: ApiEquipmentStatus): Prisma.EquipmentUnitWhereInput {
+  if (!status) return {}
+
+  if (status === "available") {
+    return { status: { in: ["AVAILABLE"] } }
   }
 
-  res.json(list)
+  if (status === "in_use") {
+    return { status: { in: ["RESERVED", "CHECKED_OUT", "OVERDUE"] } }
+  }
+
+  return { status: { in: ["DUE_SOON_MAINTENANCE", "IN_MAINTENANCE", "OUT_OF_SERVICE"] } }
+}
+
+router.get("/alerts/maintenance", async (_req, res) => {
+  const today = new Date()
+  const nextWeek = new Date(today)
+  nextWeek.setDate(nextWeek.getDate() + 7)
+
+  const units = await prisma.equipmentUnit.findMany({
+    where: {
+      isActive: true,
+      nextMaintenanceDue: {
+        lte: nextWeek,
+      },
+    },
+    include: equipmentInclude,
+    orderBy: {
+      nextMaintenanceDue: "asc",
+    },
+  })
+
+  const alerts = units.filter((u) => Boolean(u.nextMaintenanceDue))
+
+  res.json({
+    count: alerts.length,
+    equipment: alerts.map(toApiEquipment),
+  })
 })
 
-router.get("/:id", (req, res) => {
-  const item = getEquipmentById(req.params.id)
+router.get("/", async (req, res) => {
+  const search = typeof req.query.search === "string" ? req.query.search.trim() : ""
+  const status = typeof req.query.status === "string" ? (req.query.status as ApiEquipmentStatus) : undefined
+  const category = typeof req.query.category === "string" ? req.query.category.trim() : undefined
+
+  const where: Prisma.EquipmentUnitWhereInput = {
+    isActive: true,
+    ...statusFilterToWhere(status),
+    ...(category
+      ? {
+          equipmentType: {
+            category: {
+              name: category,
+            },
+          },
+        }
+      : {}),
+    ...(search
+      ? {
+          OR: [
+            {
+              assetTag: {
+                contains: search,
+              },
+            },
+            {
+              equipmentType: {
+                name: {
+                  contains: search,
+                },
+              },
+            },
+          ],
+        }
+      : {}),
+  }
+
+  const units = await prisma.equipmentUnit.findMany({
+    where,
+    include: equipmentInclude,
+    orderBy: { createdAt: "desc" },
+  })
+
+  res.json(units.map(toApiEquipment))
+})
+
+router.get("/:id", async (req, res) => {
+  const item = await prisma.equipmentUnit.findFirst({
+    where: { id: req.params.id, isActive: true },
+    include: equipmentInclude,
+  })
+
   if (!item) {
     res.status(404).json({ message: "Equipment not found" })
     return
   }
-  res.json(item)
+
+  res.json(toApiEquipment(item))
 })
 
-router.post("/", requireRole("admin"), (req, res) => {
-  const body = req.body as Omit<Equipment, "id">
-  const item: Equipment = {
-    id: newId(),
-    name: body.name,
-    category: body.category,
-    status: body.status,
-    qrCode: body.qrCode,
-    lastServiceDate: body.lastServiceDate,
-    maintenanceIntervalDays: body.maintenanceIntervalDays,
-    nextServiceDueDate: body.nextServiceDueDate,
-    notes: body.notes,
+router.post("/", requireRole("admin"), async (req, res) => {
+  const body = req.body as Partial<ApiEquipment>
+
+  if (!body.name || !body.category || !body.qrCode || !body.status) {
+    res.status(400).json({ message: "name, category, qrCode, and status are required" })
+    return
   }
-  equipment.unshift(item)
-  res.status(201).json(item)
+
+  const categoryName = body.category.trim()
+  const categoryCode = slugifyCode(categoryName)
+  const typeName = body.name.trim()
+  const typeCode = slugifyCode(typeName)
+  const qrCode = body.qrCode
+  const nextStatus = body.status
+
+  const createdEquipmentId = await prisma.$transaction(async (tx) => {
+    const category = await tx.equipmentCategory.upsert({
+      where: { code: categoryCode },
+      update: {
+        name: categoryName,
+      },
+      create: {
+        name: categoryName,
+        code: categoryCode,
+      },
+    })
+
+    const equipmentType = await tx.equipmentType.upsert({
+      where: { code: typeCode },
+      update: {
+        name: typeName,
+        categoryId: category.id,
+        defaultMaintenanceDays: body.maintenanceIntervalDays,
+      },
+      create: {
+        name: typeName,
+        code: typeCode,
+        categoryId: category.id,
+        defaultMaintenanceDays: body.maintenanceIntervalDays,
+      },
+    })
+
+    const defaultLocation = await tx.location.findFirst({ orderBy: { createdAt: "asc" } })
+    if (!defaultLocation) {
+      throw new Error("No location exists. Seed database first.")
+    }
+
+    const created = await tx.equipmentUnit.create({
+      data: {
+        assetTag: qrCode,
+        serialNumber: `SN-${randomUUID().slice(0, 8).toUpperCase()}`,
+        equipmentTypeId: equipmentType.id,
+        locationId: defaultLocation.id,
+        status: mapApiEquipmentStatusToPrisma(nextStatus),
+        lastMaintenanceAt: body.lastServiceDate ? new Date(body.lastServiceDate) : null,
+        nextMaintenanceDue: body.nextServiceDueDate ? new Date(body.nextServiceDueDate) : null,
+        notesSummary: body.notes,
+      },
+    })
+
+    return created.id
+  })
+
+  const equipment = await prisma.equipmentUnit.findUnique({
+    where: { id: createdEquipmentId },
+    include: equipmentInclude,
+  })
+
+  if (!equipment) {
+    res.status(500).json({ message: "Failed to create equipment" })
+    return
+  }
+
+  res.status(201).json(toApiEquipment(equipment))
 })
 
-router.put("/:id", requireRole("admin"), (req, res) => {
-  const item = getEquipmentById(req.params.id)
-  if (!item) {
+router.put("/:id", requireRole("admin"), async (req, res) => {
+  const existing = await prisma.equipmentUnit.findFirst({
+    where: { id: req.params.id, isActive: true },
+    include: equipmentInclude,
+  })
+
+  if (!existing) {
     res.status(404).json({ message: "Equipment not found" })
     return
   }
 
-  const body = req.body as Partial<Equipment>
+  const body = req.body as Partial<ApiEquipment>
 
-  item.name = body.name ?? item.name
-  item.category = body.category ?? item.category
-  item.status = (body.status as EquipmentStatus) ?? item.status
-  item.qrCode = body.qrCode ?? item.qrCode
-  item.lastServiceDate = body.lastServiceDate ?? item.lastServiceDate
-  item.maintenanceIntervalDays = body.maintenanceIntervalDays ?? item.maintenanceIntervalDays
-  item.nextServiceDueDate = body.nextServiceDueDate ?? item.nextServiceDueDate
-  item.notes = body.notes ?? item.notes
+  let equipmentTypeId = existing.equipmentTypeId
+  if (body.name || body.category || body.maintenanceIntervalDays !== undefined) {
+    const categoryName = (body.category ?? existing.equipmentType.category.name).trim()
+    const categoryCode = slugifyCode(categoryName)
+    const typeName = (body.name ?? existing.equipmentType.name).trim()
+    const typeCode = slugifyCode(typeName)
 
-  res.json(item)
+    const category = await prisma.equipmentCategory.upsert({
+      where: { code: categoryCode },
+      update: { name: categoryName },
+      create: { name: categoryName, code: categoryCode },
+    })
+
+    const type = await prisma.equipmentType.upsert({
+      where: { code: typeCode },
+      update: {
+        name: typeName,
+        categoryId: category.id,
+        defaultMaintenanceDays: body.maintenanceIntervalDays ?? existing.equipmentType.defaultMaintenanceDays,
+      },
+      create: {
+        name: typeName,
+        code: typeCode,
+        categoryId: category.id,
+        defaultMaintenanceDays: body.maintenanceIntervalDays,
+      },
+    })
+
+    equipmentTypeId = type.id
+  }
+
+  const item = await prisma.equipmentUnit.update({
+    where: { id: existing.id },
+    data: {
+      equipmentTypeId,
+      status: body.status ? mapApiEquipmentStatusToPrisma(body.status) : undefined,
+      assetTag: body.qrCode,
+      lastMaintenanceAt: body.lastServiceDate ? new Date(body.lastServiceDate) : existing.lastMaintenanceAt,
+      nextMaintenanceDue:
+        body.nextServiceDueDate !== undefined
+          ? body.nextServiceDueDate
+            ? new Date(body.nextServiceDueDate)
+            : null
+          : existing.nextMaintenanceDue,
+      notesSummary: body.notes ?? existing.notesSummary,
+    },
+    include: equipmentInclude,
+  })
+
+  res.json(toApiEquipment(item))
 })
 
-router.delete("/:id", requireRole("admin"), (req, res) => {
-  const idx = equipment.findIndex((e) => e.id === req.params.id)
-  if (idx === -1) {
+router.delete("/:id", requireRole("admin"), async (req, res) => {
+  const item = await prisma.equipmentUnit.findUnique({ where: { id: req.params.id } })
+  if (!item || !item.isActive) {
     res.status(404).json({ message: "Equipment not found" })
     return
   }
 
-  equipment.splice(idx, 1)
+  await prisma.equipmentUnit.update({
+    where: { id: item.id },
+    data: { isActive: false },
+  })
+
   res.status(204).end()
 })
 
-router.patch("/:id/status", requireRole("admin", "maintenance"), (req, res) => {
-  const item = getEquipmentById(req.params.id)
+router.patch("/:id/status", requireRole("admin", "maintenance"), async (req, res) => {
+  const item = await prisma.equipmentUnit.findFirst({
+    where: { id: req.params.id, isActive: true },
+  })
 
   if (!item) {
     res.status(404).json({ message: "Equipment not found" })
     return
   }
 
-  const status = req.body?.status as EquipmentStatus | undefined
+  const status = req.body?.status as ApiEquipmentStatus | undefined
   const actorUserId = req.body?.actorUserId as string | undefined
 
   if (!status || !actorUserId) {
@@ -120,50 +342,94 @@ router.patch("/:id/status", requireRole("admin", "maintenance"), (req, res) => {
     return
   }
 
-  item.status = status
-  addActivity(item.id, "status_change", actorUserId, `Status changed to ${status}`)
+  const actor = await ensureUserExists(actorUserId)
+  if (!actor) {
+    res.status(400).json({ message: "actorUserId is required" })
+    return
+  }
 
-  res.json(item)
+  const updated = await prisma.$transaction(async (tx) => {
+    const unit = await tx.equipmentUnit.update({
+      where: { id: item.id },
+      data: { status: mapApiEquipmentStatusToPrisma(status) },
+      include: equipmentInclude,
+    })
+
+    await tx.auditLog.create({
+      data: {
+        action: "STATUS_CHANGED",
+        actorId: actor.id,
+        equipmentUnitId: item.id,
+        message: `Status changed to ${status}`,
+      },
+    })
+
+    return unit
+  })
+
+  res.json(toApiEquipment(updated))
 })
 
-router.post("/:id/checkout", (req, res) => {
-  const item = getEquipmentById(req.params.id)
+router.post("/:id/checkout", async (req, res) => {
+  const item = await prisma.equipmentUnit.findFirst({
+    where: { id: req.params.id, isActive: true },
+    include: equipmentInclude,
+  })
 
   if (!item) {
     res.status(404).json({ message: "Equipment not found" })
     return
   }
 
-  if (item.status === "maintenance") {
+  if (mapPrismaEquipmentStatusToApi(item.status) === "maintenance") {
     res.status(400).json({ message: "Equipment is under maintenance and cannot be checked out" })
     return
   }
 
-  if (item.nextServiceDueDate) {
-    const today = new Date()
-    const serviceDate = new Date(item.nextServiceDueDate)
-
-    if (serviceDate <= today) {
-      res.status(400).json({ message: "Equipment service overdue. Maintenance required." })
-      return
-    }
+  if (item.nextMaintenanceDue && item.nextMaintenanceDue <= new Date()) {
+    res.status(400).json({ message: "Equipment service overdue. Maintenance required." })
+    return
   }
 
   const actorUserId = req.body?.actorUserId as string | undefined
-
-  if (!actorUserId || !getUserById(actorUserId)) {
+  if (!actorUserId) {
     res.status(400).json({ message: "actorUserId is required" })
     return
   }
 
-  item.status = "in_use"
-  addActivity(item.id, "checkout", actorUserId, "Checked out")
+  const actor = await ensureUserExists(actorUserId)
+  if (!actor) {
+    res.status(400).json({ message: "actorUserId is required" })
+    return
+  }
 
-  res.json(item)
+  const updated = await prisma.$transaction(async (tx) => {
+    const unit = await tx.equipmentUnit.update({
+      where: { id: item.id },
+      data: { status: "CHECKED_OUT" },
+      include: equipmentInclude,
+    })
+
+    await tx.auditLog.create({
+      data: {
+        action: "CHECKED_OUT",
+        actorId: actor.id,
+        equipmentUnitId: item.id,
+        message: "Checked out",
+      },
+    })
+
+    return unit
+  })
+
+  res.json(toApiEquipment(updated))
 })
 
-router.post("/:id/checkin", (req, res) => {
-  const item = getEquipmentById(req.params.id)
+router.post("/:id/checkin", async (req, res) => {
+  const item = await prisma.equipmentUnit.findFirst({
+    where: { id: req.params.id, isActive: true },
+    include: equipmentInclude,
+  })
 
   if (!item) {
     res.status(404).json({ message: "Equipment not found" })
@@ -171,20 +437,44 @@ router.post("/:id/checkin", (req, res) => {
   }
 
   const actorUserId = req.body?.actorUserId as string | undefined
-
-  if (!actorUserId || !getUserById(actorUserId)) {
+  if (!actorUserId) {
     res.status(400).json({ message: "actorUserId is required" })
     return
   }
 
-  item.status = "available"
-  addActivity(item.id, "checkin", actorUserId, "Checked in")
+  const actor = await ensureUserExists(actorUserId)
+  if (!actor) {
+    res.status(400).json({ message: "actorUserId is required" })
+    return
+  }
 
-  res.json(item)
+  const updated = await prisma.$transaction(async (tx) => {
+    const unit = await tx.equipmentUnit.update({
+      where: { id: item.id },
+      data: { status: "AVAILABLE" },
+      include: equipmentInclude,
+    })
+
+    await tx.auditLog.create({
+      data: {
+        action: "RETURNED",
+        actorId: actor.id,
+        equipmentUnitId: item.id,
+        message: "Checked in",
+      },
+    })
+
+    return unit
+  })
+
+  res.json(toApiEquipment(updated))
 })
 
-router.post("/:id/mark-serviced", requireRole("maintenance", "admin"), (req, res) => {
-  const item = getEquipmentById(req.params.id)
+router.post("/:id/mark-serviced", requireRole("maintenance", "admin"), async (req, res) => {
+  const item = await prisma.equipmentUnit.findFirst({
+    where: { id: req.params.id, isActive: true },
+    include: equipmentInclude,
+  })
 
   if (!item) {
     res.status(404).json({ message: "Equipment not found" })
@@ -199,38 +489,93 @@ router.post("/:id/mark-serviced", requireRole("maintenance", "admin"), (req, res
     return
   }
 
-  const today = new Date().toISOString().slice(0, 10)
+  const performer = await ensureUserExists(performedByUserId)
+  if (!performer) {
+    res.status(400).json({ message: "performedByUserId is required" })
+    return
+  }
 
-  item.lastServiceDate = today
-  if (nextServiceDueDate) item.nextServiceDueDate = nextServiceDueDate
-  item.status = "available"
+  const now = new Date()
 
-  serviceLogs.unshift({
-    id: newId(),
-    equipmentId: item.id,
-    date: today,
-    note: "Marked serviced",
-    performedByUserId,
+  const updated = await prisma.$transaction(async (tx) => {
+    const unit = await tx.equipmentUnit.update({
+      where: { id: item.id },
+      data: {
+        lastMaintenanceAt: now,
+        nextMaintenanceDue: nextServiceDueDate ? new Date(nextServiceDueDate) : item.nextMaintenanceDue,
+        status: "AVAILABLE",
+      },
+      include: equipmentInclude,
+    })
+
+    await tx.maintenanceRecord.create({
+      data: {
+        equipmentUnitId: item.id,
+        technicianId: performer.id,
+        status: "COMPLETED",
+        trigger: "ROUTINE",
+        title: "Service completed",
+        description: "Marked serviced",
+        completedAt: now,
+        nextDueAt: nextServiceDueDate ? new Date(nextServiceDueDate) : null,
+      },
+    })
+
+    await tx.auditLog.create({
+      data: {
+        action: "MAINTENANCE_COMPLETED",
+        actorId: performer.id,
+        equipmentUnitId: item.id,
+        message: "Service completed",
+      },
+    })
+
+    return unit
   })
 
-  addActivity(item.id, "service", performedByUserId, "Service completed")
-
-  res.json(item)
+  res.json(toApiEquipment(updated))
 })
 
-router.get("/:id/service-logs", (req, res) => {
-  const item = getEquipmentById(req.params.id)
+router.get("/:id/service-logs", async (req, res) => {
+  const item = await prisma.equipmentUnit.findFirst({
+    where: { id: req.params.id, isActive: true },
+    select: { id: true },
+  })
 
   if (!item) {
     res.status(404).json({ message: "Equipment not found" })
     return
   }
 
-  res.json(serviceLogs.filter((l) => l.equipmentId === item.id))
+  const logs = await prisma.maintenanceRecord.findMany({
+    where: { equipmentUnitId: item.id },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      equipmentUnitId: true,
+      completedAt: true,
+      createdAt: true,
+      description: true,
+      technicianId: true,
+    },
+  })
+
+  const data: ServiceLogEntry[] = logs.map((entry) => ({
+    id: entry.id,
+    equipmentId: entry.equipmentUnitId,
+    date: toIsoDate(entry.completedAt ?? entry.createdAt) ?? "",
+    note: entry.description ?? "Maintenance entry",
+    performedByUserId: entry.technicianId ?? "",
+  }))
+
+  res.json(data)
 })
 
-router.post("/:id/service-logs", requireRole("maintenance", "admin"), (req, res) => {
-  const item = getEquipmentById(req.params.id)
+router.post("/:id/service-logs", requireRole("maintenance", "admin"), async (req, res) => {
+  const item = await prisma.equipmentUnit.findFirst({
+    where: { id: req.params.id, isActive: true },
+    select: { id: true },
+  })
 
   if (!item) {
     res.status(404).json({ message: "Equipment not found" })
@@ -246,42 +591,60 @@ router.post("/:id/service-logs", requireRole("maintenance", "admin"), (req, res)
     return
   }
 
-  const entry = {
-    id: newId(),
-    equipmentId: item.id,
-    date,
-    note,
-    performedByUserId,
+  const performer = await ensureUserExists(performedByUserId)
+  if (!performer) {
+    res.status(400).json({ message: "performedByUserId is required" })
+    return
   }
 
-  serviceLogs.unshift(entry)
+  const completedAt = new Date(date)
 
-  res.status(201).json(entry)
-})
+  const entry = await prisma.$transaction(async (tx) => {
+    const record = await tx.maintenanceRecord.create({
+      data: {
+        equipmentUnitId: item.id,
+        technicianId: performer.id,
+        status: "COMPLETED",
+        trigger: "ROUTINE",
+        title: "Service log",
+        description: note,
+        completedAt,
+      },
+      select: {
+        id: true,
+        equipmentUnitId: true,
+        completedAt: true,
+        description: true,
+        technicianId: true,
+      },
+    })
 
-router.get("/alerts/maintenance", (req, res) => {
-  const today = new Date()
+    await tx.auditLog.create({
+      data: {
+        action: "MAINTENANCE_COMPLETED",
+        actorId: performer.id,
+        equipmentUnitId: item.id,
+        message: note,
+      },
+    })
 
-  const alerts = equipment.filter((e) => {
-    if (!e.nextServiceDueDate) return false
-
-    const serviceDate = new Date(e.nextServiceDueDate)
-
-    const diffDays =
-      (serviceDate.getTime() - today.getTime()) /
-      (1000 * 60 * 60 * 24)
-
-    return diffDays <= 7
+    return record
   })
 
-  res.json({
-    count: alerts.length,
-    equipment: alerts,
+  res.status(201).json({
+    id: entry.id,
+    equipmentId: entry.equipmentUnitId,
+    date: toIsoDate(entry.completedAt) ?? date,
+    note: entry.description ?? note,
+    performedByUserId: entry.technicianId ?? performedByUserId,
   })
 })
 
-router.get("/:id/activity", (req, res) => {
-  const item = getEquipmentById(req.params.id)
+router.get("/:id/activity", async (req, res) => {
+  const item = await prisma.equipmentUnit.findFirst({
+    where: { id: req.params.id, isActive: true },
+    select: { id: true },
+  })
 
   if (!item) {
     res.status(404).json({ message: "Equipment not found" })
@@ -290,11 +653,30 @@ router.get("/:id/activity", (req, res) => {
 
   const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : 10
 
-  const list = activityEvents
-    .filter((a) => a.equipmentId === item.id)
-    .slice(0, Number.isFinite(limit) ? limit : 10)
+  const logs = await prisma.auditLog.findMany({
+    where: { equipmentUnitId: item.id },
+    orderBy: { createdAt: "desc" },
+    take: Number.isFinite(limit) ? limit : 10,
+    select: {
+      id: true,
+      equipmentUnitId: true,
+      action: true,
+      createdAt: true,
+      actorId: true,
+      message: true,
+    },
+  })
 
-  res.json(list)
+  res.json(
+    logs.map((a) => ({
+      id: a.id,
+      equipmentId: a.equipmentUnitId ?? item.id,
+      type: mapAuditActionToActivityType(a.action),
+      timestamp: a.createdAt.toISOString(),
+      actorUserId: a.actorId ?? "",
+      summary: a.message,
+    })),
+  )
 })
 
 export default router

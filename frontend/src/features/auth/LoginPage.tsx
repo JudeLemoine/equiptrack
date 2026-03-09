@@ -36,7 +36,7 @@ export default function LoginPage() {
 
   return (
     <main className="relative grid min-h-screen grid-rows-[1fr_auto_1fr] overflow-hidden bg-slate-950 px-4 py-10">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.25),_transparent_50%),radial-gradient(circle_at_80%_80%,_rgba(148,163,184,0.2),_transparent_45%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.25),transparent_50%),radial-gradient(circle_at_80%_80%,rgba(148,163,184,0.2),transparent_45%)]" />
       <div className="pointer-events-none z-10 row-start-1 flex items-center justify-center">
         <img
           alt="EquipTrack logo"
@@ -44,7 +44,7 @@ export default function LoginPage() {
           src={fullLogoStroke}
         />
       </div>
-      <div className="relative z-20 row-start-2 flex min-h-[14rem] justify-self-center rounded-xl border border-slate-700 bg-slate-900/90 p-5 text-slate-100 shadow-2xl sm:p-6">
+      <div className="relative z-20 row-start-2 flex min-h-56 justify-self-center rounded-xl border border-slate-700 bg-slate-900/90 p-5 text-slate-100 shadow-2xl sm:p-6">
         <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4 items-center">
           <Button
             className="h-24 flex-col gap-2"

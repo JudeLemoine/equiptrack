@@ -3,13 +3,14 @@ import { Building2, HardHat, Wrench } from 'lucide-react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Button } from '../../components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
+import fullLogoStroke from '../../assets/logos/full_logo_stroke.png'
 import { isAuthenticated, setSession } from '../../lib/auth'
 import { loginAsRole } from '../../services/authService'
 import type { UserRole } from '../../types/auth'
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const authenticated = isAuthenticated()
 
   const loginMutation = useMutation({
     mutationFn: (role: UserRole) => loginAsRole(role),
@@ -29,32 +30,34 @@ export default function LoginPage() {
     },
   })
 
-  if (isAuthenticated()) {
+  if (authenticated) {
     return <Navigate replace to="/" />
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-950 px-4 py-10">
+    <main className="relative grid min-h-screen grid-rows-[1fr_auto_1fr] overflow-hidden bg-slate-950 px-4 py-10">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.25),_transparent_50%),radial-gradient(circle_at_80%_80%,_rgba(148,163,184,0.2),_transparent_45%)]" />
-      <Card className="relative z-10 w-full max-w-xl border-slate-700 bg-slate-900/90 text-slate-100 shadow-2xl">
-        <CardHeader>
-          <CardTitle className="text-3xl text-white">EquipTrack</CardTitle>
-          <CardDescription className="text-slate-300">
-            Choose a role to enter the portal. This login is mock-auth backed by MSW.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-3">
+      <div className="pointer-events-none z-10 row-start-1 flex items-center justify-center">
+        <img
+          alt="EquipTrack logo"
+          className="h-auto select-none w-50 md:w-70"
+          src={fullLogoStroke}
+        />
+      </div>
+      <div className="relative z-20 row-start-2 flex min-h-[14rem] justify-self-center rounded-xl border border-slate-700 bg-slate-900/90 p-5 text-slate-100 shadow-2xl sm:p-6">
+        <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4 items-center">
           <Button
             className="h-24 flex-col gap-2"
             disabled={loginMutation.isPending}
             onClick={() => loginMutation.mutate('admin')}
             size="lg"
+            variant="secondary"
           >
             <Building2 className="h-5 w-5" />
             Login as Admin
           </Button>
           <Button
-            className="h-24 flex-col gap-2"
+            className="h-24 w-full flex-col gap-2"
             disabled={loginMutation.isPending}
             onClick={() => loginMutation.mutate('field')}
             size="lg"
@@ -64,17 +67,17 @@ export default function LoginPage() {
             Login as Field User
           </Button>
           <Button
-            className="h-24 flex-col gap-2"
+            className="h-24 w-full flex-col gap-2"
             disabled={loginMutation.isPending}
             onClick={() => loginMutation.mutate('maintenance')}
             size="lg"
-            variant="outline"
+            variant="secondary"
           >
             <Wrench className="h-5 w-5" />
             Login as Maintenance
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </main>
   )
 }

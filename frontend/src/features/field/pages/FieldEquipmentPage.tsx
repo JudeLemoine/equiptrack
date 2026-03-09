@@ -104,7 +104,7 @@ export default function FieldEquipmentPage() {
                 <StatusBadge status={item.status} />
               </CardContent>
               <CardFooter>
-                <Button asChild size="sm" variant="outline">
+                <Button asChild size="sm" variant="secondary">
                   <Link to={`/field/equipment/${item.id}`}>View</Link>
                 </Button>
               </CardFooter>

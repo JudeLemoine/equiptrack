@@ -134,7 +134,7 @@ export default function AdminEquipmentPage() {
         cell: ({ row }) => (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="icon" variant="ghost">
+              <Button size="icon" variant="secondary">
                 <MoreHorizontal className="h-4 w-4" />
                 <span className="sr-only">Open actions</span>
               </Button>
@@ -258,13 +258,13 @@ export default function AdminEquipmentPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel asChild>
-              <Button variant="outline">Cancel</Button>
+              <Button variant="secondary">Cancel</Button>
             </AlertDialogCancel>
             <AlertDialogAction asChild>
               <Button
                 disabled={deleteMutation.isPending}
                 onClick={() => deleteItem && deleteMutation.mutate(deleteItem.id)}
-                variant="destructive"
+                variant="default"
               >
                 {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
               </Button>

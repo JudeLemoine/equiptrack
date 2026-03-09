@@ -130,7 +130,7 @@ export default function AppLayout() {
             className="md:hidden"
             onClick={() => setSidebarOpen(true)}
             size="icon"
-            variant="outline"
+            variant="secondary"
           >
             <Menu className="h-4 w-4" />
             <span className="sr-only">Open sidebar</span>

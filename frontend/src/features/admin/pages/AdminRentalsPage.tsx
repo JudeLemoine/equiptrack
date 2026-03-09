@@ -108,7 +108,7 @@ export default function AdminRentalsPage() {
           const rental = row.original
           return (
             <div className="flex flex-wrap gap-2">
-              <Button onClick={() => setSelectedRentalId(rental.id)} size="sm" variant="outline">
+              <Button onClick={() => setSelectedRentalId(rental.id)} size="sm" variant="secondary">
                 View
               </Button>
               {rental.status === 'pending' ? (
@@ -136,7 +136,7 @@ export default function AdminRentalsPage() {
                       })
                     }
                     size="sm"
-                    variant="destructive"
+                    variant="default"
                   >
                     Reject
                   </Button>
@@ -249,7 +249,7 @@ export default function AdminRentalsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel asChild>
-              <Button variant="outline">Cancel</Button>
+              <Button variant="secondary">Cancel</Button>
             </AlertDialogCancel>
             <AlertDialogAction asChild>
               <Button

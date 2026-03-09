@@ -215,7 +215,7 @@ export default function EquipmentProfilePage() {
       <PageHeader
         actions={
           <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline">
+            <Button asChild variant="secondary">
               <Link to={backPath}>Back</Link>
             </Button>
 
@@ -227,11 +227,11 @@ export default function EquipmentProfilePage() {
                     setStatusValue(equipment.status)
                     setStatusOpen(true)
                   }}
-                  variant="outline"
+                  variant="secondary"
                 >
                   Change status
                 </Button>
-                <Button onClick={() => setDeleteConfirmOpen(true)} variant="destructive">Delete</Button>
+                <Button onClick={() => setDeleteConfirmOpen(true)} variant="default">Delete</Button>
               </>
             ) : null}
 
@@ -473,10 +473,10 @@ export default function EquipmentProfilePage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel asChild>
-              <Button variant="outline">Cancel</Button>
+              <Button variant="secondary">Cancel</Button>
             </AlertDialogCancel>
             <AlertDialogAction asChild>
-              <Button disabled={deleteMutation.isPending} onClick={() => deleteMutation.mutate()} variant="destructive">
+              <Button disabled={deleteMutation.isPending} onClick={() => deleteMutation.mutate()} variant="default">
                 {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
               </Button>
             </AlertDialogAction>

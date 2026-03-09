@@ -73,7 +73,7 @@ export default function DataTable<TData>({
                           className="h-auto px-0 text-slate-600 hover:text-slate-900"
                           onClick={header.column.getToggleSortingHandler()}
                           type="button"
-                          variant="ghost"
+                          variant="secondary"
                         >
                           {flexRender(header.column.columnDef.header, header.getContext())}
                           {header.column.getIsSorted() === 'asc' ? (

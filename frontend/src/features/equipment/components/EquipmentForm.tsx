@@ -137,7 +137,7 @@ export default function EquipmentForm({
 
       <div className="flex items-center justify-end gap-2">
         {onCancel ? (
-          <Button onClick={onCancel} type="button" variant="outline">
+          <Button onClick={onCancel} type="button" variant="secondary">
             Cancel
           </Button>
         ) : null}

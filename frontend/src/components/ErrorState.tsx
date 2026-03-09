@@ -38,7 +38,7 @@ export default function ErrorState({
           <h2 className="text-sm font-semibold uppercase tracking-wide">{title}</h2>
           <p className="mt-2 text-sm">{getMessage(error)}</p>
           {onRetry ? (
-            <Button className="mt-4" onClick={onRetry} size="sm" variant="destructive">
+            <Button className="mt-4" onClick={onRetry} size="sm" variant="default">
               Retry
             </Button>
           ) : null}

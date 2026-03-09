@@ -81,7 +81,7 @@ export default function MaintenanceEquipmentPage() {
         enableSorting: false,
         cell: ({ row }) => (
           <div className="flex gap-2">
-            <Button asChild size="sm" variant="outline">
+            <Button asChild size="sm" variant="secondary">
               <Link to={`/maintenance/equipment/${row.original.id}`}>View</Link>
             </Button>
             <Button onClick={() => setSelectedItem(row.original)} size="sm">

@@ -87,7 +87,7 @@ export default function FieldDashboardPage() {
             <CardDescription>Based on current availability</CardDescription>
           </div>
           <div className="flex gap-2">
-            <Button asChild variant="outline">
+            <Button asChild variant="secondary">
               <Link to="/field/equipment">Browse equipment</Link>
             </Button>
             <Button asChild>

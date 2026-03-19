@@ -13,6 +13,7 @@ const router = Router()
 type ApiRental = {
   id: string
   equipmentId: string
+  equipmentTypeId: string
   equipmentName: string
   requestedBy: string
   requestedByName: string
@@ -41,6 +42,7 @@ function toApiRental(rental: Prisma.RentalGetPayload<{ include: typeof rentalInc
   return {
     id: rental.id,
     equipmentId: rental.equipmentUnitId ?? "",
+    equipmentTypeId: rental.equipmentTypeId,
     equipmentName: rental.equipmentUnit?.equipmentType.name ?? "Equipment",
     requestedBy: rental.requesterId,
     requestedByName: rental.requester.name,
@@ -57,7 +59,11 @@ function statusFilterToWhere(status?: ApiRentalStatus): Prisma.RentalWhereInput 
   if (!status) return {}
 
   if (status === "pending") {
-    return { status: { in: [RentalStatus.PENDING, RentalStatus.APPROVED, RentalStatus.RESERVED] } }
+    return { status: RentalStatus.PENDING }
+  }
+
+  if (status === "approved") {
+    return { status: { in: [RentalStatus.APPROVED, RentalStatus.RESERVED] } }
   }
 
   if (status === "active") {

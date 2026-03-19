@@ -370,6 +370,114 @@ router.patch("/:id/status", requireRole("admin", "maintenance"), async (req, res
   res.json(toApiEquipment(updated))
 })
 
+// New endpoint: Report Issue
+router.post("/:id/report-issue", requireRole("maintenance", "admin"), async (req, res) => {
+  const item = await prisma.equipmentUnit.findFirst({
+    where: { id: req.params.id, isActive: true },
+    include: equipmentInclude,
+  })
+
+  if (!item) {
+    res.status(404).json({ message: "Equipment not found" })
+    return
+  }
+
+  const { severity, description, actorUserId } = req.body as {
+    severity: string;
+    description: string;
+    actorUserId: string;
+  }
+
+  if (!severity || !description || !actorUserId) {
+    res.status(400).json({ message: "severity, description, and actorUserId are required" })
+    return
+  }
+
+  const actor = await ensureUserExists(actorUserId)
+  if (!actor) {
+    res.status(400).json({ message: "Invalid actorUserId" })
+    return
+  }
+
+  // Create IssueReport
+  const issue = await prisma.issueReport.create({
+    data: {
+      equipmentUnitId: item.id,
+      reportedById: actor.id,
+      title: `Issue reported: ${severity}`,
+      description,
+      severity: severity as any, // assumes enum mapping
+    },
+  })
+
+  // If high severity, set equipment status to OUT_OF_SERVICE
+  let updatedUnit = item
+  if (severity.toUpperCase() === "HIGH" || severity.toUpperCase() === "CRITICAL") {
+    updatedUnit = await prisma.equipmentUnit.update({
+      where: { id: item.id },
+      data: { status: "OUT_OF_SERVICE" },
+      include: equipmentInclude,
+    })
+    await prisma.auditLog.create({
+      data: {
+        action: "STATUS_CHANGED",
+        actorId: actor.id,
+        equipmentUnitId: item.id,
+        message: "Status changed to OUT_OF_SERVICE due to high severity issue",
+      },
+    })
+  }
+
+  // Log the issue creation in audit log
+  await prisma.auditLog.create({
+    data: {
+      action: "ISSUE_REPORTED",
+      actorId: actor.id,
+      equipmentUnitId: item.id,
+      issueReportId: issue.id,
+      message: `Issue reported with severity ${severity}`,
+    },
+  })
+
+  res.status(201).json({ issue, equipment: toApiEquipment(updatedUnit) })
+})
+
+// Notes endpoints
+router.get("/:id/notes", async (req, res) => {
+  const notes = await prisma.note.findMany({
+    where: { equipmentUnitId: req.params.id },
+    include: { author: true },
+    orderBy: { createdAt: "desc" },
+  })
+  res.json(notes.map(n => ({ id: n.id, author: n.author.name, body: n.body, createdAt: n.createdAt })))
+})
+
+router.post("/:id/notes", requireRole("maintenance", "admin"), async (req, res) => {
+  const { authorId, body } = req.body as { authorId: string; body: string }
+  if (!authorId || !body) {
+    res.status(400).json({ message: "authorId and body are required" })
+    return
+  }
+  const note = await prisma.note.create({
+    data: {
+      authorId,
+      body,
+      targetType: "EQUIPMENT_UNIT",
+      equipmentUnitId: req.params.id,
+    },
+  })
+  await prisma.auditLog.create({
+    data: {
+      action: "NOTE_ADDED",
+      actorId: authorId,
+      equipmentUnitId: req.params.id,
+      noteId: note.id,
+      message: "Note added",
+    },
+  })
+  res.status(201).json(note)
+})
+
 router.post("/:id/checkout", async (req, res) => {
   const item = await prisma.equipmentUnit.findFirst({
     where: { id: req.params.id, isActive: true },

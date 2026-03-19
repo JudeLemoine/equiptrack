@@ -1,10 +1,9 @@
-generator client {
-  provider = "prisma-client-js"
-}
-
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
 }
 
 enum UserRole {
@@ -21,6 +20,7 @@ enum EquipmentStatus {
   DUE_SOON_MAINTENANCE
   IN_MAINTENANCE
   OUT_OF_SERVICE
+  MAINTENANCE
 }
 
 enum RentalStatus {
@@ -90,11 +90,15 @@ enum AuditAction {
 
 model User {
   id         String   @id @default(cuid())
-  name       String
-  email      String   @unique
-  role       UserRole
-  department String?
-  createdAt  DateTime @default(now())
+  name         String
+  email        String   @unique
+  role         UserRole
+  department   String?
+  phoneNumber  String?
+  position     String?
+  avatarUrl    String?
+  isAvatarIcon Boolean  @default(false)
+  createdAt    DateTime @default(now())
 
   submittedRentals  Rental[] @relation("RentalRequester")
   approvedRentals   Rental[] @relation("RentalApprover")
@@ -267,6 +271,7 @@ model Note {
   rental            Rental?            @relation(fields: [rentalId], references: [id], onDelete: Cascade)
   maintenanceRecord MaintenanceRecord? @relation(fields: [maintenanceRecordId], references: [id], onDelete: Cascade)
   issueReport       IssueReport?       @relation(fields: [issueReportId], references: [id], onDelete: Cascade)
+  auditLogs         AuditLog[]
 }
 
 model AuditLog {
@@ -277,6 +282,7 @@ model AuditLog {
   rentalId            String?
   maintenanceRecordId String?
   issueReportId       String?
+  noteId              String?
   message             String
   createdAt           DateTime    @default(now())
 
@@ -285,4 +291,5 @@ model AuditLog {
   rental            Rental?            @relation(fields: [rentalId], references: [id], onDelete: Cascade)
   maintenanceRecord MaintenanceRecord? @relation(fields: [maintenanceRecordId], references: [id], onDelete: Cascade)
   issueReport       IssueReport?       @relation(fields: [issueReportId], references: [id], onDelete: Cascade)
+  note              Note?              @relation(fields: [noteId], references: [id], onDelete: SetNull)
 }

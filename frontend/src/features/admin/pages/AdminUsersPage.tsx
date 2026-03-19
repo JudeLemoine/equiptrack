@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { ColumnDef } from '@tanstack/react-table'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
 import DataTable from '../../../components/DataTable'
 import ErrorState from '../../../components/ErrorState'
 import Loader from '../../../components/Loader'
@@ -10,7 +11,8 @@ import PageHeader from '../../../components/PageHeader'
 import { Button } from '../../../components/ui/button'
 import { Label } from '../../../components/ui/label'
 import { Select } from '../../../components/ui/select'
-import { listUsers } from '../../../services/userService'
+import { listUsers, deleteUser } from '../../../services/userService'
+import { getSession } from '../../../lib/auth'
 import type { UserRole } from '../../../types/auth'
 import type { User } from '../../../types/user'
 
@@ -29,6 +31,10 @@ const roleLabelMap: Record<UserRole, string> = {
 
 export default function AdminUsersPage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const session = getSession()
+  const currentUserRole = session?.user?.role
+
   const [search, setSearch] = useState('')
   const [role, setRole] = useState<UserRole | 'all'>('all')
 
@@ -36,6 +42,17 @@ export default function AdminUsersPage() {
     queryKey: ['users', { role }],
     queryFn: () => listUsers({ role }),
     placeholderData: keepPreviousData,
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteUser,
+    onSuccess: () => {
+      toast.success('User deleted successfully')
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+    },
+    onError: (error) => {
+      toast.error('Failed to delete user: ' + (error as Error).message)
+    }
   })
 
   const columns = useMemo<ColumnDef<User>[]>(
@@ -54,8 +71,35 @@ export default function AdminUsersPage() {
         header: 'Role',
         cell: ({ row }) => roleLabelMap[row.original.role],
       },
+      {
+        id: 'actions',
+        header: 'Actions',
+        cell: ({ row }) => {
+          const user = row.original
+          
+          if (currentUserRole === 'admin' && user.role === 'admin') {
+            return null
+          }
+
+          return (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => {
+                if (window.confirm('Are you sure you want to delete this user?')) {
+                  deleteMutation.mutate(user.id)
+                }
+              }}
+              disabled={deleteMutation.isPending}
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete
+            </Button>
+          )
+        }
+      }
     ],
-    [],
+    [currentUserRole, deleteMutation],
   )
 
   if (usersQuery.isLoading) {

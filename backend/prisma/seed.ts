@@ -14,7 +14,6 @@ const categories = [
   { name: "Oilfield", code: "OILFIELD" },
   { name: "Power", code: "POWER" },
   { name: "Plant", code: "PLANT" },
-  { name: "Marine", code: "MARINE" },
   { name: "Rail", code: "RAIL" },
   { name: "Tunneling", code: "TUNNEL" },
   { name: "Safety", code: "SAFETY" },
@@ -158,12 +157,6 @@ const equipmentCatalog = [
   ["Pipe Rack System", "OILFIELD"],
   ["Top Drive Drilling System", "OILFIELD"],
   ["BOP Handling System", "OILFIELD"],
-  ["Offshore Crane", "MARINE"],
-  ["Deck Crane", "MARINE"],
-  ["Subsea ROV System", "MARINE"],
-  ["Subsea Intervention Unit", "MARINE"],
-  ["Heavy Lift Vessel Crane", "MARINE"],
-  ["Pipe Lay Barge Crane", "MARINE"],
   ["Wind Turbine Installation Crane", "POWER"],
   ["Wind Turbine Blade Transporter", "POWER"],
   ["Wind Turbine Tower Transporter", "POWER"],
@@ -186,15 +179,6 @@ const equipmentCatalog = [
   ["Shaft Sinking Rig", "TUNNEL"],
   ["Raise Boring Machine", "TUNNEL"],
   ["Slurry Shield TBM", "TUNNEL"],
-  ["Cutter Suction Dredge", "MARINE"],
-  ["Trailing Suction Hopper Dredge", "MARINE"],
-  ["Amphibious Excavator", "MARINE"],
-  ["Floating Crane", "MARINE"],
-  ["Pile Driving Barge", "MARINE"],
-  ["Offshore Jack-Up Rig", "MARINE"],
-  ["Drillship", "MARINE"],
-  ["Semi-Submersible Drilling Rig", "MARINE"],
-  ["Floating Production Unit", "MARINE"],
   ["LNG Pump Skid", "PLANT"],
   ["Cryogenic Storage Tank", "PLANT"],
   ["Industrial Cooling Tower", "PLANT"],
@@ -362,35 +346,70 @@ async function main() {
 
   const users = [];
 
-  for (let i = 1; i <= 6; i++) {
+  const adminProfiles = [
+    { name: "Robert MacMillan", position: "Operations Director" },
+    { name: "Sarah Jenkins", position: "Fleet Manager" },
+    { name: "David Chen", position: "Site Superintendent" },
+    { name: "Amanda Torres", position: "Logistics Coordinator" },
+    { name: "Michael O'Connor", position: "HSE Manager" },
+    { name: "Lisa Wong", position: "Equipment Dispatcher" }
+  ];
+
+  for (let i = 0; i < adminProfiles.length; i++) {
     users.push(await prisma.user.create({
       data: {
-        name: `Admin ${i}`,
-        email: `admin${i}@equiptrack.local`,
+        name: adminProfiles[i].name,
+        email: `admin${i + 1}@equiptrack.local`,
         role: UserRole.ADMIN,
         department: "Administration",
+        phoneNumber: `555-010${i}`,
+        position: adminProfiles[i].position,
+        isAvatarIcon: true,
+        avatarUrl: randomItem(["hardhat", "wrench", "truck", "clipboard", "gear"]),
       },
     }));
   }
 
-  for (let i = 1; i <= 18; i++) {
+  const fieldWorkerNames = [
+    "James Smith", "Maria Garcia", "John Johnson", "Robert Williams",
+    "Michael Brown", "William Jones", "David Miller", "Richard Davis",
+    "Joseph Garcia", "Thomas Rodriguez", "Charles Wilson", "Christopher Martinez",
+    "Daniel Anderson", "Matthew Taylor", "Anthony Thomas", "Mark Hernandez",
+    "Donald Moore", "Steven Martin"
+  ];
+
+  for (let i = 0; i < fieldWorkerNames.length; i++) {
     users.push(await prisma.user.create({
       data: {
-        name: `Field Worker ${i}`,
-        email: `field${i}@equiptrack.local`,
+        name: fieldWorkerNames[i],
+        email: `field${i + 1}@equiptrack.local`,
         role: UserRole.FIELD_WORKER,
         department: randomItem(departments),
+        phoneNumber: `555-020${String(i).padStart(2, '0')}`,
+        position: randomItem(["Heavy Equipment Operator", "Site Supervisor", "Foreman", "Laborer", "Surveyor"]),
+        isAvatarIcon: true,
+        avatarUrl: randomItem(["hardhat", "truck", "clipboard"]),
       },
     }));
   }
 
-  for (let i = 1; i <= 12; i++) {
+  const maintenanceNames = [
+    "Paul Lee", "Kevin Perez", "Brian Thompson", "George White",
+    "Edward Harris", "Ronald Sanchez", "Timothy Clark", "Jason Ramirez",
+    "Jeffrey Lewis", "Ryan Robinson", "Jacob Walker", "Gary Young"
+  ];
+
+  for (let i = 0; i < maintenanceNames.length; i++) {
     users.push(await prisma.user.create({
       data: {
-        name: `Maintenance Tech ${i}`,
-        email: `maintenance${i}@equiptrack.local`,
+        name: maintenanceNames[i],
+        email: `maintenance${i + 1}@equiptrack.local`,
         role: UserRole.MAINTENANCE,
         department: "Maintenance",
+        phoneNumber: `555-030${String(i).padStart(2, '0')}`,
+        position: randomItem(["Heavy Duty Mechanic", "Welder", "Electrical Technician", "Service Truck Operator", "Shop Foreman"]),
+        isAvatarIcon: true,
+        avatarUrl: randomItem(["wrench", "gear", "hardhat"]),
       },
     }));
   }

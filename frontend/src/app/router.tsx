@@ -14,6 +14,7 @@ import FieldRentalsPage from '../features/field/pages/FieldRentalsPage'
 import MaintenanceDashboardPage from '../features/maintenance/pages/MaintenanceDashboardPage'
 import MaintenanceEquipmentPage from '../features/maintenance/pages/MaintenanceEquipmentPage'
 import MaintenanceEquipmentDetailPage from '../features/maintenance/pages/MaintenanceEquipmentDetailPage'
+import UserProfilePage from '../features/user/pages/UserProfilePage'
 import NotFoundPage from './NotFoundPage'
 import { getCurrentRole } from '../lib/auth'
 
@@ -43,6 +44,7 @@ export default function AppRouter() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route element={<RootRedirect />} index />
+          <Route element={<UserProfilePage />} path="/profile" />
 
           <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
             <Route element={<AdminDashboardPage />} path="/admin/dashboard" />

@@ -16,3 +16,22 @@ export function listUsers(params?: ListUsersParams): Promise<User[]> {
   const queryString = searchParams.toString()
   return apiClient.get<User[]>(`/api/users${queryString ? `?${queryString}` : ''}`)
 }
+
+export function getUser(id: string): Promise<User> {
+  return apiClient.get<User>(`/api/users/${id}`)
+}
+
+export type UpdateUserPayload = {
+  phoneNumber?: string | null
+  position?: string | null
+  avatarUrl?: string | null
+  isAvatarIcon?: boolean
+}
+
+export function updateUser(id: string, payload: UpdateUserPayload): Promise<User> {
+  return apiClient.put<User, UpdateUserPayload>(`/api/users/${id}`, payload)
+}
+
+export function deleteUser(id: string): Promise<void> {
+  return apiClient.delete<void>(`/api/users/${id}`)
+}

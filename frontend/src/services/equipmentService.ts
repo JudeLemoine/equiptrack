@@ -23,6 +23,7 @@ export type MarkServicedDTO = {
 export type ChangeEquipmentStatusDTO = {
   status: EquipmentStatus
   actorUserId: string
+  note?: string
 }
 
 export function listEquipment(params?: ListEquipmentParams): Promise<Equipment[]> {
@@ -77,4 +78,14 @@ export function markEquipmentServiced(id: string, dto: MarkServicedDTO): Promise
 
 export function listMaintenanceQueue(days = 14): Promise<Equipment[]> {
   return apiClient.get<Equipment[]>(`/api/maintenance/queue?days=${days}`)
+}
+
+export function reportIssue(
+  equipmentId: string,
+  data: { severity: string; title: string; description: string; reportedById: string },
+): Promise<{ issue: unknown; equipment: Equipment }> {
+  return apiClient.post<
+    { issue: unknown; equipment: Equipment },
+    { severity: string; title: string; description: string; reportedById: string }
+  >(`/api/equipment/${equipmentId}/report-issue`, data)
 }

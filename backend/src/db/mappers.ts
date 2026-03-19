@@ -7,7 +7,7 @@ import {
 
 export type ApiRole = "admin" | "field" | "maintenance"
 export type ApiEquipmentStatus = "available" | "in_use" | "maintenance"
-export type ApiRentalStatus = "pending" | "active" | "returned" | "rejected"
+export type ApiRentalStatus = "pending" | "approved" | "active" | "returned" | "rejected"
 
 export function mapApiRoleToPrisma(role: ApiRole): PrismaUserRole {
   switch (role) {
@@ -42,6 +42,7 @@ export function mapPrismaEquipmentStatusToApi(status: PrismaEquipmentStatus): Ap
     case PrismaEquipmentStatus.DUE_SOON_MAINTENANCE:
     case PrismaEquipmentStatus.IN_MAINTENANCE:
     case PrismaEquipmentStatus.OUT_OF_SERVICE:
+    case PrismaEquipmentStatus.MAINTENANCE:
       return "maintenance"
   }
 }
@@ -60,9 +61,10 @@ export function mapApiEquipmentStatusToPrisma(status: ApiEquipmentStatus): Prism
 export function mapPrismaRentalStatusToApi(status: PrismaRentalStatus): ApiRentalStatus {
   switch (status) {
     case PrismaRentalStatus.PENDING:
+      return "pending"
     case PrismaRentalStatus.APPROVED:
     case PrismaRentalStatus.RESERVED:
-      return "pending"
+      return "approved"
     case PrismaRentalStatus.CHECKED_OUT:
     case PrismaRentalStatus.OVERDUE:
       return "active"
@@ -78,6 +80,8 @@ export function mapApiRentalStatusToPrisma(status: ApiRentalStatus): PrismaRenta
   switch (status) {
     case "pending":
       return PrismaRentalStatus.PENDING
+    case "approved":
+      return PrismaRentalStatus.APPROVED
     case "active":
       return PrismaRentalStatus.CHECKED_OUT
     case "returned":

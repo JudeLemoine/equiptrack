@@ -50,6 +50,7 @@ type StatusInput =
 type ApiRental = {
   id: string
   equipmentId: string
+  equipmentTypeId: string
   equipmentName: string
   requestedBy: string
   requestedByName: string
@@ -121,6 +122,7 @@ function toApiRental(rental: RentalWithRelations): ApiRental {
   return {
     id: rental.id,
     equipmentId: rental.equipmentUnitId ?? "",
+    equipmentTypeId: rental.equipmentTypeId,
     equipmentName: rental.equipmentUnit?.equipmentType.name ?? rental.equipmentType.name,
     requestedBy: rental.requesterId,
     requestedByName: rental.requester.name,

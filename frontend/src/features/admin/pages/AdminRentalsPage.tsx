@@ -42,9 +42,12 @@ type RentalAction = {
 const tabMap: Array<{ label: string; value: RentalStatus | 'all' }> = [
   { label: 'All', value: 'all' },
   { label: 'Pending', value: 'pending' },
+  { label: 'Approved', value: 'approved' },
   { label: 'Active', value: 'active' },
   { label: 'Returned', value: 'returned' },
 ]
+
+import ApproveRentalDialog from '../components/ApproveRentalDialog'
 
 export default function AdminRentalsPage() {
   const queryClient = useQueryClient()
@@ -52,6 +55,7 @@ export default function AdminRentalsPage() {
   const [status, setStatus] = useState<RentalStatus | 'all'>('all')
   const [selectedRentalId, setSelectedRentalId] = useState<string | null>(null)
   const [action, setAction] = useState<RentalAction | null>(null)
+  const [approveDialog, setApproveDialog] = useState<{ id: string; typeId: string; start: string; end?: string } | null>(null)
 
   const rentalsQuery = useQuery({
     queryKey: ['rentals', { status }],
@@ -119,11 +123,11 @@ export default function AdminRentalsPage() {
                 <>
                   <Button
                     onClick={() =>
-                      setAction({
+                      setApproveDialog({
                         id: rental.id,
-                        nextStatus: 'active',
-                        title: 'Approve rental request?',
-                        description: 'Approving marks equipment as in use.',
+                        typeId: rental.equipmentTypeId,
+                        start: rental.startDate,
+                        end: rental.endDate,
                       })
                     }
                     size="sm"
@@ -146,6 +150,22 @@ export default function AdminRentalsPage() {
                     Reject
                   </Button>
                 </>
+              ) : null}
+              {rental.status === 'approved' ? (
+                <Button
+                  onClick={() =>
+                    setAction({
+                      id: rental.id,
+                      nextStatus: 'active',
+                      title: 'Check out rental?',
+                      description: 'This marks the equipment as checked out by the user.',
+                    })
+                  }
+                  size="sm"
+                  variant="success"
+                >
+                  Check out
+                </Button>
               ) : null}
               {rental.status === 'active' ? (
                 <Button
@@ -271,6 +291,17 @@ export default function AdminRentalsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {approveDialog ? (
+        <ApproveRentalDialog
+          endDate={approveDialog.end}
+          equipmentTypeId={approveDialog.typeId}
+          onClose={() => setApproveDialog(null)}
+          open={true}
+          rentalId={approveDialog.id}
+          startDate={approveDialog.start}
+        />
+      ) : null}
     </div>
   )
 }

@@ -1,13 +1,12 @@
 import { Prisma, RentalStatus } from "@prisma/client"
 import { Router } from "express"
+import { mapPrismaRentalStatusToApi, toIsoDate, type ApiRentalStatus } from "../db/mappers"
+import { prisma } from "../lib/db"
 import {
-  mapApiRentalStatusToPrisma,
-  mapPrismaRentalStatusToApi,
-  toIsoDate,
-  toIsoDateTime,
-  type ApiRentalStatus,
-} from "../db/mappers"
-import { prisma } from "../db/prisma"
+  createRentalRequest,
+  RentalLifecycleError,
+  transitionRentalStatus,
+} from "../services/rental-lifecycle.service"
 
 const router = Router()
 
@@ -126,149 +125,51 @@ router.post("/", async (req, res) => {
   const endDate = req.body?.endDate as string | undefined
   const notes = req.body?.notes as string | undefined
 
-  if (!equipmentId || !requestedBy || !startDate) {
-    res.status(400).json({ message: "equipmentId, requestedBy, startDate are required" })
-    return
-  }
-
-  const equipment = await prisma.equipmentUnit.findFirst({
-    where: { id: equipmentId, isActive: true },
-    include: {
-      equipmentType: true,
-    },
-  })
-
-  if (!equipment) {
-    res.status(404).json({ message: "Equipment not found" })
-    return
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { id: requestedBy },
-  })
-
-  if (!user) {
-    res.status(404).json({ message: "User not found" })
-    return
-  }
-
-  if (equipment.status === "IN_MAINTENANCE" || equipment.status === "OUT_OF_SERVICE") {
-    res.status(400).json({ message: "Equipment is under maintenance and cannot be rented" })
-    return
-  }
-
-  if (equipment.status === "CHECKED_OUT" || equipment.status === "RESERVED" || equipment.status === "OVERDUE") {
-    res.status(400).json({ message: "Equipment already in use" })
-    return
-  }
-
-  if (equipment.nextMaintenanceDue && equipment.nextMaintenanceDue <= new Date()) {
-    res.status(400).json({ message: "Equipment service overdue and must be maintained before rental" })
-    return
-  }
-
-  const requestedStart = new Date(startDate)
-  const requestedEnd = new Date(endDate ?? startDate)
-
-  const rental = await prisma.$transaction(async (tx) => {
-    const created = await tx.rental.create({
-      data: {
-        equipmentUnitId: equipment.id,
-        equipmentTypeId: equipment.equipmentTypeId,
-        requesterId: user.id,
-        locationId: equipment.locationId,
-        status: "PENDING",
-        reason: notes ?? "Rental requested",
-        requestedStart,
-        requestedEnd,
-      },
-      include: rentalInclude,
+  try {
+    const rental = await createRentalRequest({
+      equipmentId: equipmentId ?? "",
+      requestedByUserId: requestedBy ?? "",
+      startDate: startDate ?? "",
+      endDate,
+      notes,
     })
-
-    await tx.auditLog.create({
-      data: {
-        action: "REQUEST_SUBMITTED",
-        actorId: user.id,
-        rentalId: created.id,
-        equipmentUnitId: equipment.id,
-        message: "Pending",
-      },
-    })
-
-    return created
-  })
-
-  res.status(201).json(toApiRental(rental))
+    res.status(201).json(rental)
+  } catch (error) {
+    if (error instanceof RentalLifecycleError) {
+      res.status(error.statusCode).json({ message: error.message })
+      return
+    }
+    throw error
+  }
 })
 
 router.patch("/:id/status", async (req, res) => {
-  const rental = await prisma.rental.findUnique({ where: { id: req.params.id } })
+  const requestedStatus = req.body?.status as string | undefined
+  const actorUserId = (req.body?.actorUserId as string | undefined) ?? ((req as any).user?.id as string | undefined)
+  const assignedEquipmentId = req.body?.assignedEquipmentId as string | undefined
+  const rejectionReason = req.body?.rejectionReason as string | undefined
 
-  if (!rental) {
-    res.status(404).json({ message: "Rental not found" })
+  if (!requestedStatus || !actorUserId) {
+    res.status(400).json({ message: "status and actorUserId are required" })
     return
   }
 
-  const status = req.body?.status as Extract<ApiRentalStatus, "active" | "returned" | "rejected"> | undefined
-
-  if (!status) {
-    res.status(400).json({ message: "status is required" })
-    return
+  try {
+    const rental = await transitionRentalStatus({
+      rentalId: req.params.id,
+      requestedStatus: requestedStatus as Parameters<typeof transitionRentalStatus>[0]["requestedStatus"],
+      actorUserId,
+      assignedEquipmentId,
+      rejectionReason,
+    })
+    res.json(rental)
+  } catch (error) {
+    if (error instanceof RentalLifecycleError) {
+      res.status(error.statusCode).json({ message: error.message })
+      return
+    }
+    throw error
   }
-
-  const mappedStatus = mapApiRentalStatusToPrisma(status)
-
-  const updated = await prisma.$transaction(async (tx) => {
-    const nextData: Prisma.RentalUpdateInput = {
-      status: mappedStatus,
-    }
-
-    if (status === "active") {
-      nextData.checkedOutAt = new Date()
-    } else if (status === "returned") {
-      nextData.returnedAt = new Date()
-    } else {
-      nextData.rejectedReason = "Rejected"
-    }
-
-    const nextRental = await tx.rental.update({
-      where: { id: rental.id },
-      data: nextData,
-      include: rentalInclude,
-    })
-
-    if (rental.equipmentUnitId) {
-      if (status === "active") {
-        await tx.equipmentUnit.update({
-          where: { id: rental.equipmentUnitId },
-          data: { status: "CHECKED_OUT" },
-        })
-      }
-
-      if (status === "returned") {
-        await tx.equipmentUnit.update({
-          where: { id: rental.equipmentUnitId },
-          data: { status: "AVAILABLE" },
-        })
-      }
-    }
-
-    await tx.auditLog.create({
-      data: {
-        action: status === "active" ? "CHECKED_OUT" : status === "returned" ? "RETURNED" : "REQUEST_REJECTED",
-        rentalId: rental.id,
-        equipmentUnitId: rental.equipmentUnitId,
-        message: status === "active" ? "Active" : status === "returned" ? "Returned" : "Rejected",
-      },
-    })
-
-    return nextRental
-  })
-
-  res.json({
-    ...toApiRental(updated),
-    updatedAt: toIsoDateTime(updated.updatedAt) ?? new Date().toISOString(),
-  })
 })
 
 export default router

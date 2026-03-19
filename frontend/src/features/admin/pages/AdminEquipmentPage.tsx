@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ColumnDef } from '@tanstack/react-table'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { MoreHorizontal, Plus } from 'lucide-react'
+import { MoreHorizontal, Plus, ArrowLeft } from 'lucide-react'
 import DataTable from '../../../components/DataTable'
 import ErrorState from '../../../components/ErrorState'
 import Loader from '../../../components/Loader'
@@ -61,6 +61,7 @@ const filterOptions: Array<{ label: string; value: EquipmentStatus | 'all' }> = 
 
 export default function AdminEquipmentPage() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<EquipmentStatus | 'all'>('all')
   const [isCreateOpen, setCreateOpen] = useState(false)
@@ -70,6 +71,7 @@ export default function AdminEquipmentPage() {
   const equipmentQuery = useQuery({
     queryKey: ['equipment', { search, statusFilter }],
     queryFn: () => listEquipment({ search, status: statusFilter }),
+    placeholderData: keepPreviousData,
   })
 
   const createMutation = useMutation({
@@ -171,6 +173,10 @@ export default function AdminEquipmentPage() {
 
   return (
     <div className="space-y-6">
+      <Button className="mb-4" onClick={() => navigate('/admin/dashboard')} size="sm" variant="outline">
+        <ArrowLeft className="mr-2 h-4 w-4" />
+        Back to Dashboard
+      </Button>
       <PageHeader
         actions={
           <Button onClick={() => setCreateOpen(true)}>

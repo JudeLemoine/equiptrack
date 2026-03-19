@@ -35,8 +35,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="relative grid min-h-screen grid-rows-[1fr_auto_1fr] overflow-hidden bg-slate-950 px-4 py-10">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.25),transparent_50%),radial-gradient(circle_at_80%_80%,rgba(148,163,184,0.2),transparent_45%)]" />
+    <main className="relative grid min-h-screen grid-rows-[1fr_auto_1fr] overflow-hidden bg-[#1A4889] px-4 py-10">
       <div className="pointer-events-none z-10 row-start-1 flex items-center justify-center">
         <img
           alt="EquipTrack logo"

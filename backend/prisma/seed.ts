@@ -557,61 +557,7 @@ async function main() {
     }
   }
 
-  for (let i = 0; i < 320; i++) {
-    const unit = randomItem(allUnits);
-    const tech = Math.random() < 0.85 ? randomItem(maintenanceUsers) : null;
-    const createdAt = randomDateWithinPast(180);
-    const trigger = randomItem([
-      MaintenanceTrigger.ROUTINE,
-      MaintenanceTrigger.ISSUE_REPORTED,
-      MaintenanceTrigger.INSPECTION,
-      MaintenanceTrigger.BREAKDOWN,
-      MaintenanceTrigger.ADMIN_REQUEST,
-    ]);
-
-    let status = randomItem([
-      MaintenanceStatus.OPEN,
-      MaintenanceStatus.SCHEDULED,
-      MaintenanceStatus.IN_PROGRESS,
-      MaintenanceStatus.COMPLETED,
-    ]);
-
-    const startedAt =
-      status === MaintenanceStatus.IN_PROGRESS || status === MaintenanceStatus.COMPLETED
-        ? addDays(createdAt, randomInt(0, 5))
-        : null;
-
-    const completedAt =
-      status === MaintenanceStatus.COMPLETED && startedAt
-        ? addDays(startedAt, randomInt(1, 10))
-        : null;
-
-    const record = await prisma.maintenanceRecord.create({
-      data: {
-        equipmentUnitId: unit.id,
-        technicianId: tech?.id,
-        status,
-        trigger,
-        title: `${trigger.replace("_", " ")} maintenance`,
-        description: "Inspection, servicing, and corrective work as required.",
-        scheduledFor: addDays(createdAt, randomInt(1, 14)),
-        startedAt,
-        completedAt,
-        nextDueAt: completedAt ? addDays(completedAt, randomItem([30, 60, 90, 120])) : null,
-        createdAt,
-      },
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        action: status === MaintenanceStatus.COMPLETED ? AuditAction.MAINTENANCE_COMPLETED : AuditAction.MAINTENANCE_OPENED,
-        actorId: tech?.id ?? null,
-        maintenanceRecordId: record.id,
-        equipmentUnitId: unit.id,
-        message: `Maintenance record ${status.toLowerCase()} for equipment unit.`,
-      },
-    });
-  }
+  const createdIssues: { id: string }[] = [];
 
   for (let i = 0; i < 180; i++) {
     const unit = randomItem(allUnits);
@@ -643,6 +589,8 @@ async function main() {
       },
     });
 
+    createdIssues.push(issue);
+
     await prisma.auditLog.create({
       data: {
         action: AuditAction.ISSUE_REPORTED,
@@ -650,6 +598,68 @@ async function main() {
         issueReportId: issue.id,
         equipmentUnitId: unit.id,
         message: `Issue reported against ${unit.assetTag}.`,
+      },
+    });
+  }
+
+  for (let i = 0; i < 320; i++) {
+    const unit = randomItem(allUnits);
+    const tech = Math.random() < 0.85 ? randomItem(maintenanceUsers) : null;
+    const createdAt = randomDateWithinPast(180);
+    const trigger = randomItem([
+      MaintenanceTrigger.ROUTINE,
+      MaintenanceTrigger.ISSUE_REPORTED,
+      MaintenanceTrigger.INSPECTION,
+      MaintenanceTrigger.BREAKDOWN,
+      MaintenanceTrigger.ADMIN_REQUEST,
+    ]);
+
+    let issueReportId = null;
+    if (trigger === MaintenanceTrigger.ISSUE_REPORTED && createdIssues.length > 0) {
+      issueReportId = randomItem(createdIssues).id;
+    }
+
+    let status = randomItem([
+      MaintenanceStatus.OPEN,
+      MaintenanceStatus.SCHEDULED,
+      MaintenanceStatus.IN_PROGRESS,
+      MaintenanceStatus.COMPLETED,
+    ]);
+
+    const startedAt =
+      status === MaintenanceStatus.IN_PROGRESS || status === MaintenanceStatus.COMPLETED
+        ? addDays(createdAt, randomInt(0, 5))
+        : null;
+
+    const completedAt =
+      status === MaintenanceStatus.COMPLETED && startedAt
+        ? addDays(startedAt, randomInt(1, 10))
+        : null;
+
+    const record = await prisma.maintenanceRecord.create({
+      data: {
+        equipmentUnitId: unit.id,
+        technicianId: tech?.id,
+        status,
+        trigger,
+        issueReportId,
+        title: `${trigger.replace("_", " ")} maintenance`,
+        description: "Inspection, servicing, and corrective work as required.",
+        scheduledFor: addDays(createdAt, randomInt(1, 14)),
+        startedAt,
+        completedAt,
+        nextDueAt: completedAt ? addDays(completedAt, randomItem([30, 60, 90, 120])) : null,
+        createdAt,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: status === MaintenanceStatus.COMPLETED ? AuditAction.MAINTENANCE_COMPLETED : AuditAction.MAINTENANCE_OPENED,
+        actorId: tech?.id ?? null,
+        maintenanceRecordId: record.id,
+        equipmentUnitId: unit.id,
+        message: `Maintenance record ${status.toLowerCase()} for equipment unit.`,
       },
     });
   }

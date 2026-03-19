@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { Activity, CheckCircle2, Clock3, Package, Wrench } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Activity, CheckCircle2, Clock3, Package, Wrench, Users, ClipboardList } from 'lucide-react'
+import { Card as MuiCard, CardActionArea, Typography, Box } from '@mui/material'
 import ErrorState from '../../../components/ErrorState'
 import Loader from '../../../components/Loader'
 import PageHeader from '../../../components/PageHeader'
@@ -71,6 +73,42 @@ export default function AdminDashboardPage() {
         subtitle="Operational health of inventory and rental demand"
         title="Admin Dashboard"
       />
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 2, mb: 1 }}>
+        <MuiCard elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: 2 }}>
+          <CardActionArea component={Link} to="/admin/equipment" sx={{ p: 3, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 3 }}>
+            <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: '#f1f5f9', color: '#0f172a' }}>
+              <Package size={24} />
+            </Box>
+            <Box>
+              <Typography variant="subtitle1" fontWeight="600" color="#0f172a">Equipment</Typography>
+              <Typography variant="body2" color="text.secondary">Manage inventory</Typography>
+            </Box>
+          </CardActionArea>
+        </MuiCard>
+        <MuiCard elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: 2 }}>
+          <CardActionArea component={Link} to="/admin/rentals" sx={{ p: 3, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 3 }}>
+            <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: '#f1f5f9', color: '#0f172a' }}>
+              <ClipboardList size={24} />
+            </Box>
+            <Box>
+              <Typography variant="subtitle1" fontWeight="600" color="#0f172a">Rentals</Typography>
+              <Typography variant="body2" color="text.secondary">Review requests</Typography>
+            </Box>
+          </CardActionArea>
+        </MuiCard>
+        <MuiCard elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: 2 }}>
+          <CardActionArea component={Link} to="/admin/users" sx={{ p: 3, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 3 }}>
+            <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: '#f1f5f9', color: '#0f172a' }}>
+              <Users size={24} />
+            </Box>
+            <Box>
+              <Typography variant="subtitle1" fontWeight="600" color="#0f172a">Users</Typography>
+              <Typography variant="body2" color="text.secondary">Manage access</Typography>
+            </Box>
+          </CardActionArea>
+        </MuiCard>
+      </Box>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {cards.map((card) => (

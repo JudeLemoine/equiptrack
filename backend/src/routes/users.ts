@@ -1,7 +1,7 @@
 import { Router } from "express"
 import { Prisma, UserRole } from "@prisma/client"
 import { mapApiRoleToPrisma, mapPrismaRoleToApi, type ApiRole } from "../db/mappers"
-import { prisma } from "../db/prisma"
+import { prisma } from "../lib/db"
 
 const router = Router()
 

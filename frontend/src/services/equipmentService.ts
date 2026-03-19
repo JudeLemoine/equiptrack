@@ -10,6 +10,9 @@ export type ListEquipmentParams = {
   search?: string
   status?: EquipmentStatus | 'all'
   category?: string | 'all'
+  location?: string
+  startDate?: string
+  endDate?: string
 }
 
 export type MarkServicedDTO = {
@@ -28,6 +31,9 @@ export function listEquipment(params?: ListEquipmentParams): Promise<Equipment[]
   if (params?.search) searchParams.set('search', params.search)
   if (params?.status && params.status !== 'all') searchParams.set('status', params.status)
   if (params?.category && params.category !== 'all') searchParams.set('category', params.category)
+  if (params?.location) searchParams.set('location', params.location)
+  if (params?.startDate) searchParams.set('startDate', params.startDate)
+  if (params?.endDate) searchParams.set('endDate', params.endDate)
 
   const queryString = searchParams.toString()
   return apiClient.get<Equipment[]>(`/api/equipment${queryString ? `?${queryString}` : ''}`)

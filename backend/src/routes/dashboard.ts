@@ -1,6 +1,6 @@
 import { Router } from "express"
 import { EquipmentStatus, RentalStatus } from "@prisma/client"
-import { prisma } from "../db/prisma"
+import { prisma } from "../lib/db"
 
 const router = Router()
 

@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ColumnDef } from '@tanstack/react-table'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
+import { ArrowLeft } from 'lucide-react'
 import DataTable from '../../../components/DataTable'
 import ErrorState from '../../../components/ErrorState'
 import Loader from '../../../components/Loader'
@@ -25,6 +26,7 @@ import { getSession } from '../../../lib/auth'
 
 export default function MaintenanceEquipmentPage() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const session = getSession()
   const userId = session?.user.id ?? ''
   const [selectedItem, setSelectedItem] = useState<Equipment | null>(null)
@@ -33,6 +35,7 @@ export default function MaintenanceEquipmentPage() {
   const equipmentQuery = useQuery({
     queryKey: ['maintenance-queue'],
     queryFn: () => listMaintenanceQueue(14),
+    placeholderData: keepPreviousData,
   })
 
   const completeServiceMutation = useMutation({
@@ -110,6 +113,10 @@ export default function MaintenanceEquipmentPage() {
 
   return (
     <div className="space-y-6">
+      <Button className="mb-4" onClick={() => navigate('/maintenance/dashboard')} size="sm" variant="outline">
+        <ArrowLeft className="mr-2 h-4 w-4" />
+        Back to Dashboard
+      </Button>
       <PageHeader
         subtitle="Items due in the next 14 days or already overdue"
         title="Maintenance Queue"

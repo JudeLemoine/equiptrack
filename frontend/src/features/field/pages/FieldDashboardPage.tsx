@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { ClipboardList, Hammer, Package } from 'lucide-react'
+import { Card as MuiCard, CardActionArea, Typography, Box } from '@mui/material'
 import ErrorState from '../../../components/ErrorState'
 import Loader from '../../../components/Loader'
 import PageHeader from '../../../components/PageHeader'
@@ -56,6 +57,32 @@ export default function FieldDashboardPage() {
         subtitle="Monitor your requests and quickly access available equipment"
         title="Field Dashboard"
       />
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 1 }}>
+        <MuiCard elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: 2 }}>
+          <CardActionArea component={Link} to="/field/equipment" sx={{ p: 3, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 3 }}>
+            <Box sx={{ p: 2, borderRadius: 2, bgcolor: '#f1f5f9', color: '#0f172a' }}>
+              <Package size={28} />
+            </Box>
+            <Box>
+              <Typography variant="h6" fontWeight="600" color="#0f172a">Equipment Availability</Typography>
+              <Typography variant="body2" color="text.secondary">Browse and request ready equipment</Typography>
+            </Box>
+          </CardActionArea>
+        </MuiCard>
+
+        <MuiCard elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: 2 }}>
+          <CardActionArea component={Link} to="/field/rentals" sx={{ p: 3, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 3 }}>
+            <Box sx={{ p: 2, borderRadius: 2, bgcolor: '#f1f5f9', color: '#0f172a' }}>
+              <ClipboardList size={28} />
+            </Box>
+            <Box>
+              <Typography variant="h6" fontWeight="600" color="#0f172a">My Requests</Typography>
+              <Typography variant="body2" color="text.secondary">Track your active and pending rentals</Typography>
+            </Box>
+          </CardActionArea>
+        </MuiCard>
+      </Box>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>

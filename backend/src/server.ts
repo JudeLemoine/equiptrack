@@ -1,24 +1,26 @@
 import express from "express"
 import cors from "cors"
-import productRoutes from "./routes/products"
 import rentalRoutes from "./routes/rentals"
 import equipmentRoutes from "./routes/equipment"
 import authRoutes from "./routes/auth"
 import usersRoutes from "./routes/users"
 import dashboardRoutes from "./routes/dashboard"
 import maintenanceRoutes from "./routes/maintenance"
+import { attachUser } from "./middleware/attachUser"
+import availabilityRoutes from "./routes/availability"
 
 const app = express()
 
 app.use(cors())
 app.use(express.json())
+app.use(attachUser)
 
 app.use("/api/auth", authRoutes)
 app.use("/api/users", usersRoutes)
 app.use("/api/dashboard", dashboardRoutes)
 app.use("/api/maintenance", maintenanceRoutes)
+app.use("/api/availability", availabilityRoutes)
 
-app.use("/api/products", productRoutes)
 app.use("/api/equipment", equipmentRoutes)
 app.use("/api/rentals", rentalRoutes)
 

@@ -4,10 +4,11 @@ import {
   getSortedRowModel,
   useReactTable,
   type ColumnDef,
+  type Row,
   type SortingState,
 } from '@tanstack/react-table'
 import { useState } from 'react'
-import { ArrowDown, ArrowUp, ArrowUpDown, Search } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, Search, ChevronDown, ChevronUp } from 'lucide-react'
 import { Input } from './ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
 import { Button } from './ui/button'
@@ -21,6 +22,49 @@ type DataTableProps<TData> = {
   onSearchValueChange?: (value: string) => void
   emptyTitle: string
   emptyDescription?: string
+}
+
+function MobileAccordionRow<TData>({ row }: { row: Row<TData> }) {
+  const [expanded, setExpanded] = useState(false)
+  const firstCell = row.getVisibleCells()[0]
+  const otherCells = row.getVisibleCells().slice(1)
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+      <button
+        className="flex w-full items-center justify-between p-4 text-left font-medium text-slate-900"
+        onClick={() => setExpanded(!expanded)}
+        type="button"
+      >
+        <div>{flexRender(firstCell.column.columnDef.cell, firstCell.getContext())}</div>
+        {expanded ? (
+          <ChevronUp className="h-5 w-5 text-slate-500 shrink-0 ml-2" />
+        ) : (
+          <ChevronDown className="h-5 w-5 text-slate-500 shrink-0 ml-2" />
+        )}
+      </button>
+      {expanded ? (
+        <div className="space-y-3 border-t border-slate-100 p-4">
+          {otherCells.map((cell) => {
+            const header =
+              typeof cell.column.columnDef.header === 'string'
+                ? cell.column.columnDef.header
+                : cell.column.id
+            return (
+              <div className="flex flex-col gap-1" key={cell.id}>
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  {header}
+                </span>
+                <div className="text-sm text-slate-900">
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      ) : null}
+    </div>
+  )
 }
 
 export default function DataTable<TData>({
@@ -59,7 +103,7 @@ export default function DataTable<TData>({
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white md:block">
         <div className="w-full overflow-x-auto">
           <Table className="min-w-[720px]">
             <TableHeader>
@@ -115,6 +159,18 @@ export default function DataTable<TData>({
             </TableBody>
           </Table>
         </div>
+      </div>
+
+      <div className="space-y-3 md:hidden">
+        {hasRows ? (
+          table.getRowModel().rows.map((row) => (
+            <MobileAccordionRow key={row.id} row={row} />
+          ))
+        ) : (
+          <div className="rounded-xl border border-slate-200 bg-white py-10">
+            <EmptyState description={emptyDescription} title={emptyTitle} />
+          </div>
+        )}
       </div>
     </div>
   )

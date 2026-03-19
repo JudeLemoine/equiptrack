@@ -8,7 +8,7 @@ import {
   toIsoDate,
   type ApiEquipmentStatus,
 } from "../db/mappers"
-import { prisma } from "../db/prisma"
+import { prisma } from "../lib/db"
 import { requireRole } from "../middleware/requireRole"
 
 const router = Router()

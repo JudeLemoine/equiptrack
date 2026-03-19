@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { Wrench, CheckCircle2, Activity } from 'lucide-react'
+import { Card as MuiCard, CardActionArea, Typography, Box } from '@mui/material'
 import ErrorState from '../../../components/ErrorState'
 import Loader from '../../../components/Loader'
 import PageHeader from '../../../components/PageHeader'
@@ -53,6 +55,20 @@ export default function MaintenanceDashboardPage() {
         subtitle="Service workload and inventory health"
         title="Maintenance Dashboard"
       />
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr' }, gap: 2, mb: 1 }}>
+        <MuiCard elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: 2 }}>
+          <CardActionArea component={Link} to="/maintenance/queue" sx={{ p: 3, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 3 }}>
+            <Box sx={{ p: 2, borderRadius: 2, bgcolor: '#f1f5f9', color: '#0f172a' }}>
+              <Wrench size={28} />
+            </Box>
+            <Box>
+              <Typography variant="h6" fontWeight="600" color="#0f172a">Maintenance Queue</Typography>
+              <Typography variant="body2" color="text.secondary">Review and resolve service requests</Typography>
+            </Box>
+          </CardActionArea>
+        </MuiCard>
+      </Box>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {cards.map((card) => (

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
-import { PackageSearch } from 'lucide-react'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { Link, useNavigate } from 'react-router-dom'
+import { PackageSearch, ArrowLeft } from 'lucide-react'
 import EmptyState from '../../../components/EmptyState'
 import ErrorState from '../../../components/ErrorState'
 import Loader from '../../../components/Loader'
@@ -17,13 +17,18 @@ import { listEquipment } from '../../../services/equipmentService'
 import type { EquipmentStatus } from '../../../types/equipment'
 
 export default function FieldEquipmentPage() {
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<EquipmentStatus | 'all'>('available')
   const [category, setCategory] = useState<string>('all')
+  const [location, setLocation] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
 
   const equipmentQuery = useQuery({
-    queryKey: ['equipment', 'field', { search, status, category }],
-    queryFn: () => listEquipment({ search, status, category }),
+    queryKey: ['equipment', 'field', { search, status, category, location, startDate, endDate }],
+    queryFn: () => listEquipment({ search, status, category, location, startDate, endDate }),
+    placeholderData: keepPreviousData,
   })
 
   const categories = useMemo(() => {
@@ -47,19 +52,50 @@ export default function FieldEquipmentPage() {
 
   return (
     <div className="space-y-6">
+      <Button className="mb-4" onClick={() => navigate('/field/dashboard')} size="sm" variant="outline">
+        <ArrowLeft className="mr-2 h-4 w-4" />
+        Back to Dashboard
+      </Button>
       <PageHeader
         subtitle="Filter and browse inventory ready for rental"
         title="Availability"
       />
 
-      <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 md:grid-cols-3">
+      <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 md:grid-cols-3 lg:grid-cols-6">
         <div className="space-y-2">
           <Label htmlFor="equipmentSearch">Search</Label>
           <Input
             id="equipmentSearch"
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search by equipment name"
+            placeholder="Search equipment"
             value={search}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="locationFilter">Location</Label>
+          <Input
+            id="locationFilter"
+            onChange={(event) => setLocation(event.target.value)}
+            placeholder="e.g. Site A"
+            value={location}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="startDate">Start Date</Label>
+          <Input
+            id="startDate"
+            type="date"
+            onChange={(event) => setStartDate(event.target.value)}
+            value={startDate}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="endDate">End Date</Label>
+          <Input
+            id="endDate"
+            type="date"
+            onChange={(event) => setEndDate(event.target.value)}
+            value={endDate}
           />
         </div>
         <div className="space-y-2">
@@ -84,7 +120,7 @@ export default function FieldEquipmentPage() {
           >
             <option value="all">All categories</option>
             {categories.map((option) => (
-              <option key={option} value={option}>{option}</option>
+               <option key={option} value={option}>{option}</option>
             ))}
           </Select>
         </div>

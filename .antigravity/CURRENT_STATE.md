@@ -1,30 +1,14 @@
-# Current Project State & Debt
+# Current Project State & Active Debt
 
-## Status of Logic
-- **Missing Engine:** The core "Availability Engine" (overlap detection) is incomplete.
-- **Status Desync:** Some routes allow moving a Rental to CHECKED_OUT without an assigned Unit.
-- **Mock Leaks:** `products.controller.ts` and others still reference legacy mock data.
+## Status of Backend Logic
+- **Maintenance Workflow Broken:** The "Mark Serviced" flow asks for a manual date even when an interval is configured, and the action fails entirely upon submission.
+- **Notes System Missing:** API endpoints and DB logic for adding/deleting Notes tied to Equipment objects are incomplete for Admin, Maintenance, and Field Worker roles.
 
-## Structural Debt
-- **Folder Names:** `products.controller.ts` is misnamed; it should be `equipment.controller.ts` to align with PRD.
-- **Frontend Placeholder:** Many pages in `features/` contain placeholder logic and mismatched navigation patterns from an earlier "fake store" iteration.
-
-## Immediate Priority
-1. Finalize `schema.prisma` to support `AuditLog`, `MaintenanceRecord`, and `IssueReport`.
-2. Refactor Backend Services to use Prisma exclusively.
-3. Build the backend Availability Engine.
-
----
-
-# Current Polish Phase (Active Debt)
-
-## UI/UX Bugs
-- [ ] **Search Focus:** Typing in search boxes triggers a re-render that steals focus.
-- [ ] **Table Overflow:** Mobile views require horizontal scrolling; need transition to Accordions.
-- [ ] **Header Width:** Navbar contents are stretching full-width on ultra-wide monitors.
-- [ ] **Legibility:** Admin filter dropdowns are using unreadably small font sizes.
-
-## Logic & Data
-- [ ] **Seed Data:** Purge equipment that is un-related to or would never be used at an on-land oilfields jobsite; replace numbered users with real names.
-- [ ] **Admin Security:** Admins currently lack protection from being deleted by other Admins.
-- [ ] **User Profiles:** Models need expansion for phone numbers, positions, and avatar icons.
+## UI/UX & Frontend Debt
+- **Search Behavior:** Search fields currently preload massive lists. They must start empty and only populate upon typing.
+- **Data Presentation:** Equipment availability grid needs to be converted to a list view. Tables/Lists need more left/right padding on column headers.
+- **Admin Dashboard:** Action buttons (View, Approve, Reject, Mark Returned, Checkout) lack consistent styling and wrap poorly on medium screens. The "Delete User" button is too aggressive and needs to be moved inside a User Profile view under a "..." menu.
+- **Field Worker Dashboard:** The "recommended available equipment" section needs to be completely removed.
+- **Equipment Detail Navigation:** Redundant "Back" button beside "Mark Serviced" needs removal. Standardize "Back" to return to previous page, not always Dashboard.
+- **Empty States:** Missing placeholder text (e.g., "No recent history on file") in Recent History and Service Logs.
+- **Login Styling:** Background should be white; the button container should be the brand navy color.

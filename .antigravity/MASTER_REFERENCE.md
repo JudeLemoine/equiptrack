@@ -212,13 +212,14 @@ The single source of truth for a unit, showing:
 ## 15. Admin Workflow
 - **Creation:** Add Types (models) and Units (physical machines).
 - **Bulk Creation:** Generate units with auto-incremented asset tags based on type codes (e.g., EXC-003, EXC-004).
+- **Permissions:** Admins can delete Field and Maintenance users. **Constraint:** Admins are strictly prohibited from deleting other Admins. The UI must hide the "Delete" action for Admin-to-Admin interactions.
 
 ---
 
 ## 16. Dashboards by Role
 - **Field:** Request, My Requests, My Rentals, Report Issue.
 - **Maintenance:** Due Soon, Overdue, Open Issues.
-- **Admin:** Approvals, Overdue Returns, Conflicts, Asset Management.
+- **Admin:** Approvals, Overdue Returns, Conflicts, Asset Management, User Management.
 
 ---
 

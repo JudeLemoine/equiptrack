@@ -10,6 +10,7 @@ import {
 } from "../db/mappers"
 import { prisma } from "../lib/db"
 import { requireRole } from "../middleware/requireRole"
+import { markServiced } from "../services/maintenance.service"
 
 const router = Router()
 
@@ -442,41 +443,6 @@ router.post("/:id/report-issue", requireRole("maintenance", "admin"), async (req
   res.status(201).json({ issue, equipment: toApiEquipment(updatedUnit) })
 })
 
-// Notes endpoints
-router.get("/:id/notes", async (req, res) => {
-  const notes = await prisma.note.findMany({
-    where: { equipmentUnitId: req.params.id },
-    include: { author: true },
-    orderBy: { createdAt: "desc" },
-  })
-  res.json(notes.map(n => ({ id: n.id, author: n.author.name, body: n.body, createdAt: n.createdAt })))
-})
-
-router.post("/:id/notes", requireRole("maintenance", "admin"), async (req, res) => {
-  const { authorId, body } = req.body as { authorId: string; body: string }
-  if (!authorId || !body) {
-    res.status(400).json({ message: "authorId and body are required" })
-    return
-  }
-  const note = await prisma.note.create({
-    data: {
-      authorId,
-      body,
-      targetType: "EQUIPMENT_UNIT",
-      equipmentUnitId: req.params.id,
-    },
-  })
-  await prisma.auditLog.create({
-    data: {
-      action: "NOTE_ADDED",
-      actorId: authorId,
-      equipmentUnitId: req.params.id,
-      noteId: note.id,
-      message: "Note added",
-    },
-  })
-  res.status(201).json(note)
-})
 
 router.post("/:id/checkout", async (req, res) => {
   const item = await prisma.equipmentUnit.findFirst({
@@ -579,16 +545,6 @@ router.post("/:id/checkin", async (req, res) => {
 })
 
 router.post("/:id/mark-serviced", requireRole("maintenance", "admin"), async (req, res) => {
-  const item = await prisma.equipmentUnit.findFirst({
-    where: { id: req.params.id, isActive: true },
-    include: equipmentInclude,
-  })
-
-  if (!item) {
-    res.status(404).json({ message: "Equipment not found" })
-    return
-  }
-
   const performedByUserId = req.body?.performedByUserId as string | undefined
   const nextServiceDueDate = req.body?.nextServiceDueDate as string | undefined
 
@@ -597,51 +553,19 @@ router.post("/:id/mark-serviced", requireRole("maintenance", "admin"), async (re
     return
   }
 
-  const performer = await ensureUserExists(performedByUserId)
-  if (!performer) {
-    res.status(400).json({ message: "performedByUserId is required" })
+  const result = await markServiced(req.params.id, performedByUserId, nextServiceDueDate)
+
+  if (result === null) {
+    res.status(404).json({ message: "Equipment not found" })
     return
   }
 
-  const now = new Date()
+  if (result === undefined) {
+    res.status(400).json({ message: "performedByUserId is invalid" })
+    return
+  }
 
-  const updated = await prisma.$transaction(async (tx) => {
-    const unit = await tx.equipmentUnit.update({
-      where: { id: item.id },
-      data: {
-        lastMaintenanceAt: now,
-        nextMaintenanceDue: nextServiceDueDate ? new Date(nextServiceDueDate) : item.nextMaintenanceDue,
-        status: "AVAILABLE",
-      },
-      include: equipmentInclude,
-    })
-
-    await tx.maintenanceRecord.create({
-      data: {
-        equipmentUnitId: item.id,
-        technicianId: performer.id,
-        status: "COMPLETED",
-        trigger: "ROUTINE",
-        title: "Service completed",
-        description: "Marked serviced",
-        completedAt: now,
-        nextDueAt: nextServiceDueDate ? new Date(nextServiceDueDate) : null,
-      },
-    })
-
-    await tx.auditLog.create({
-      data: {
-        action: "MAINTENANCE_COMPLETED",
-        actorId: performer.id,
-        equipmentUnitId: item.id,
-        message: "Service completed",
-      },
-    })
-
-    return unit
-  })
-
-  res.json(toApiEquipment(updated))
+  res.json(toApiEquipment(result))
 })
 
 router.get("/:id/service-logs", async (req, res) => {

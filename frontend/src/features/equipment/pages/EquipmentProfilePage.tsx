@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import ErrorState from '../../../components/ErrorState'
 import Loader from '../../../components/Loader'
@@ -32,7 +32,6 @@ import type { ServiceLogEntry } from '../../../types/serviceLog'
 
 export default function EquipmentProfilePage() {
   const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const session = getSession()
   
@@ -68,12 +67,6 @@ export default function EquipmentProfilePage() {
   // Theme Colors
   const navy = "#1A4889"
   const gold = "#EBBA38"
-
-  const backPath = useMemo(() => {
-    if (role === 'admin') return '/admin/equipment'
-    if (role === 'maintenance') return '/maintenance/queue'
-    return '/field/equipment'
-  }, [role])
 
   const refreshAll = async () => {
     await queryClient.invalidateQueries({ queryKey: ['equipment', id] })
@@ -115,7 +108,6 @@ export default function EquipmentProfilePage() {
       <PageHeader
         actions={
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => navigate(backPath)}>Back</Button>
             
             {role === 'field' && (
               <>

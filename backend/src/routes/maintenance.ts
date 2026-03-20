@@ -4,6 +4,7 @@ import { requireRole } from "../middleware/requireRole"
 import {
   createIssueReport,
   createNote,
+  deleteNote,
   getMaintenanceQueue,
   listIssueReports,
   listNotes,
@@ -156,6 +157,29 @@ router.post("/notes", requireRole("field", "maintenance", "admin"), async (req, 
   }
 
   res.status(201).json(created)
+})
+
+router.delete("/notes/:id", requireRole("maintenance", "admin"), async (req, res) => {
+  const actorUserId = req.body?.actorUserId as string | undefined
+
+  if (!actorUserId) {
+    res.status(400).json({ message: "actorUserId is required" })
+    return
+  }
+
+  const result = await deleteNote(req.params.id, actorUserId)
+
+  if (result === null) {
+    res.status(404).json({ message: "Note not found" })
+    return
+  }
+
+  if (result === undefined) {
+    res.status(403).json({ message: "Forbidden: insufficient permissions" })
+    return
+  }
+
+  res.status(204).end()
 })
 
 export default router

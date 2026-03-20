@@ -16,7 +16,6 @@
 - **Primary Navy:** `#1A4889` (Use for Headers, Primary Buttons).
 - **Secondary Gold:** `#EBBA38` (Use for Accents, Icons, Warning States).
 - **Background Off-White:** `#F2F2F2` (Use for Page Backgrounds).
-- **Login Page:** Avoid gradients that clash with the logo. Use solid `#1A4889` or a subtle Navy-to-Dark-Navy transition.
 
 ### 2. Responsive Data Tables & Mobile First
 - **Mobile Rule:** For screens < 768px, standard tables are FORBIDDEN.

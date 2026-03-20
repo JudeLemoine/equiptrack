@@ -330,3 +330,94 @@ export async function createNote(input: NotePayload) {
     createdAt: created.createdAt.toISOString(),
   }
 }
+
+export async function deleteNote(noteId: string, actorUserId: string) {
+  const [note, actor] = await Promise.all([
+    prisma.note.findUnique({ where: { id: noteId } }),
+    prisma.user.findUnique({ where: { id: actorUserId } }),
+  ])
+
+  if (!note) return null
+  if (!actor || (actor.role !== "ADMIN" && actor.role !== "MAINTENANCE")) return undefined
+
+  await prisma.$transaction(async (tx) => {
+    await tx.note.delete({ where: { id: noteId } })
+    await tx.auditLog.create({
+      data: {
+        action: "DELETED",
+        actorId: actor.id,
+        equipmentUnitId: note.equipmentUnitId,
+        rentalId: note.rentalId,
+        maintenanceRecordId: note.maintenanceRecordId,
+        issueReportId: note.issueReportId,
+        message: `Note deleted by ${actor.name}`,
+      },
+    })
+  })
+
+  return true
+}
+
+export async function markServiced(unitId: string, performedByUserId: string, nextServiceDue?: string) {
+  const unit = await prisma.equipmentUnit.findUnique({
+    where: { id: unitId },
+    include: { equipmentType: true },
+  })
+
+  if (!unit) return null
+
+  const performer = await prisma.user.findUnique({ where: { id: performedByUserId } })
+  if (!performer) return undefined
+
+  const now = new Date()
+  let nextDue: Date | null = null
+
+  if (nextServiceDue) {
+    nextDue = new Date(nextServiceDue)
+  } else if (unit.equipmentType.defaultMaintenanceDays) {
+    nextDue = new Date(now)
+    nextDue.setDate(now.getDate() + unit.equipmentType.defaultMaintenanceDays)
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const next = await tx.equipmentUnit.update({
+      where: { id: unit.id },
+      data: {
+        lastMaintenanceAt: now,
+        nextMaintenanceDue: nextDue,
+        status: "AVAILABLE",
+      },
+      include: {
+        equipmentType: {
+          include: { category: true },
+        },
+      },
+    })
+
+    await tx.maintenanceRecord.create({
+      data: {
+        equipmentUnitId: unit.id,
+        technicianId: performer.id,
+        status: "COMPLETED",
+        trigger: "ROUTINE",
+        title: "Service completed",
+        description: "Marked serviced via automated workflow",
+        completedAt: now,
+        nextDueAt: nextDue,
+      },
+    })
+
+    await tx.auditLog.create({
+      data: {
+        action: "MAINTENANCE_COMPLETED",
+        actorId: performer.id,
+        equipmentUnitId: unit.id,
+        message: "Service completed and status restored to AVAILABLE",
+      },
+    })
+
+    return next
+  })
+
+  return updated
+}

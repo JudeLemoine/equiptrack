@@ -115,7 +115,7 @@ router.get("/:id", async (req, res) => {
 
   const detail: ApiRentalDetail = {
     ...toApiRental(rental),
-    timeline: timeline.map((item) => ({
+    timeline: timeline.map((item: any) => ({
       label: item.message,
       at: item.createdAt.toISOString(),
     })),

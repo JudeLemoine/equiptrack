@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { getSession } from '../../../lib/auth'
 import { getMaintenanceSummary } from '../../../services/dashboardService'
 import { listIssueReports, resolveIssue, moveToMaintenance } from '../../../services/maintenanceService'
+import { formatDateTime } from '../../../lib/utils'
 
 export default function MaintenanceDashboardPage() {
   const navigate = useNavigate()
@@ -91,6 +92,15 @@ export default function MaintenanceDashboardPage() {
       header: 'Issue Title',
     },
     {
+      accessorKey: 'reportedAt',
+      header: 'Date / Time',
+      cell: ({ row }: any) => (
+        <span className="text-sm text-slate-600 whitespace-nowrap">
+          {formatDateTime(row.original.reportedAt)}
+        </span>
+      ),
+    },
+    {
       accessorKey: 'severity',
       header: 'Severity',
       cell: ({ row }: any) => {
@@ -102,7 +112,9 @@ export default function MaintenanceDashboardPage() {
           CRITICAL: 'text-red-700 bg-red-50 border-red-200',
         }
         return (
-          <span className={`px-2 py-0.5 rounded text-xs font-semibold border ${colors[severity] || 'text-slate-700 bg-slate-50 border-slate-200'}`}>
+          <span
+            className={`inline-block w-20 text-center py-0.5 rounded text-xs font-semibold border ${colors[severity] || 'text-slate-700 bg-slate-50 border-slate-200'}`}
+          >
             {severity}
           </span>
         )
@@ -111,6 +123,7 @@ export default function MaintenanceDashboardPage() {
     {
       id: 'actions',
       header: 'Actions',
+      enableSorting: false,
       cell: ({ row }: any) => (
         <div className="flex gap-2">
           <Button
@@ -123,7 +136,8 @@ export default function MaintenanceDashboardPage() {
           <Button
             onClick={() => maintenanceMutation.mutate(row.original.id)}
             size="sm"
-            className="bg-navy-700 hover:bg-navy-800"
+            className="hover:opacity-90"
+            style={{ backgroundColor: 'rgb(var(--brand-navy-rgb))', color: '#fff' }}
             disabled={maintenanceMutation.isPending}
           >
             Move to Maintenance

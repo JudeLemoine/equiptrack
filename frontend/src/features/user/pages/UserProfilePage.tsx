@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { MoreVertical, Trash2, ArrowLeft } from 'lucide-react'
+import { MoreVertical, Trash2, ArrowLeft, Mail } from 'lucide-react'
 import { toast } from 'sonner'
 import PageHeader from '../../../components/PageHeader'
 import ErrorState from '../../../components/ErrorState'
@@ -61,6 +61,8 @@ export default function UserProfilePage() {
     onSuccess: (updated) => {
       toast.success('Profile updated successfully')
       queryClient.setQueryData(['user', effectiveUserId], updated)
+      // Force the global header avatar query to refetch immediately
+      void queryClient.invalidateQueries({ queryKey: ['current-user-avatar'] })
     },
     onError: (error) => {
       toast.error('Failed to update profile: ' + (error as Error).message)
@@ -103,17 +105,15 @@ export default function UserProfilePage() {
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
-      {id && (
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          className="mb-2" 
-          onClick={() => navigate(-1)}
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
-      )}
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        className="mb-2" 
+        onClick={() => navigate(-1)}
+      >
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        Back
+      </Button>
 
       <PageHeader
         actions={
@@ -159,7 +159,20 @@ export default function UserProfilePage() {
             </div>
             <div>
               <Label className="text-slate-500">Email</Label>
-              <p className="font-medium mt-1">{user.email}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <p className="font-medium">{user.email}</p>
+                {isOwnProfile && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => toast.info('Email update is not yet available.')}
+                  >
+                    <Mail className="h-3 w-3 mr-1" />
+                    Update Email
+                  </Button>
+                )}
+              </div>
             </div>
             <div>
               <Label className="text-slate-500">Role</Label>

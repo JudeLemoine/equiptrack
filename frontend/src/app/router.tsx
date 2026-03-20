@@ -44,7 +44,7 @@ export default function AppRouter() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route element={<RootRedirect />} index />
-          <Route element={<UserProfilePage />} path="/profile" />
+          <Route element={<UserProfilePage />} path="/profile/:id?" />
 
           <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
             <Route element={<AdminDashboardPage />} path="/admin/dashboard" />

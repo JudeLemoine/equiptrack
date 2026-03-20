@@ -35,7 +35,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="relative grid min-h-screen grid-rows-[1fr_auto_1fr] overflow-hidden bg-[#1A4889] px-4 py-10">
+    <main className="relative grid min-h-screen grid-rows-[1fr_auto_1fr] overflow-hidden bg-white px-4 py-10">
       <div className="pointer-events-none z-10 row-start-1 flex items-center justify-center">
         <img
           alt="EquipTrack logo"
@@ -43,38 +43,44 @@ export default function LoginPage() {
           src={fullLogoStroke}
         />
       </div>
-      <div className="relative z-20 row-start-2 flex min-h-56 justify-self-center rounded-xl border border-slate-700 bg-slate-900/90 p-5 text-slate-100 shadow-2xl sm:p-6">
-        <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4 items-center">
-          <Button
-            className="h-24 flex-col gap-2"
-            disabled={loginMutation.isPending}
-            onClick={() => loginMutation.mutate('admin')}
-            size="lg"
-            variant="secondary"
-          >
-            <Building2 className="h-5 w-5" />
-            Login as Admin
-          </Button>
-          <Button
-            className="h-24 w-full flex-col gap-2"
-            disabled={loginMutation.isPending}
-            onClick={() => loginMutation.mutate('field')}
-            size="lg"
-            variant="secondary"
-          >
-            <HardHat className="h-5 w-5" />
-            Login as Field User
-          </Button>
-          <Button
-            className="h-24 w-full flex-col gap-2"
-            disabled={loginMutation.isPending}
-            onClick={() => loginMutation.mutate('maintenance')}
-            size="lg"
-            variant="secondary"
-          >
-            <Wrench className="h-5 w-5" />
-            Login as Maintenance
-          </Button>
+      <div className="relative z-20 row-start-2 flex min-h-56 justify-self-center rounded-xl border border-slate-200 bg-[#1A4889] p-5 text-white shadow-2xl sm:p-8">
+        <div className="flex flex-col gap-6 w-full max-w-md items-center">
+          <div className="text-center space-y-1">
+            <h1 className="text-2xl font-bold tracking-tight">Welcome Back</h1>
+            <p className="text-slate-300">Select your role to continue</p>
+          </div>
+          <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4 items-center">
+            <Button
+              className="h-28 flex-col gap-3 bg-white/10 hover:bg-white/20 border-white/20 text-white"
+              disabled={loginMutation.isPending}
+              onClick={() => loginMutation.mutate('admin')}
+              size="lg"
+              variant="outline"
+            >
+              <Building2 className="h-6 w-6" />
+              <span className="text-xs font-semibold uppercase tracking-wider">Admin</span>
+            </Button>
+            <Button
+              className="h-28 w-full flex-col gap-3 bg-white/10 hover:bg-white/20 border-white/20 text-white"
+              disabled={loginMutation.isPending}
+              onClick={() => loginMutation.mutate('field')}
+              size="lg"
+              variant="outline"
+            >
+              <HardHat className="h-6 w-6" />
+              <span className="text-xs font-semibold uppercase tracking-wider">Field User</span>
+            </Button>
+            <Button
+              className="h-28 w-full flex-col gap-3 bg-white/10 hover:bg-white/20 border-white/20 text-white"
+              disabled={loginMutation.isPending}
+              onClick={() => loginMutation.mutate('maintenance')}
+              size="lg"
+              variant="outline"
+            >
+              <Wrench className="h-6 w-6" />
+              <span className="text-xs font-semibold uppercase tracking-wider">Maintenance</span>
+            </Button>
+          </div>
         </div>
       </div>
     </main>

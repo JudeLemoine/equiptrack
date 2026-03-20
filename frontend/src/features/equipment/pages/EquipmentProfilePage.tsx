@@ -188,12 +188,16 @@ export default function EquipmentProfilePage() {
           <CardHeader><CardTitle>Recent History</CardTitle></CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {activity?.map((log: ActivityEvent) => (
-                <div key={log.id} className="border-l-2 border-slate-200 pl-4 py-1">
-                  <p className="text-sm font-medium">{log.summary}</p>
-                  <p className="text-xs text-slate-500">{formatDateTime(log.timestamp)}</p>
-                </div>
-              ))}
+              {activity && activity.length > 0 ? (
+                activity.map((log: ActivityEvent) => (
+                  <div key={log.id} className="border-l-2 border-slate-200 pl-4 py-1">
+                    <p className="text-sm font-medium">{log.summary}</p>
+                    <p className="text-xs text-slate-500">{formatDateTime(log.timestamp)}</p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-slate-500 py-2">No recent history on file</p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -202,12 +206,16 @@ export default function EquipmentProfilePage() {
           <CardHeader><CardTitle>Service Logs</CardTitle></CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {serviceLogs?.map((entry: ServiceLogEntry) => (
-                <div key={entry.id} className="rounded-lg bg-slate-50 p-3">
-                  <p className="text-sm">{entry.note}</p>
-                  <p className="text-xs text-slate-500 mt-1">{formatDate(entry.date)}</p>
-                </div>
-              ))}
+              {serviceLogs && serviceLogs.length > 0 ? (
+                serviceLogs.map((entry: ServiceLogEntry) => (
+                  <div key={entry.id} className="rounded-lg bg-slate-50 p-3">
+                    <p className="text-sm">{entry.note}</p>
+                    <p className="text-xs text-slate-500 mt-1">{formatDate(entry.date)}</p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-slate-500 py-2">No service logs on file</p>
+              )}
             </div>
           </CardContent>
         </Card>

@@ -118,7 +118,7 @@ export default function UserProfilePage() {
       <PageHeader
         actions={
           <div className="flex items-center gap-2">
-            {isAdmin && !isOwnProfile && (
+            {isAdmin && !isOwnProfile && user.role !== 'admin' && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon">

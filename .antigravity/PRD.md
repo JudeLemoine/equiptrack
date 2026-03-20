@@ -16,3 +16,4 @@ EquipTrack is a role-based industrial equipment operations platform. Unlike cons
 ## 4. Lifecycle Definitions
 - **Rental Status:** PENDING, APPROVED, RESERVED, CHECKED_OUT, RETURNED, OVERDUE, CANCELLED.
 - **Equipment Status:** AVAILABLE, RESERVED, CHECKED_OUT, OVERDUE, IN_MAINTENANCE, OUT_OF_SERVICE.
+

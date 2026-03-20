@@ -1,3 +1,4 @@
+import { getSession } from '../lib/auth'
 import type { ApiError } from '../types/api'
 
 const baseUrl = import.meta.env.VITE_API_URL ?? ''
@@ -43,6 +44,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (init?.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
+  }
+
+  // Automatically attach auth token if available
+  const session = getSession()
+  if (session?.token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${session.token}`)
+  }
+
+  // Also support x-user-id for backend compatibility
+  if (session?.user?.id && !headers.has('x-user-id')) {
+    headers.set('x-user-id', session.user.id)
   }
 
   try {

@@ -12,6 +12,7 @@ import { Card } from '../../../components/ui/card'
 import { Input } from '../../../components/ui/input'
 import { Label } from '../../../components/ui/label'
 import { Select } from '../../../components/ui/select'
+import { TextField } from '@mui/material'
 import { formatDate } from '../../../lib/utils'
 import { listEquipment } from '../../../services/equipmentService'
 import type { EquipmentStatus } from '../../../types/equipment'
@@ -77,20 +78,42 @@ export default function FieldEquipmentPage() {
         </div>
         <div className="space-y-2">
           <Label htmlFor="startDate">Start Date</Label>
-          <Input
+          <TextField
             id="startDate"
             type="date"
-            onChange={(event) => setStartDate(event.target.value)}
+            fullWidth
+            size="small"
             value={startDate}
+            onChange={(event) => setStartDate(event.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }}
+            variant="outlined"
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                height: '40px',
+                borderRadius: '8px',
+                backgroundColor: 'white'
+              }
+            }}
           />
         </div>
         <div className="space-y-2">
           <Label htmlFor="endDate">End Date</Label>
-          <Input
+          <TextField
             id="endDate"
             type="date"
-            onChange={(event) => setEndDate(event.target.value)}
+            fullWidth
+            size="small"
             value={endDate}
+            onChange={(event) => setEndDate(event.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }}
+            variant="outlined"
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                height: '40px',
+                borderRadius: '8px',
+                backgroundColor: 'white'
+              }
+            }}
           />
         </div>
         <div className="space-y-2">
@@ -153,7 +176,12 @@ export default function FieldEquipmentPage() {
                 </div>
                 <div className="flex items-center border-t border-slate-100 bg-slate-50/50 p-4 sm:border-l sm:border-t-0 sm:px-6">
                   <Button asChild size="sm" variant="secondary" className="w-full sm:w-auto">
-                    <Link to={`/field/equipment/${item.id}`}>View Details</Link>
+                    <Link 
+                      to={`/field/equipment/${item.id}`}
+                      state={{ startDate, endDate }}
+                    >
+                      View Details
+                    </Link>
                   </Button>
                 </div>
               </div>

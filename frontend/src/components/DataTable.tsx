@@ -112,25 +112,33 @@ export default function DataTable<TData>({
                   {headerGroup.headers.map((header) => {
                     const canSort = header.column.getCanSort()
                     return (
-                      <TableHead key={header.id} className="px-4">
+                      <TableHead key={header.id} className="h-12 px-4 py-2">
                         {header.isPlaceholder ? null : canSort ? (
                           <Button
-                            className="h-auto px-0 text-slate-600 hover:text-slate-900"
+                            className="flex h-auto w-full items-center justify-start gap-2 px-0 text-slate-600 hover:text-slate-900"
                             onClick={header.column.getToggleSortingHandler()}
                             type="button"
-                            variant="secondary"
+                            variant="ghost"
                           >
-                            {flexRender(header.column.columnDef.header, header.getContext())}
-                            {header.column.getIsSorted() === 'asc' ? (
-                              <ArrowUp className="ml-2 h-4 w-4" />
-                            ) : header.column.getIsSorted() === 'desc' ? (
-                              <ArrowDown className="ml-2 h-4 w-4" />
-                            ) : (
-                              <ArrowUpDown className="ml-2 h-4 w-4" />
-                            )}
+                            <span className="truncate whitespace-nowrap font-semibold uppercase tracking-wider text-xs">
+                              {flexRender(header.column.columnDef.header, header.getContext())}
+                            </span>
+                            <div className="flex-shrink-0">
+                              {header.column.getIsSorted() === 'asc' ? (
+                                <ArrowUp className="h-3.5 w-3.5 text-blue-600" />
+                              ) : header.column.getIsSorted() === 'desc' ? (
+                                <ArrowDown className="h-3.5 w-3.5 text-blue-600" />
+                              ) : (
+                                <ArrowUpDown className="h-3.5 w-3.5 text-slate-400 group-hover:text-slate-600" />
+                              )}
+                            </div>
                           </Button>
                         ) : (
-                          flexRender(header.column.columnDef.header, header.getContext())
+                          <div className="flex h-auto w-full items-center justify-start py-2">
+                            <span className="truncate whitespace-nowrap font-semibold uppercase tracking-wider text-xs text-slate-500">
+                              {flexRender(header.column.columnDef.header, header.getContext())}
+                            </span>
+                          </div>
                         )}
                       </TableHead>
                     )

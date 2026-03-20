@@ -84,14 +84,15 @@ Each user now possesses a **Mini Profile** containing:
 - **Avatar:** Choice of uploaded photo, selection from Industrial Icon set (Hard-hat, Wrench, Truck), or blank.
 
 ### 5.1 Field Worker
-- **Needs:** Search by date/location, request for future use, track request status, report issues, view current checkouts.
+- **Needs:** Search by date/location, request for future use, track request status, report issues, view current checkouts, **and add operational notes to equipment they are actively renting or returning.**
 - **Does NOT Need:** Admin control, raw asset management, fleet-wide maintenance queues.
-- **Workflow:** Dashboard -> Search -> Request -> Track.
+- **Workflow:** Dashboard -> Search -> Request -> Track -> Return/Note.
 
 ### 5.2 Maintenance User
-- **Needs:** Queues for "Due Soon," "Overdue," and "Flagged" items; update statuses, log work, set next maintenance dates.
+- **Needs:** Queues for "Due Soon," "Overdue," and a dedicated **"Reported Issues" triage queue**; update statuses, log work, and rely on auto-calculated next maintenance dates based on intervals.
 - **Does NOT Need:** Rental browsing, job planning tools, worker-specific views.
-- **Workflow:** Dashboard -> Maintenance Queue -> Update Record -> Restore Availability.
+- **Workflow:** Dashboard -> Maintenance Queue / Reported Issues -> Triage / Update Record -> Restore Availability.
+
 
 ### 5.3 Admin
 - **Needs:** Approve/Reject requests, resolve conflicts, oversee exceptions, bulk-create units, inspect audit trails.
@@ -181,11 +182,12 @@ A unit is available ONLY if:
 
 ---
 
-## 11. Issue Reporting
-- Field-triggered attention for damage, safety concerns, or malfunctions.
-- Severity levels: LOW, MEDIUM, HIGH, CRITICAL.
-- Integration: Can trigger maintenance records or admin review.
-
+## 11. Issue Reporting & Triage
+- **Trigger:** Field-triggered attention for damage, safety concerns, or malfunctions via the Equipment Profile.
+- **Severity levels:** LOW, MEDIUM, HIGH, CRITICAL.
+- **Triage Workflow:** Issues flow directly to the Maintenance Dashboard's "Reported Issues" queue. Maintenance users can either:
+  1. **Move to Maintenance:** Automatically updates equipment status to `IN_MAINTENANCE` or `DUE_SOON` and generates a work record.
+  2. **Dismiss Issue:** Deletes/closes the report and restores the unit to `AVAILABLE`.
 ---
 
 ## 12. Equipment Profile Page
@@ -203,10 +205,10 @@ The single source of truth for a unit, showing:
 
 ---
 
-## 14. Navigation Model (Updated)
+## 14. Navigation & UI Model (Updated)
 - **Pattern:** Dashboard as Hub.
-- **Back Actions:** Every sub-page must include a prominent "Back to Dashboard" or "Back" button to ensure easy navigation in a single-page environment.
-
+- **Search Behavior:** Search and filter lists must **start empty** to prevent massive data dumps. Data is only fetched/displayed upon user input.
+- **Back Actions:** Every sub-page must include a "Back" button utilizing relative history routing (e.g., `useNavigate(-1)`) to return the user to their exact previous screen, rather than force-routing them back to the dashboard.
 ---
 
 ## 15. Admin Workflow
@@ -217,9 +219,9 @@ The single source of truth for a unit, showing:
 ---
 
 ## 16. Dashboards by Role
-- **Field:** Request, My Requests, My Rentals, Report Issue.
-- **Maintenance:** Due Soon, Overdue, Open Issues.
-- **Admin:** Approvals, Overdue Returns, Conflicts, Asset Management, User Management.
+- **Field:** Request (Empty by default until searched), My Requests, My Rentals.
+- **Maintenance:** Due Soon, Overdue, **Reported Issues (Triage Queue)**, Completed.
+- **Admin:** Approvals, Overdue Returns, Conflicts, Asset Management, User Management
 
 ---
 
@@ -259,21 +261,20 @@ Models include: `User`, `Location`, `EquipmentCategory`, `EquipmentType`, `Equip
 
 ---
 
-## 24. Current State
-- Concept and Roles defined.
-- Prisma schema designed.
-- **Incomplete:** Backend mock data remains; availability engine not fully implemented; rental lifecycle disconnected; UI requires alignment with mobile-friendly hub model.
+## 24. Current State (As of Capstone Final Polish)
+- **Completed:** Prisma schema is active. Mock data has been purged. The Availability Engine successfully detects overlaps and blocks double-booking. Role-based dashboards (Admin, Maintenance, Field) are functional. Authentication and middleware routing are strictly enforced.
+- **Active Phase:** Final QA testing, resolving edge-case 400/401 API errors, standardizing table padding, and finalizing presentation data seeds. 
 
----
-
-## 25. Recommended Rebuild Order
-1. Finalize Prisma/Backend Access.
-2. Build Availability Engine & Overlap Logic.
-3. Field Worker Flows (Search/Request).
-4. Equipment Profiles & Notes.
-5. Maintenance Module.
-6. Admin Approval/Exception Management.
-7. Navigation/UI Cleanup.
+## 25. Rebuild Milestones
+1. ~~Finalize Prisma/Backend Access.
+2. ~~Build Availability Engine & Overlap Logic.
+3. ~~Field Worker Flows (Search/Request).
+4. ~~Equipment Profiles & Notes.
+5. ~~Maintenance Module & Triage Queues.
+6. ~~Admin Approval/Exception Management.
+7. ~~Navigation/UI Cleanup.
+8. ~~Final bug and logic fixes. (Current)
+8. **Final Capstone QA & Presentation Prep.** (Current)
 
 ---
 

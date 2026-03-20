@@ -113,9 +113,9 @@ export default function MaintenanceEquipmentPage() {
 
   return (
     <div className="space-y-6">
-      <Button className="mb-4" onClick={() => navigate('/maintenance/dashboard')} size="sm" variant="outline">
+      <Button className="mb-4" onClick={() => navigate(-1)} size="sm" variant="outline">
         <ArrowLeft className="mr-2 h-4 w-4" />
-        Back to Dashboard
+        Back
       </Button>
       <PageHeader
         subtitle="Items due in the next 14 days or already overdue"

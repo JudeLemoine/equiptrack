@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useParams } from 'react-router-dom'
+import { useParams, useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 import ErrorState from '../../../components/ErrorState'
 import Loader from '../../../components/Loader'
@@ -16,15 +16,17 @@ import {
   DialogTitle,
 } from '../../../components/ui/dialog'
 import { Label } from '../../../components/ui/label'
-import { Select } from '../../../components/ui/select'
 import { Textarea } from '../../../components/ui/textarea'
 import { getSession } from '../../../lib/auth'
 import { formatDate, formatDateTime } from '../../../lib/utils'
 import { listActivityByEquipment } from '../../../services/activityService'
+import { Input } from '../../../components/ui/input'
 import {
   checkoutEquipment,
   getEquipment,
+  markEquipmentServiced,
   reportIssue,
+  addEquipmentNote,
 } from '../../../services/equipmentService'
 import { listServiceLogsByEquipment } from '../../../services/serviceLogService'
 import type { ActivityEvent } from '../../../types/activity'
@@ -32,15 +34,23 @@ import type { ServiceLogEntry } from '../../../types/serviceLog'
 
 export default function EquipmentProfilePage() {
   const { id } = useParams<{ id: string }>()
+  const location = useLocation()
   const queryClient = useQueryClient()
   const session = getSession()
+
+  // Extract dates from navigation state (passed from search page)
+  const searchDates = location.state as { startDate?: string; endDate?: string } | null
+  const { startDate, endDate } = searchDates || {}
   
   // Dialog States
   const [isReportIssueOpen, setReportIssueOpen] = useState(false)
+  const [isMarkServicedOpen, setMarkServicedOpen] = useState(false)
+  const [manualNextDueDate, setManualNextDueDate] = useState('')
 
   // Form States
   const [issueSeverity, setIssueSeverity] = useState('low')
   const [issueDescription, setIssueDescription] = useState('')
+  const [fieldNote, setFieldNote] = useState('')
 
   const role = session?.user.role
   const userId = session?.user.id ?? ''
@@ -77,7 +87,6 @@ export default function EquipmentProfilePage() {
   // Mutations
   const reportIssueMutation = useMutation({
     mutationFn: async () => {
-      console.log("Reporting issue:", { issueSeverity, issueDescription })
       return reportIssue(id as string, {
         severity: issueSeverity,
         title: `Issue Report: ${equipment?.name}`,
@@ -86,40 +95,83 @@ export default function EquipmentProfilePage() {
       })
     },
     onSuccess: async () => {
-      // Unmount-like behavior: Close modal and THEN clear state
       setReportIssueOpen(false)
       setIssueSeverity('low')
       setIssueDescription('')
-      
-      // Explicit refetch to ensure freshness
       await refreshAll()
       toast.success('Issue reported successfully.')
     }
   })
 
-  const checkoutMutation = useMutation({
-    mutationFn: () => checkoutEquipment(id as string, userId),
-    onSuccess: refreshAll
+  const addNoteMutation = useMutation({
+    mutationFn: async () => {
+      return addEquipmentNote(id as string, {
+        note: fieldNote,
+        authorId: userId
+      })
+    },
+    onSuccess: async () => {
+      setFieldNote('')
+      await refreshAll()
+      toast.success('Note added to equipment history.')
+    }
   })
+
+  const markServicedMutation = useMutation({
+    mutationFn: () => markEquipmentServiced(id as string, {
+      performedByUserId: userId,
+      nextServiceDueDate: manualNextDueDate || undefined,
+    }),
+    onSuccess: async () => {
+      setMarkServicedOpen(false)
+      setManualNextDueDate('')
+      await refreshAll()
+      toast.success('Equipment marked as serviced.')
+    },
+    onError: () => toast.error('Could not mark serviced. Add a manual due date if needed.'),
+  })
+
+  const checkoutMutation = useMutation({
+    mutationFn: () => {
+      if (!startDate || !endDate) {
+        toast.error('Please select rental dates on the Search page before checking out.')
+        throw new Error('Start date and end date are required for checkout.')
+      }
+      return checkoutEquipment(id as string, {
+        requestedBy: userId,
+        startDate,
+        endDate,
+      })
+    },
+    onSuccess: () => {
+      refreshAll()
+      toast.success('Checkout request submitted for approval.')
+    },
+    onError: (err: any) => {
+      if (err.message !== 'Start date and end date are required for checkout.') {
+        toast.error(err.message || 'Failed to submit checkout request.')
+      }
+    }
+  })
+
+  const canCheckout = equipment?.status === 'available' && startDate && endDate
 
   if (isLoading) return <Loader label="Loading Asset Profile..." />
   if (isError || !equipment) return <ErrorState error={error as Error} title="Asset Not Found" />
 
   return (
     <div className="space-y-6 pb-10">
-      {/* Header with Navy/Gold buttons */}
       <PageHeader
         actions={
           <div className="flex flex-wrap gap-2">
-            
             {role === 'field' && (
               <>
                 <Button 
                   style={{ backgroundColor: navy, color: 'white' }}
                   onClick={() => checkoutMutation.mutate()}
-                  disabled={equipment.status !== 'available'}
+                  disabled={!canCheckout || checkoutMutation.isPending}
                 >
-                  Check Out
+                  {checkoutMutation.isPending ? 'Processing...' : 'Check Out'}
                 </Button>
                 <Button 
                   variant="outline" 
@@ -132,7 +184,7 @@ export default function EquipmentProfilePage() {
             )}
 
             {role === 'maintenance' && (
-              <Button style={{ backgroundColor: navy }}>
+              <Button style={{ backgroundColor: navy }} onClick={() => setMarkServicedOpen(true)}>
                 Mark Serviced
               </Button>
             )}
@@ -171,6 +223,13 @@ export default function EquipmentProfilePage() {
               <Label className="text-xs text-slate-500">Last Service</Label>
               <p className="text-slate-700">{formatDate(equipment.lastServiceDate)}</p>
             </div>
+            {role === 'field' && !canCheckout && equipment.status === 'available' && (
+              <div className="sm:col-span-2">
+                <p className="text-xs text-amber-600 font-medium">
+                  * Please select rental dates on the Search page before checking out.
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -184,6 +243,33 @@ export default function EquipmentProfilePage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Field Worker Add Note (New Feature) */}
+      {role === 'field' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Log Field Note</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2">
+              <Textarea 
+                placeholder="Add a field observation, site note, or specific usage detail..." 
+                value={fieldNote}
+                onChange={(e) => setFieldNote(e.target.value)}
+                className="min-h-[80px]"
+              />
+              <Button 
+                style={{ backgroundColor: navy }} 
+                className="self-end"
+                onClick={() => addNoteMutation.mutate()}
+                disabled={!fieldNote.trim() || addNoteMutation.isPending}
+              >
+                Add Note
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Activity & Service History */}
       <div className="grid gap-6 md:grid-cols-2">
@@ -224,7 +310,7 @@ export default function EquipmentProfilePage() {
         </Card>
       </div>
 
-      {/* REPORT ISSUE DIALOG (Node 08 Feature) */}
+      {/* REPORT ISSUE DIALOG */}
       <Dialog open={isReportIssueOpen} onOpenChange={setReportIssueOpen}>
         <DialogContent>
           <DialogHeader>
@@ -236,11 +322,15 @@ export default function EquipmentProfilePage() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Severity</Label>
-              <Select value={issueSeverity} onChange={(e) => setIssueSeverity(e.target.value)}>
+              <select 
+                className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={issueSeverity} 
+                onChange={(e) => setIssueSeverity(e.target.value)}
+              >
                 <option value="low">Low (Operational)</option>
                 <option value="medium">Medium (Monitor)</option>
                 <option value="critical">Critical (Immediate Repair)</option>
-              </Select>
+              </select>
             </div>
             <div className="space-y-2">
               <Label>Description</Label>
@@ -254,10 +344,44 @@ export default function EquipmentProfilePage() {
               className="w-full" 
               style={{ backgroundColor: navy }}
               onClick={() => reportIssueMutation.mutate()}
-              disabled={reportIssueMutation.isPending}
+              disabled={reportIssueMutation.isPending || !issueDescription.trim()}
             >
-              Submit Report
+              {reportIssueMutation.isPending ? 'Sending...' : 'Submit Report'}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* MARK SERVICED DIALOG */}
+      <Dialog open={isMarkServicedOpen} onOpenChange={setMarkServicedOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mark Serviced</DialogTitle>
+            <DialogDescription>
+              This will add a routine service log and update last/next service dates.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm"><span className="font-medium">Equipment:</span> {equipment?.name}</p>
+            <p className="text-sm"><span className="font-medium">Configured interval:</span> {equipment?.maintenanceIntervalDays ?? '-'} days</p>
+            <div className="space-y-2">
+              <Label htmlFor="manualNextDueDate">Manual next due date (required if no interval)</Label>
+              <Input
+                id="manualNextDueDate"
+                onChange={(e) => setManualNextDueDate(e.target.value)}
+                type="date"
+                value={manualNextDueDate}
+              />
+            </div>
+            <div className="flex justify-end">
+              <Button
+                style={{ backgroundColor: navy }}
+                disabled={markServicedMutation.isPending}
+                onClick={() => markServicedMutation.mutate()}
+              >
+                {markServicedMutation.isPending ? 'Saving...' : 'Confirm'}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

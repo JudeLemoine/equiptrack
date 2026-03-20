@@ -227,9 +227,9 @@ export default function AdminRentalsPage() {
 
   return (
     <div className="space-y-6">
-      <Button className="mb-4" onClick={() => navigate('/admin/dashboard')} size="sm" variant="outline">
+      <Button className="mb-4" onClick={() => navigate(-1)} size="sm" variant="outline">
         <ArrowLeft className="mr-2 h-4 w-4" />
-        Back to Dashboard
+        Back
       </Button>
       <PageHeader
         subtitle="Review requests and manage status transitions"

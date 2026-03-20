@@ -114,7 +114,7 @@ export default function MaintenanceDashboardPage() {
       cell: ({ row }: any) => (
         <div className="flex gap-2">
           <Button
-            onClick={() => navigate(`/equipment/${row.original.equipmentId}`)}
+            onClick={() => navigate(`/maintenance/equipment/${row.original.equipmentId}`)}
             size="sm"
             variant="outline"
           >

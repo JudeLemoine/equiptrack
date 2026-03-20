@@ -80,7 +80,7 @@ export default function FieldRentalsPage() {
         enableSorting: false,
         cell: ({ row }) => (
           <Button
-            onClick={() => navigate(`/equipment/${row.original.equipmentId}`)}
+            onClick={() => navigate(`/field/equipment/${row.original.equipmentId}`)}
             size="sm"
             variant="ghost"
             className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
@@ -109,9 +109,9 @@ export default function FieldRentalsPage() {
 
   return (
     <div className="space-y-6">
-      <Button className="mb-4" onClick={() => navigate('/field/dashboard')} size="sm" variant="outline">
+      <Button className="mb-4" onClick={() => navigate(-1)} size="sm" variant="outline">
         <ArrowLeft className="mr-2 h-4 w-4" />
-        Back to Dashboard
+        Back
       </Button>
       <PageHeader
         subtitle="Track request status and active assignments"

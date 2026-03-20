@@ -151,7 +151,9 @@ router.post("/", async (req, res) => {
 
 router.patch("/:id/status", async (req, res) => {
   const requestedStatus = req.body?.status as string | undefined
-  const actorUserId = (req.body?.actorUserId as string | undefined) ?? ((req as any).user?.id as string | undefined)
+  const actorUserId = (req.body?.actorUserId as string | undefined)
+    ?? (req.headers["x-user-id"] as string | undefined)
+    ?? ((req as any).user?.id as string | undefined)
   const assignedEquipmentId = req.body?.assignedEquipmentId as string | undefined
   const rejectionReason = req.body?.rejectionReason as string | undefined
 

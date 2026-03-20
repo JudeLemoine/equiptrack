@@ -372,7 +372,7 @@ router.patch("/:id/status", requireRole("admin", "maintenance"), async (req, res
 })
 
 // New endpoint: Report Issue
-router.post("/:id/report-issue", requireRole("maintenance", "admin"), async (req, res) => {
+router.post("/:id/report-issue", requireRole("field", "maintenance", "admin"), async (req, res) => {
   const item = await prisma.equipmentUnit.findFirst({
     where: { id: req.params.id, isActive: true },
     include: equipmentInclude,
@@ -383,10 +383,11 @@ router.post("/:id/report-issue", requireRole("maintenance", "admin"), async (req
     return
   }
 
-  const { severity, description, actorUserId } = req.body as {
+  const { severity, description, actorUserId, title } = req.body as {
     severity: string;
     description: string;
     actorUserId: string;
+    title?: string;
   }
 
   if (!severity || !description || !actorUserId) {
@@ -405,9 +406,9 @@ router.post("/:id/report-issue", requireRole("maintenance", "admin"), async (req
     data: {
       equipmentUnitId: item.id,
       reportedById: actor.id,
-      title: `Issue reported: ${severity}`,
+      title: title || `Issue reported: ${severity.toUpperCase()}`,
       description,
-      severity: severity as any, // assumes enum mapping
+      severity: severity.toUpperCase() as any, // normalize to match Prisma enum
     },
   })
 
@@ -670,6 +671,53 @@ router.post("/:id/service-logs", requireRole("maintenance", "admin"), async (req
     note: entry.description ?? note,
     performedByUserId: entry.technicianId ?? performedByUserId,
   })
+})
+
+router.post("/:id/notes", async (req, res) => {
+  const item = await prisma.equipmentUnit.findFirst({
+    where: { id: req.params.id, isActive: true },
+  })
+
+  if (!item) {
+    res.status(404).json({ message: "Equipment not found" })
+    return
+  }
+
+  const { note, authorId } = req.body as { note: string; authorId: string }
+
+  if (!note || !authorId) {
+    res.status(400).json({ message: "note and authorId are required" })
+    return
+  }
+
+  const author = await ensureUserExists(authorId)
+  if (!author) {
+    res.status(400).json({ message: "Invalid authorId" })
+    return
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const createdNote = await tx.note.create({
+      data: {
+        body: note,
+        authorId: author.id,
+        targetType: "EQUIPMENT_UNIT",
+        equipmentUnitId: item.id,
+      },
+    })
+
+    await tx.auditLog.create({
+      data: {
+        action: "NOTE_ADDED",
+        actorId: author.id,
+        equipmentUnitId: item.id,
+        noteId: createdNote.id,
+        message: `Field Note: ${note.length > 50 ? note.slice(0, 47) + "..." : note}`,
+      },
+    })
+  })
+
+  res.status(201).json({ message: "Note added successfully" })
 })
 
 router.get("/:id/activity", async (req, res) => {

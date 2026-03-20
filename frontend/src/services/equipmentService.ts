@@ -60,16 +60,28 @@ export function changeEquipmentStatus(id: string, dto: ChangeEquipmentStatusDTO)
   return apiClient.patch<Equipment, ChangeEquipmentStatusDTO>(`/api/equipment/${id}/status`, dto)
 }
 
-export function checkoutEquipment(id: string, actorUserId: string): Promise<Equipment> {
-  return apiClient.post<Equipment, { actorUserId: string }>(`/api/equipment/${id}/checkout`, {
-    actorUserId,
-  })
+export function checkoutEquipment(
+  id: string,
+  data: { requestedBy: string; startDate: string; endDate: string },
+): Promise<Equipment> {
+  return apiClient.post<Equipment, { actorUserId: string; startDate: string; endDate: string }>(
+    `/api/equipment/${id}/checkout`,
+    {
+      actorUserId: data.requestedBy,
+      startDate: data.startDate,
+      endDate: data.endDate,
+    },
+  )
 }
 
-export function checkinEquipment(id: string, actorUserId: string): Promise<Equipment> {
-  return apiClient.post<Equipment, { actorUserId: string }>(`/api/equipment/${id}/checkin`, {
-    actorUserId,
-  })
+export function addEquipmentNote(
+  id: string,
+  data: { note: string; authorId: string },
+): Promise<void> {
+  return apiClient.post<void, { note: string; authorId: string }>(
+    `/api/equipment/${id}/notes`,
+    data,
+  )
 }
 
 export function markEquipmentServiced(id: string, dto: MarkServicedDTO): Promise<Equipment> {
@@ -86,6 +98,11 @@ export function reportIssue(
 ): Promise<{ issue: unknown; equipment: Equipment }> {
   return apiClient.post<
     { issue: unknown; equipment: Equipment },
-    { severity: string; title: string; description: string; reportedById: string }
-  >(`/api/equipment/${equipmentId}/report-issue`, data)
+    { severity: string; title: string; description: string; actorUserId: string }
+  >(`/api/equipment/${equipmentId}/report-issue`, {
+    severity: data.severity,
+    title: data.title,
+    description: data.description,
+    actorUserId: data.reportedById,
+  })
 }

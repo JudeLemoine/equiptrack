@@ -17,7 +17,7 @@ import {
   DialogTitle,
 } from '../../../components/ui/dialog'
 import { Button } from '../../../components/ui/button'
-import { Input } from '../../../components/ui/input'
+import { TextField } from '@mui/material'
 import { Label } from '../../../components/ui/label'
 import { listMaintenanceQueue, markEquipmentServiced } from '../../../services/equipmentService'
 import type { Equipment } from '../../../types/equipment'
@@ -143,11 +143,16 @@ export default function MaintenanceEquipmentPage() {
               <p className="text-sm"><span className="font-medium">Configured interval:</span> {selectedItem.maintenanceIntervalDays ?? '-'} days</p>
               <div className="space-y-2">
                 <Label htmlFor="manualNextDueDate">Manual next due date (required if no interval)</Label>
-                <Input
+                <TextField
                   id="manualNextDueDate"
-                  onChange={(event) => setManualNextDueDate(event.target.value)}
                   type="date"
+                  fullWidth
+                  size="small"
                   value={manualNextDueDate}
+                  onChange={(event) => setManualNextDueDate(event.target.value)}
+                  slotProps={{ inputLabel: { shrink: true } }}
+                  variant="outlined"
+                  sx={{ '& .MuiOutlinedInput-root': { height: '40px', borderRadius: '8px', backgroundColor: 'white' } }}
                 />
               </div>
               <div className="flex justify-end">

@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
+import { TextField } from '@mui/material'
 import { Button } from '../../../components/ui/button'
 import { Input } from '../../../components/ui/input'
 import { Label } from '../../../components/ui/label'
@@ -111,7 +112,16 @@ export default function EquipmentForm({
 
       <div className="space-y-2">
         <Label htmlFor="lastServiceDate">Last Service Date</Label>
-        <Input id="lastServiceDate" type="date" {...form.register('lastServiceDate')} />
+        <TextField
+          id="lastServiceDate"
+          type="date"
+          fullWidth
+          size="small"
+          {...form.register('lastServiceDate')}
+          slotProps={{ inputLabel: { shrink: true } }}
+          variant="outlined"
+          sx={{ '& .MuiOutlinedInput-root': { height: '40px', borderRadius: '8px', backgroundColor: 'white' } }}
+        />
         {form.formState.errors.lastServiceDate ? (
           <p className="text-xs text-red-600">{form.formState.errors.lastServiceDate.message}</p>
         ) : null}
@@ -119,7 +129,16 @@ export default function EquipmentForm({
 
       <div className="space-y-2">
         <Label htmlFor="nextServiceDueDate">Next Service Due Date</Label>
-        <Input id="nextServiceDueDate" type="date" {...form.register('nextServiceDueDate')} />
+        <TextField
+          id="nextServiceDueDate"
+          type="date"
+          fullWidth
+          size="small"
+          {...form.register('nextServiceDueDate')}
+          slotProps={{ inputLabel: { shrink: true } }}
+          variant="outlined"
+          sx={{ '& .MuiOutlinedInput-root': { height: '40px', borderRadius: '8px', backgroundColor: 'white' } }}
+        />
       </div>
 
       <div className="space-y-2">

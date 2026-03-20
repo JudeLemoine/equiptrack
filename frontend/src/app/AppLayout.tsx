@@ -1,6 +1,7 @@
 import { Link, Outlet, useNavigate } from 'react-router-dom'
-import { LogOut } from 'lucide-react'
-import { clearSession, getSession } from '../lib/auth'
+import { LogOut, User, Wrench, HardHat, Truck, ClipboardList, Settings } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { clearSession, getSession, setSession } from '../lib/auth'
 import { Avatar, AvatarFallback } from '../components/ui/avatar'
 import {
   DropdownMenu,
@@ -11,10 +12,42 @@ import {
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu'
 import iconColor from '../assets/logos/icon_color.png'
+import { getUser } from '../services/userService'
+
+const ICON_MAP: Record<string, React.ReactNode> = {
+  hardhat: <HardHat className="h-4 w-4" />,
+  wrench: <Wrench className="h-4 w-4" />,
+  truck: <Truck className="h-4 w-4" />,
+  clipboard: <ClipboardList className="h-4 w-4" />,
+  gear: <Settings className="h-4 w-4" />,
+}
 
 export default function AppLayout() {
   const navigate = useNavigate()
   const session = getSession()
+
+  // Fetch user data to keep avatar current
+  const userQuery = useQuery({
+    queryKey: ['current-user-avatar', session?.user?.id],
+    queryFn: async () => {
+      if (!session?.user?.id) return null
+      const user = await getUser(session.user.id)
+      // Update session cache with latest avatar
+      if (user && session) {
+        const updated = {
+          ...session,
+          user: { ...session.user, avatarUrl: user.avatarUrl ?? undefined, isAvatarIcon: user.isAvatarIcon },
+        }
+        setSession(updated)
+      }
+      return user
+    },
+    enabled: !!session?.user?.id,
+    staleTime: 30_000,
+  })
+
+  const avatarIcon = userQuery.data?.avatarUrl || session?.user?.avatarUrl
+  const isAvatarIcon = userQuery.data?.isAvatarIcon ?? session?.user?.isAvatarIcon
 
   const initials =
     session?.user.name
@@ -52,9 +85,13 @@ export default function AppLayout() {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-3 rounded-md px-2 py-1 hover:bg-slate-100">
+            <button className="flex items-center gap-3 rounded-md px-2 py-1 hover:bg-slate-100 transition-colors">
               <Avatar className="h-8 w-8">
-                <AvatarFallback>{initials}</AvatarFallback>
+                <AvatarFallback className="text-xs font-semibold">
+                  {isAvatarIcon && avatarIcon && ICON_MAP[avatarIcon]
+                    ? ICON_MAP[avatarIcon]
+                    : initials}
+                </AvatarFallback>
               </Avatar>
               <div className="hidden text-left sm:block">
                 <p className="text-sm font-medium leading-none">{session?.user.name ?? 'User'}</p>
@@ -62,13 +99,18 @@ export default function AppLayout() {
               </div>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>
-              <p className="text-sm">{session?.user.email}</p>
-              <p className="text-xs text-slate-500">{roleLabel}</p>
+              <p className="text-sm font-medium">{session?.user.name}</p>
+              <p className="text-xs text-slate-500">{session?.user.email}</p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout}>
+            <DropdownMenuItem onClick={() => navigate('/profile')} className="cursor-pointer">
+              <User className="mr-2 h-4 w-4" />
+              Profile
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50">
               <LogOut className="mr-2 h-4 w-4" />
               Logout
             </DropdownMenuItem>

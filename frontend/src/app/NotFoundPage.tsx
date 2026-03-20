@@ -14,7 +14,7 @@ export default function NotFoundPage() {
           The page you requested does not exist or has moved.
         </p>
         <Button asChild className="mt-6">
-          <Link to="/">Back to dashboard</Link>
+          <Link to="/">Back to home</Link>
         </Button>
       </div>
     </main>

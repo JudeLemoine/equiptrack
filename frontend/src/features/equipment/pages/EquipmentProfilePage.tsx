@@ -22,9 +22,9 @@ import { getSession } from '../../../lib/auth'
 import { formatDate, formatDateTime } from '../../../lib/utils'
 import { listActivityByEquipment } from '../../../services/activityService'
 import {
-  changeEquipmentStatus,
   checkoutEquipment,
   getEquipment,
+  reportIssue,
 } from '../../../services/equipmentService'
 import { listServiceLogsByEquipment } from '../../../services/serviceLogService'
 import type { ActivityEvent } from '../../../types/activity'
@@ -77,19 +77,22 @@ export default function EquipmentProfilePage() {
   // Mutations
   const reportIssueMutation = useMutation({
     mutationFn: async () => {
-      // Logic: If critical, backend will flip status to OUT_OF_SERVICE
-      // This matches your Node 08 requirement
       console.log("Reporting issue:", { issueSeverity, issueDescription })
-      return changeEquipmentStatus(id as string, {
-        status: issueSeverity === 'critical' ? 'maintenance' : equipment?.status ?? 'available',
-        actorUserId: userId,
-        note: `Issue Reported (${issueSeverity}): ${issueDescription}`
+      return reportIssue(id as string, {
+        severity: issueSeverity,
+        title: `Issue Report: ${equipment?.name}`,
+        description: issueDescription,
+        reportedById: userId
       })
     },
     onSuccess: async () => {
-      await refreshAll()
+      // Unmount-like behavior: Close modal and THEN clear state
       setReportIssueOpen(false)
+      setIssueSeverity('low')
       setIssueDescription('')
+      
+      // Explicit refetch to ensure freshness
+      await refreshAll()
       toast.success('Issue reported successfully.')
     }
   })

@@ -9,6 +9,8 @@ import {
   listIssueReports,
   listNotes,
   updateIssueReportStatus,
+  resolveIssueReport,
+  moveToMaintenance,
 } from "../services/maintenance.service"
 
 const router = Router()
@@ -180,6 +182,56 @@ router.delete("/notes/:id", requireRole("maintenance", "admin"), async (req, res
   }
 
   res.status(204).end()
+})
+
+router.post("/issues/:id/resolve", requireRole("maintenance", "admin"), async (req, res) => {
+  const actorUserId = req.body?.actorUserId as string | undefined
+  if (!actorUserId) {
+    res.status(400).json({ message: "actorUserId is required" })
+    return
+  }
+
+  const result = await resolveIssueReport({
+    issueId: req.params.id,
+    actorUserId,
+  })
+
+  if (result === null) {
+    res.status(404).json({ message: "Issue not found" })
+    return
+  }
+
+  if (result === undefined) {
+    res.status(400).json({ message: "actorUserId is invalid" })
+    return
+  }
+
+  res.json(result)
+})
+
+router.post("/issues/:id/move-to-maintenance", requireRole("maintenance", "admin"), async (req, res) => {
+  const actorUserId = req.body?.actorUserId as string | undefined
+  if (!actorUserId) {
+    res.status(400).json({ message: "actorUserId is required" })
+    return
+  }
+
+  const result = await moveToMaintenance({
+    issueId: req.params.id,
+    actorUserId,
+  })
+
+  if (result === null) {
+    res.status(404).json({ message: "Issue not found" })
+    return
+  }
+
+  if (result === undefined) {
+    res.status(400).json({ message: "actorUserId is invalid" })
+    return
+  }
+
+  res.json(result)
 })
 
 export default router

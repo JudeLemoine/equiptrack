@@ -1,20 +1,53 @@
-import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
-import { Wrench, CheckCircle2, Activity } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link, useNavigate } from 'react-router-dom'
+import { Wrench, CheckCircle2, Activity, AlertCircle } from 'lucide-react'
 import { Card as MuiCard, CardActionArea, Typography, Box } from '@mui/material'
+import { toast } from 'sonner'
+import DataTable from '../../../components/DataTable'
 import ErrorState from '../../../components/ErrorState'
 import Loader from '../../../components/Loader'
 import PageHeader from '../../../components/PageHeader'
+import { Button } from '../../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card'
+import { getSession } from '../../../lib/auth'
 import { getMaintenanceSummary } from '../../../services/dashboardService'
+import { listIssueReports, resolveIssue, moveToMaintenance } from '../../../services/maintenanceService'
 
 export default function MaintenanceDashboardPage() {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const session = getSession()
+  const userId = session?.user.id ?? ''
+
   const summaryQuery = useQuery({
     queryKey: ['maintenance-summary'],
     queryFn: getMaintenanceSummary,
   })
 
-  if (summaryQuery.isLoading) {
+  const issuesQuery = useQuery({
+    queryKey: ['open-issues'],
+    queryFn: () => listIssueReports({ status: 'OPEN' }),
+  })
+
+  const resolveMutation = useMutation({
+    mutationFn: (issueId: string) => resolveIssue(issueId, userId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['open-issues'] })
+      void queryClient.invalidateQueries({ queryKey: ['maintenance-summary'] })
+      toast.success('Issue dismissed successfully')
+    },
+  })
+
+  const maintenanceMutation = useMutation({
+    mutationFn: (issueId: string) => moveToMaintenance(issueId, userId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['open-issues'] })
+      void queryClient.invalidateQueries({ queryKey: ['maintenance-summary'] })
+      toast.success('Equipment moved to maintenance')
+    },
+  })
+
+  if (summaryQuery.isLoading || issuesQuery.isLoading) {
     return <Loader label="Loading maintenance dashboard..." />
   }
 
@@ -22,7 +55,10 @@ export default function MaintenanceDashboardPage() {
     return (
       <ErrorState
         error={summaryQuery.error}
-        onRetry={() => summaryQuery.refetch()}
+        onRetry={() => {
+          void summaryQuery.refetch()
+          void issuesQuery.refetch()
+        }}
         title="Could not load dashboard"
       />
     )
@@ -47,6 +83,63 @@ export default function MaintenanceDashboardPage() {
       icon: Activity,
       description: 'Currently assigned to active rentals',
     },
+  ]
+
+  const issueColumns = [
+    {
+      accessorKey: 'title',
+      header: 'Issue Title',
+    },
+    {
+      accessorKey: 'severity',
+      header: 'Severity',
+      cell: ({ row }: any) => {
+        const severity = row.original.severity
+        const colors: Record<string, string> = {
+          LOW: 'text-blue-700 bg-blue-50 border-blue-200',
+          MEDIUM: 'text-amber-700 bg-amber-50 border-amber-200',
+          HIGH: 'text-orange-700 bg-orange-50 border-orange-200',
+          CRITICAL: 'text-red-700 bg-red-50 border-red-200',
+        }
+        return (
+          <span className={`px-2 py-0.5 rounded text-xs font-semibold border ${colors[severity] || 'text-slate-700 bg-slate-50 border-slate-200'}`}>
+            {severity}
+          </span>
+        )
+      }
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }: any) => (
+        <div className="flex gap-2">
+          <Button
+            onClick={() => navigate(`/equipment/${row.original.equipmentId}`)}
+            size="sm"
+            variant="outline"
+          >
+            View
+          </Button>
+          <Button
+            onClick={() => maintenanceMutation.mutate(row.original.id)}
+            size="sm"
+            className="bg-navy-700 hover:bg-navy-800"
+            disabled={maintenanceMutation.isPending}
+          >
+            Move to Maintenance
+          </Button>
+          <Button
+            onClick={() => resolveMutation.mutate(row.original.id)}
+            size="sm"
+            variant="ghost"
+            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+            disabled={resolveMutation.isPending}
+          >
+            Dismiss
+          </Button>
+        </div>
+      )
+    }
   ]
 
   return (
@@ -83,6 +176,19 @@ export default function MaintenanceDashboardPage() {
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      <div className="mt-8 space-y-4">
+        <div className="flex items-center gap-2">
+          <AlertCircle className="h-5 w-5 text-red-600" />
+          <h2 className="text-xl font-bold text-slate-900">Reported Issues Queue</h2>
+        </div>
+        <DataTable
+          columns={issueColumns}
+          data={issuesQuery.data ?? []}
+          emptyDescription="No active issue reports found."
+          emptyTitle="Queue Clear"
+        />
       </div>
     </div>
   )

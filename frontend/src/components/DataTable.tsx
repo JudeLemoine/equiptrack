@@ -112,7 +112,7 @@ export default function DataTable<TData>({
                   {headerGroup.headers.map((header) => {
                     const canSort = header.column.getCanSort()
                     return (
-                      <TableHead key={header.id}>
+                      <TableHead key={header.id} className="px-4">
                         {header.isPlaceholder ? null : canSort ? (
                           <Button
                             className="h-auto px-0 text-slate-600 hover:text-slate-900"

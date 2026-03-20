@@ -421,3 +421,113 @@ export async function markServiced(unitId: string, performedByUserId: string, ne
 
   return updated
 }
+
+export async function resolveIssueReport(input: {
+  issueId: string
+  actorUserId: string
+}) {
+  const [issue, actor] = await Promise.all([
+    prisma.issueReport.findUnique({ where: { id: input.issueId } }),
+    prisma.user.findUnique({ where: { id: input.actorUserId } }),
+  ])
+
+  if (!issue) return null
+  if (!actor) return undefined
+
+  return prisma.$transaction(async (tx) => {
+    // 1. Update Issue Status
+    const updatedIssue = await tx.issueReport.update({
+      where: { id: issue.id },
+      data: {
+        status: "RESOLVED",
+        resolvedAt: new Date(),
+      },
+    })
+
+    // 2. Restore Equipment Status if it was Out of Service
+    const unit = await tx.equipmentUnit.findUnique({
+      where: { id: issue.equipmentUnitId },
+    })
+
+    if (unit && unit.status === "OUT_OF_SERVICE") {
+      await tx.equipmentUnit.update({
+        where: { id: unit.id },
+        data: { status: "AVAILABLE" },
+      })
+
+      await tx.auditLog.create({
+        data: {
+          action: "STATUS_CHANGED",
+          actorId: actor.id,
+          equipmentUnitId: unit.id,
+          message: "Status restored to AVAILABLE after issue resolution",
+        },
+      })
+    }
+
+    await tx.auditLog.create({
+      data: {
+        action: "UPDATED",
+        actorId: actor.id,
+        equipmentUnitId: issue.equipmentUnitId,
+        issueReportId: issue.id,
+        message: "Issue resolved and dismissed",
+      },
+    })
+
+    return updatedIssue
+  })
+}
+
+export async function moveToMaintenance(input: {
+  issueId: string
+  actorUserId: string
+}) {
+  const [issue, actor] = await Promise.all([
+    prisma.issueReport.findUnique({ where: { id: input.issueId } }),
+    prisma.user.findUnique({ where: { id: input.actorUserId } }),
+  ])
+
+  if (!issue) return null
+  if (!actor) return undefined
+
+  return prisma.$transaction(async (tx) => {
+    // 1. Update Issue Status
+    await tx.issueReport.update({
+      where: { id: issue.id },
+      data: { status: "IN_PROGRESS" },
+    })
+
+    // 2. Set Equipment to IN_MAINTENANCE
+    await tx.equipmentUnit.update({
+      where: { id: issue.equipmentUnitId },
+      data: { status: "IN_MAINTENANCE" },
+    })
+
+    // 3. Create Maintenance Record
+    const record = await tx.maintenanceRecord.create({
+      data: {
+        equipmentUnitId: issue.equipmentUnitId,
+        issueReportId: issue.id,
+        technicianId: actor.id,
+        status: "IN_PROGRESS",
+        trigger: "ISSUE_REPORTED",
+        title: `Maintenance: ${issue.title}`,
+        description: issue.description,
+        startedAt: new Date(),
+      },
+    })
+
+    await tx.auditLog.create({
+      data: {
+        action: "MAINTENANCE_OPENED",
+        actorId: actor.id,
+        equipmentUnitId: issue.equipmentUnitId,
+        maintenanceRecordId: record.id,
+        message: `Maintenance started from issue: ${issue.title}`,
+      },
+    })
+
+    return record
+  })
+}

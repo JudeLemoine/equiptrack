@@ -74,8 +74,23 @@ export default function FieldRentalsPage() {
           return <p className="text-sm text-emerald-700">Rental completed.</p>
         },
       },
+      {
+        id: 'actions',
+        header: 'View',
+        enableSorting: false,
+        cell: ({ row }) => (
+          <Button
+            onClick={() => navigate(`/equipment/${row.original.equipmentId}`)}
+            size="sm"
+            variant="ghost"
+            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+          >
+            View Profile
+          </Button>
+        ),
+      },
     ],
-    [],
+    [navigate],
   )
 
   if (rentalsQuery.isLoading) {

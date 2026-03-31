@@ -17,12 +17,11 @@ ehthumbs.db
 **/build/
 **/out/
 
-# Prisma generated client
-**/src/generated/prisma/
-
 # SQLite local databases
 *.db
 *.db-journal
+*.db-shm
+*.db-wal
 
 # Logs
 *.log

@@ -1,5 +1,5 @@
-import { EquipmentStatus, Prisma, RentalStatus } from "@prisma/client"
-import { prisma } from "../lib/db"
+import { EquipmentStatus, RentalStatus } from "../db/enums"
+import db from "../lib/db"
 
 const OCCUPYING_RENTAL_STATUSES: RentalStatus[] = ["APPROVED", "RESERVED", "CHECKED_OUT", "OVERDUE"]
 const HARD_BLOCK_EQUIPMENT_STATUSES: EquipmentStatus[] = ["IN_MAINTENANCE", "OUT_OF_SERVICE"]
@@ -138,6 +138,25 @@ function evaluateUnitAvailability(unit: UnitForAvailability, window: Availabilit
   return { isAvailable: true }
 }
 
+type UnitRow = {
+  id: string
+  assetTag: string
+  status: EquipmentStatus
+  equipmentTypeId: string
+  locationId: string
+  nextMaintenanceDue: string | null
+  typeName: string
+  categoryName: string
+}
+
+type RentalRow = {
+  id: string
+  requestedStart: string
+  requestedEnd: string
+  status: RentalStatus
+  equipmentUnitId: string
+}
+
 async function loadUnitsForAvailability(input: {
   window: AvailabilityWindow
   locationId?: string
@@ -145,38 +164,86 @@ async function loadUnitsForAvailability(input: {
   equipmentUnitId?: string
   excludeRentalId?: string
 }) {
-  const units = await prisma.equipmentUnit.findMany({
-    where: {
-      isActive: true,
-      ...(input.locationId ? { locationId: input.locationId } : {}),
-      ...(input.equipmentTypeId ? { equipmentTypeId: input.equipmentTypeId } : {}),
-      ...(input.equipmentUnitId ? { id: input.equipmentUnitId } : {}),
-    },
-    include: {
-      rentals: {
-        where: {
-          status: { in: OCCUPYING_RENTAL_STATUSES },
-          ...(input.excludeRentalId ? { id: { not: input.excludeRentalId } } : {}),
-          requestedStart: { lte: input.window.end },
-          requestedEnd: { gte: input.window.start },
-        },
-        select: {
-          id: true,
-          requestedStart: true,
-          requestedEnd: true,
-          status: true,
-        },
-      },
-      equipmentType: {
-        include: {
-          category: true,
-        },
-      },
-    },
-    orderBy: [{ equipmentType: { name: "asc" } }, { assetTag: "asc" }],
-  })
+  const conditions: string[] = ["eu.isActive = 1"]
+  const params: unknown[] = []
 
-  return units
+  if (input.locationId) {
+    conditions.push("eu.locationId = ?")
+    params.push(input.locationId)
+  }
+  if (input.equipmentTypeId) {
+    conditions.push("eu.equipmentTypeId = ?")
+    params.push(input.equipmentTypeId)
+  }
+  if (input.equipmentUnitId) {
+    conditions.push("eu.id = ?")
+    params.push(input.equipmentUnitId)
+  }
+
+  const unitRows = db.prepare(`
+    SELECT eu.id, eu.assetTag, eu.status, eu.equipmentTypeId, eu.locationId,
+           eu.nextMaintenanceDue, et.name AS typeName, ec.name AS categoryName
+    FROM EquipmentUnit eu
+    JOIN EquipmentType et ON eu.equipmentTypeId = et.id
+    JOIN EquipmentCategory ec ON et.categoryId = ec.id
+    WHERE ${conditions.join(" AND ")}
+    ORDER BY et.name ASC, eu.assetTag ASC
+  `).all(...params) as UnitRow[]
+
+  if (unitRows.length === 0) return []
+
+  const unitIds = unitRows.map((u) => u.id)
+  const placeholders = unitIds.map(() => "?").join(",")
+
+  const rentalConditions = [
+    `r.equipmentUnitId IN (${placeholders})`,
+    `r.status IN (${OCCUPYING_RENTAL_STATUSES.map(() => "?").join(",")})`,
+    "r.requestedStart <= ?",
+    "r.requestedEnd >= ?",
+  ]
+  const rentalParams: unknown[] = [
+    ...unitIds,
+    ...OCCUPYING_RENTAL_STATUSES,
+    input.window.end.toISOString(),
+    input.window.start.toISOString(),
+  ]
+
+  if (input.excludeRentalId) {
+    rentalConditions.push("r.id != ?")
+    rentalParams.push(input.excludeRentalId)
+  }
+
+  const rentalRows = db.prepare(`
+    SELECT r.id, r.requestedStart, r.requestedEnd, r.status, r.equipmentUnitId
+    FROM Rental r
+    WHERE ${rentalConditions.join(" AND ")}
+  `).all(...rentalParams) as RentalRow[]
+
+  const rentalsByUnit = new Map<string, UnitOverlapRental[]>()
+  for (const r of rentalRows) {
+    const list = rentalsByUnit.get(r.equipmentUnitId) ?? []
+    list.push({
+      id: r.id,
+      requestedStart: new Date(r.requestedStart),
+      requestedEnd: new Date(r.requestedEnd),
+      status: r.status,
+    })
+    rentalsByUnit.set(r.equipmentUnitId, list)
+  }
+
+  return unitRows.map((u) => ({
+    id: u.id,
+    assetTag: u.assetTag,
+    status: u.status,
+    equipmentTypeId: u.equipmentTypeId,
+    locationId: u.locationId,
+    nextMaintenanceDue: u.nextMaintenanceDue ? new Date(u.nextMaintenanceDue) : null,
+    rentals: rentalsByUnit.get(u.id) ?? [],
+    equipmentType: {
+      name: u.typeName,
+      category: { name: u.categoryName },
+    },
+  }))
 }
 
 function getUnitNextDate(unit: UnitForAvailability, window: AvailabilityWindow): Date | undefined {
@@ -422,41 +489,47 @@ export async function assertEquipmentUnitBookable(input: {
 }
 
 export async function checkOverlap(unitId: string, start: Date, end: Date, excludeRentalId?: string): Promise<boolean> {
-  const overlappingCount = await prisma.rental.count({
-    where: {
-      equipmentUnitId: unitId,
-      status: { in: OCCUPYING_RENTAL_STATUSES },
-      ...(excludeRentalId ? { id: { not: excludeRentalId } } : {}),
-      requestedStart: { lte: end },
-      requestedEnd: { gte: start },
-    },
-  });
-  return overlappingCount > 0;
+  const conditions = [
+    "equipmentUnitId = ?",
+    `status IN (${OCCUPYING_RENTAL_STATUSES.map(() => "?").join(",")})`,
+    "requestedStart <= ?",
+    "requestedEnd >= ?",
+  ]
+  const params: unknown[] = [unitId, ...OCCUPYING_RENTAL_STATUSES, end.toISOString(), start.toISOString()]
+
+  if (excludeRentalId) {
+    conditions.push("id != ?")
+    params.push(excludeRentalId)
+  }
+
+  const row = db.prepare(
+    `SELECT COUNT(*) as count FROM Rental WHERE ${conditions.join(" AND ")}`
+  ).get(...params) as { count: number }
+
+  return row.count > 0
 }
 
 export async function validateMaintenanceWindow(unitId: string, durationDays: number, startDate: Date = new Date()): Promise<boolean> {
-  const unit = await prisma.equipmentUnit.findUnique({
-    where: { id: unitId },
-    select: { nextMaintenanceDue: true, status: true },
-  });
-  
-  if (!unit) return false;
+  const unit = db.prepare(
+    "SELECT nextMaintenanceDue, status FROM EquipmentUnit WHERE id = ?"
+  ).get(unitId) as { nextMaintenanceDue: string | null; status: EquipmentStatus } | undefined
+
+  if (!unit) return false
 
   if (HARD_BLOCK_EQUIPMENT_STATUSES.includes(unit.status) || SOFT_BLOCK_EQUIPMENT_STATUSES.includes(unit.status)) {
-    return false;
+    return false
   }
 
   if (unit.nextMaintenanceDue) {
-    const durationEnd = new Date(startDate);
-    durationEnd.setDate(durationEnd.getDate() + durationDays);
-    
-    // If the maintenance is due before or exactly when the rental duration ends, it's invalid.
-    if (unit.nextMaintenanceDue <= durationEnd) {
-      return false;
+    const durationEnd = new Date(startDate)
+    durationEnd.setDate(durationEnd.getDate() + durationDays)
+
+    if (new Date(unit.nextMaintenanceDue) <= durationEnd) {
+      return false
     }
   }
 
-  return true;
+  return true
 }
 
 export { OCCUPYING_RENTAL_STATUSES }

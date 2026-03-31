@@ -1,13 +1,11 @@
 import {
   AuditAction,
   EquipmentStatus,
-  Prisma,
   RentalStatus,
   UserRole,
-  type User,
-} from "@prisma/client"
+} from "../db/enums"
 import { mapPrismaRentalStatusToApi, toIsoDate } from "../db/mappers"
-import { prisma } from "../lib/db"
+import db, { generateId, toDbDate } from "../lib/db"
 import { assertEquipmentUnitBookable, checkOverlap, validateMaintenanceWindow, OCCUPYING_RENTAL_STATUSES } from "./availability.service"
 
 const RENTAL_TRANSITIONS: Record<RentalStatus, ReadonlySet<RentalStatus>> = {
@@ -62,27 +60,35 @@ type ApiRental = {
   updatedAt: string
 }
 
-type RentalWithRelations = Prisma.RentalGetPayload<{
-  include: {
-    equipmentUnit: {
-      include: {
-        equipmentType: true
-      }
-    }
-    equipmentType: true
-    requester: true
-  }
-}>
+type UserRow = {
+  id: string
+  name: string
+  email: string
+  role: UserRole
+}
 
-const rentalInclude = {
-  equipmentUnit: {
-    include: {
-      equipmentType: true,
-    },
-  },
-  equipmentType: true,
-  requester: true,
-} satisfies Prisma.RentalInclude
+type RentalRow = {
+  id: string
+  equipmentUnitId: string | null
+  equipmentTypeId: string
+  requesterId: string
+  approverId: string | null
+  checkedOutById: string | null
+  returnedById: string | null
+  locationId: string | null
+  status: RentalStatus
+  reason: string
+  jobSite: string | null
+  requestedStart: string
+  requestedEnd: string
+  approvedStart: string | null
+  approvedEnd: string | null
+  checkedOutAt: string | null
+  returnedAt: string | null
+  rejectedReason: string | null
+  createdAt: string
+  updatedAt: string
+}
 
 export type CreateRentalInput = {
   equipmentId: string
@@ -118,20 +124,43 @@ export class RentalLifecycleError extends Error {
   }
 }
 
-function toApiRental(rental: RentalWithRelations): ApiRental {
+function loadRentalWithRelations(rentalId: string) {
+  const rental = db.prepare("SELECT * FROM Rental WHERE id = ?").get(rentalId) as RentalRow | undefined
+  if (!rental) return undefined
+
+  const requester = db.prepare("SELECT id, name, email, role FROM User WHERE id = ?").get(rental.requesterId) as UserRow
+
+  let equipmentTypeName = "Equipment"
+  if (rental.equipmentUnitId) {
+    const row = db.prepare(`
+      SELECT et.name FROM EquipmentUnit eu
+      JOIN EquipmentType et ON eu.equipmentTypeId = et.id
+      WHERE eu.id = ?
+    `).get(rental.equipmentUnitId) as { name: string } | undefined
+    if (row) equipmentTypeName = row.name
+  } else {
+    const row = db.prepare("SELECT name FROM EquipmentType WHERE id = ?").get(rental.equipmentTypeId) as { name: string } | undefined
+    if (row) equipmentTypeName = row.name
+  }
+
+  return { rental, requester, equipmentTypeName }
+}
+
+function toApiRental(data: { rental: RentalRow; requester: UserRow; equipmentTypeName: string }): ApiRental {
+  const { rental, requester, equipmentTypeName } = data
   return {
     id: rental.id,
     equipmentId: rental.equipmentUnitId ?? "",
     equipmentTypeId: rental.equipmentTypeId,
-    equipmentName: rental.equipmentUnit?.equipmentType.name ?? rental.equipmentType.name,
+    equipmentName: equipmentTypeName,
     requestedBy: rental.requesterId,
-    requestedByName: rental.requester.name,
+    requestedByName: requester.name,
     status: mapPrismaRentalStatusToApi(rental.status),
     startDate: toIsoDate(rental.requestedStart) ?? "",
     endDate: toIsoDate(rental.requestedEnd),
     notes: rental.reason,
-    createdAt: rental.createdAt.toISOString(),
-    updatedAt: rental.updatedAt.toISOString(),
+    createdAt: new Date(rental.createdAt).toISOString(),
+    updatedAt: new Date(rental.updatedAt).toISOString(),
   }
 }
 
@@ -181,7 +210,7 @@ function canTransition(from: RentalStatus, to: RentalStatus): boolean {
   return RENTAL_TRANSITIONS[from].has(to)
 }
 
-function ensureRoleForAction(actor: User, action: AllowedAction, rental?: { requesterId: string }) {
+function ensureRoleForAction(actor: UserRow, action: AllowedAction, rental?: { requesterId: string }) {
   if (action === "REQUEST") {
     if (actor.role !== UserRole.FIELD_WORKER && actor.role !== UserRole.ADMIN) {
       throw new RentalLifecycleError("FORBIDDEN", "Only field workers and admins can create requests", 403)
@@ -209,8 +238,7 @@ function ensureRoleForAction(actor: User, action: AllowedAction, rental?: { requ
 }
 
 async function resolveRequestedEquipment(
-  tx: Prisma.TransactionClient,
-  rental: { id: string; equipmentUnitId: string | null; requestedStart: Date; requestedEnd: Date; locationId: string | null },
+  rental: { id: string; equipmentUnitId: string | null; requestedStart: string; requestedEnd: string; locationId: string | null },
   targetStatus: RentalStatus,
   assignedEquipmentId?: string,
 ) {
@@ -219,25 +247,25 @@ async function resolveRequestedEquipment(
     throw new RentalLifecycleError("INVALID_INPUT", "assignedEquipmentId is required for approval", 400)
   }
 
-  const unit = await tx.equipmentUnit.findFirst({
-    where: { id: equipmentId, isActive: true },
-    select: {
-      id: true,
-      status: true,
-      nextMaintenanceDue: true,
-      equipmentTypeId: true,
-      locationId: true,
-    },
-  })
+  const unit = db.prepare(`
+    SELECT id, status, nextMaintenanceDue, equipmentTypeId, locationId
+    FROM EquipmentUnit WHERE id = ? AND isActive = 1
+  `).get(equipmentId) as {
+    id: string; status: EquipmentStatus; nextMaintenanceDue: string | null;
+    equipmentTypeId: string; locationId: string
+  } | undefined
 
   if (!unit) {
     throw new RentalLifecycleError("NOT_FOUND", "Equipment not found", 404)
   }
 
+  const requestedStart = new Date(rental.requestedStart)
+  const requestedEnd = new Date(rental.requestedEnd)
+
   const bookable = await assertEquipmentUnitBookable({
     equipmentUnitId: unit.id,
-    startDate: rental.requestedStart,
-    endDate: rental.requestedEnd,
+    startDate: requestedStart,
+    endDate: requestedEnd,
     locationId: rental.locationId ?? undefined,
     excludeRentalId: rental.id,
   })
@@ -245,17 +273,17 @@ async function resolveRequestedEquipment(
     throw new RentalLifecycleError("CONFLICT", bookable.message, bookable.statusCode)
   }
 
-  const overlap = await checkOverlap(unit.id, rental.requestedStart, rental.requestedEnd, rental.id);
+  const overlap = await checkOverlap(unit.id, requestedStart, requestedEnd, rental.id)
   if (overlap) {
-    throw new RentalLifecycleError("CONFLICT", "Equipment is already reserved or checked out during the requested window.", 409);
+    throw new RentalLifecycleError("CONFLICT", "Equipment is already reserved or checked out during the requested window.", 409)
   }
 
-  const durationMs = rental.requestedEnd.getTime() - rental.requestedStart.getTime();
-  const durationDays = Math.ceil(durationMs / (1000 * 60 * 60 * 24));
-  
-  const validMaintenance = await validateMaintenanceWindow(unit.id, durationDays, rental.requestedStart);
+  const durationMs = requestedEnd.getTime() - requestedStart.getTime()
+  const durationDays = Math.ceil(durationMs / (1000 * 60 * 60 * 24))
+
+  const validMaintenance = await validateMaintenanceWindow(unit.id, durationDays, requestedStart)
   if (!validMaintenance) {
-    throw new RentalLifecycleError("CONFLICT", "Equipment maintenance is due during the requested rental duration.", 409);
+    throw new RentalLifecycleError("CONFLICT", "Equipment maintenance is due during the requested rental duration.", 409)
   }
 
   if (targetStatus === "CHECKED_OUT") {
@@ -276,17 +304,15 @@ async function resolveRequestedEquipment(
   return { ...unit, nextStatus: unit.status }
 }
 
-async function releaseEquipmentIfNeeded(
-  tx: Prisma.TransactionClient,
+function releaseEquipmentIfNeeded(
   rentalId: string,
   equipmentUnitId: string | null,
 ) {
   if (!equipmentUnitId) return
 
-  const equipment = await tx.equipmentUnit.findUnique({
-    where: { id: equipmentUnitId },
-    select: { id: true, status: true },
-  })
+  const equipment = db.prepare(
+    "SELECT id, status FROM EquipmentUnit WHERE id = ?"
+  ).get(equipmentUnitId) as { id: string; status: EquipmentStatus } | undefined
 
   if (!equipment) return
 
@@ -294,22 +320,16 @@ async function releaseEquipmentIfNeeded(
     return
   }
 
-  const stillHeld = await tx.rental.count({
-    where: {
-      id: { not: rentalId },
-      equipmentUnitId,
-      status: { in: OCCUPYING_RENTAL_STATUSES },
-    },
-  })
+  const placeholders = OCCUPYING_RENTAL_STATUSES.map(() => "?").join(",")
+  const row = db.prepare(
+    `SELECT COUNT(*) as count FROM Rental WHERE id != ? AND equipmentUnitId = ? AND status IN (${placeholders})`
+  ).get(rentalId, equipmentUnitId, ...OCCUPYING_RENTAL_STATUSES) as { count: number }
 
-  if (stillHeld > 0) {
+  if (row.count > 0) {
     return
   }
 
-  await tx.equipmentUnit.update({
-    where: { id: equipmentUnitId },
-    data: { status: EquipmentStatus.AVAILABLE },
-  })
+  db.prepare("UPDATE EquipmentUnit SET status = ? WHERE id = ?").run(EquipmentStatus.AVAILABLE, equipmentUnitId)
 }
 
 function getAuditEntry(status: RentalStatus, rejectionReason?: string): { action: AuditAction; message: string } {
@@ -334,17 +354,10 @@ export async function createRentalRequest(input: CreateRentalInput): Promise<Api
     throw new RentalLifecycleError("INVALID_INPUT", "startDate/endDate are invalid", 400)
   }
 
-  const [user, equipment] = await Promise.all([
-    prisma.user.findUnique({ where: { id: input.requestedByUserId } }),
-    prisma.equipmentUnit.findFirst({
-      where: { id: input.equipmentId, isActive: true },
-      select: {
-        id: true,
-        equipmentTypeId: true,
-        locationId: true,
-      },
-    }),
-  ])
+  const user = db.prepare("SELECT id, name, email, role FROM User WHERE id = ?").get(input.requestedByUserId) as UserRow | undefined
+  const equipment = db.prepare(
+    "SELECT id, equipmentTypeId, locationId FROM EquipmentUnit WHERE id = ? AND isActive = 1"
+  ).get(input.equipmentId) as { id: string; equipmentTypeId: string; locationId: string } | undefined
 
   if (!user) throw new RentalLifecycleError("NOT_FOUND", "User not found", 404)
   if (!equipment) throw new RentalLifecycleError("NOT_FOUND", "Equipment not found", 404)
@@ -361,43 +374,40 @@ export async function createRentalRequest(input: CreateRentalInput): Promise<Api
     throw new RentalLifecycleError("CONFLICT", bookable.message, bookable.statusCode)
   }
 
-  const rental = await prisma.$transaction(async (tx) => {
-    const created = await tx.rental.create({
-      data: {
-        equipmentUnitId: equipment.id,
-        equipmentTypeId: equipment.equipmentTypeId,
-        requesterId: user.id,
-        locationId: equipment.locationId,
-        status: "PENDING",
-        reason: input.notes ?? "Rental requested",
-        requestedStart,
-        requestedEnd,
-      },
-      include: rentalInclude,
-    })
+  const rentalId = generateId()
+  const now = new Date().toISOString()
 
-    await tx.auditLog.create({
-      data: {
-        action: "REQUEST_SUBMITTED",
-        actorId: user.id,
-        rentalId: created.id,
-        equipmentUnitId: equipment.id,
-        message: "Rental request submitted",
-      },
-    })
+  const runTransaction = db.transaction(() => {
+    db.prepare(`
+      INSERT INTO Rental (id, equipmentUnitId, equipmentTypeId, requesterId, locationId,
+        status, reason, requestedStart, requestedEnd, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      rentalId, equipment.id, equipment.equipmentTypeId, user.id, equipment.locationId,
+      "PENDING", input.notes ?? "Rental requested",
+      requestedStart.toISOString(), requestedEnd.toISOString(), now, now
+    )
 
-    return created
+    db.prepare(`
+      INSERT INTO AuditLog (id, action, actorId, rentalId, equipmentUnitId, message, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(generateId(), "REQUEST_SUBMITTED", user.id, rentalId, equipment.id, "Rental request submitted", now)
   })
 
-  return toApiRental(rental)
+  runTransaction()
+
+  const loaded = loadRentalWithRelations(rentalId)
+  if (!loaded) throw new RentalLifecycleError("NOT_FOUND", "Rental creation failed", 500)
+
+  return toApiRental(loaded)
 }
 
 export async function transitionRentalStatus(input: TransitionRentalInput): Promise<ApiRental> {
   const targetStatus = parseRequestedStatus(input.requestedStatus)
-  const actor = await prisma.user.findUnique({ where: { id: input.actorUserId } })
+  const actor = db.prepare("SELECT id, name, email, role FROM User WHERE id = ?").get(input.actorUserId) as UserRow | undefined
   if (!actor) throw new RentalLifecycleError("NOT_FOUND", "actorUserId is invalid", 404)
 
-  const rental = await prisma.rental.findUnique({ where: { id: input.rentalId } })
+  const rental = db.prepare("SELECT * FROM Rental WHERE id = ?").get(input.rentalId) as RentalRow | undefined
   if (!rental) throw new RentalLifecycleError("NOT_FOUND", "Rental not found", 404)
 
   if (!canTransition(rental.status, targetStatus)) {
@@ -406,74 +416,74 @@ export async function transitionRentalStatus(input: TransitionRentalInput): Prom
 
   ensureRoleForAction(actor, toAction(targetStatus), rental)
 
-  const updated = await prisma.$transaction(async (tx) => {
-    let equipmentUnitId = rental.equipmentUnitId
-    let equipmentTypeId = rental.equipmentTypeId
-    let locationId = rental.locationId
+  let equipmentUnitId = rental.equipmentUnitId
+  let equipmentTypeId = rental.equipmentTypeId
+  let locationId = rental.locationId
 
-    if (targetStatus === "APPROVED" || targetStatus === "RESERVED" || targetStatus === "CHECKED_OUT" || targetStatus === "OVERDUE") {
-      const unit = await resolveRequestedEquipment(
-        tx,
-        {
-          id: rental.id,
-          equipmentUnitId: rental.equipmentUnitId,
-          requestedStart: rental.requestedStart,
-          requestedEnd: rental.requestedEnd,
-          locationId: rental.locationId,
-        },
-        targetStatus,
-        input.assignedEquipmentId,
-      )
-      equipmentUnitId = unit.id
-      equipmentTypeId = unit.equipmentTypeId
-      locationId = unit.locationId
+  if (targetStatus === "APPROVED" || targetStatus === "RESERVED" || targetStatus === "CHECKED_OUT" || targetStatus === "OVERDUE") {
+    const unit = await resolveRequestedEquipment(
+      {
+        id: rental.id,
+        equipmentUnitId: rental.equipmentUnitId,
+        requestedStart: rental.requestedStart,
+        requestedEnd: rental.requestedEnd,
+        locationId: rental.locationId,
+      },
+      targetStatus,
+      input.assignedEquipmentId,
+    )
+    equipmentUnitId = unit.id
+    equipmentTypeId = unit.equipmentTypeId
+    locationId = unit.locationId
 
-      if (unit.status !== unit.nextStatus) {
-        await tx.equipmentUnit.update({
-          where: { id: unit.id },
-          data: { status: unit.nextStatus },
-        })
-      }
+    if (unit.status !== unit.nextStatus) {
+      db.prepare("UPDATE EquipmentUnit SET status = ? WHERE id = ?").run(unit.nextStatus, unit.id)
     }
+  }
 
-    const updateData: Prisma.RentalUncheckedUpdateInput = {
-      status: targetStatus,
-      equipmentUnitId: equipmentUnitId ?? undefined,
+  const now = new Date().toISOString()
+
+  const runTransaction = db.transaction(() => {
+    db.prepare(`
+      UPDATE Rental SET
+        status = ?, equipmentUnitId = ?, equipmentTypeId = ?, locationId = ?,
+        approverId = ?, approvedStart = ?, approvedEnd = ?,
+        checkedOutById = ?, checkedOutAt = ?,
+        returnedById = ?, returnedAt = ?,
+        rejectedReason = ?, updatedAt = ?
+      WHERE id = ?
+    `).run(
+      targetStatus,
+      equipmentUnitId ?? null,
       equipmentTypeId,
-      locationId: locationId ?? undefined,
-      approverId: targetStatus === "APPROVED" || targetStatus === "RESERVED" ? actor.id : rental.approverId,
-      approvedStart: targetStatus === "APPROVED" || targetStatus === "RESERVED" ? rental.requestedStart : rental.approvedStart,
-      approvedEnd: targetStatus === "APPROVED" || targetStatus === "RESERVED" ? rental.requestedEnd : rental.approvedEnd,
-      checkedOutById: targetStatus === "CHECKED_OUT" ? actor.id : rental.checkedOutById,
-      checkedOutAt: targetStatus === "CHECKED_OUT" ? new Date() : rental.checkedOutAt,
-      returnedById: targetStatus === "RETURNED" ? actor.id : rental.returnedById,
-      returnedAt: targetStatus === "RETURNED" ? new Date() : rental.returnedAt,
-      rejectedReason: targetStatus === "REJECTED" ? input.rejectionReason ?? "Rejected" : null,
-    }
-
-    const nextRental = await tx.rental.update({
-      where: { id: rental.id },
-      data: updateData,
-      include: rentalInclude,
-    })
+      locationId ?? null,
+      targetStatus === "APPROVED" || targetStatus === "RESERVED" ? actor.id : rental.approverId,
+      targetStatus === "APPROVED" || targetStatus === "RESERVED" ? rental.requestedStart : rental.approvedStart,
+      targetStatus === "APPROVED" || targetStatus === "RESERVED" ? rental.requestedEnd : rental.approvedEnd,
+      targetStatus === "CHECKED_OUT" ? actor.id : rental.checkedOutById,
+      targetStatus === "CHECKED_OUT" ? now : rental.checkedOutAt,
+      targetStatus === "RETURNED" ? actor.id : rental.returnedById,
+      targetStatus === "RETURNED" ? now : rental.returnedAt,
+      targetStatus === "REJECTED" ? input.rejectionReason ?? "Rejected" : null,
+      now,
+      rental.id,
+    )
 
     if (targetStatus === "RETURNED" || targetStatus === "REJECTED" || targetStatus === "CANCELLED") {
-      await releaseEquipmentIfNeeded(tx, rental.id, nextRental.equipmentUnitId)
+      releaseEquipmentIfNeeded(rental.id, equipmentUnitId)
     }
 
     const audit = getAuditEntry(targetStatus, input.rejectionReason)
-    await tx.auditLog.create({
-      data: {
-        action: audit.action,
-        actorId: actor.id,
-        rentalId: rental.id,
-        equipmentUnitId: nextRental.equipmentUnitId,
-        message: audit.message,
-      },
-    })
-
-    return nextRental
+    db.prepare(`
+      INSERT INTO AuditLog (id, action, actorId, rentalId, equipmentUnitId, message, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(generateId(), audit.action, actor.id, rental.id, equipmentUnitId, audit.message, now)
   })
 
-  return toApiRental(updated)
+  runTransaction()
+
+  const loaded = loadRentalWithRelations(rental.id)
+  if (!loaded) throw new RentalLifecycleError("NOT_FOUND", "Rental not found after update", 500)
+
+  return toApiRental(loaded)
 }

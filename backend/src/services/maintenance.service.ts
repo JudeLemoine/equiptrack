@@ -1,6 +1,7 @@
-import { IssueSeverity, IssueStatus, NoteTargetType, Prisma } from "@prisma/client"
+import { IssueSeverity, IssueStatus, NoteTargetType } from "../db/enums"
+import type { EquipmentStatus, UserRole } from "../db/enums"
 import { mapPrismaEquipmentStatusToApi, toIsoDate } from "../db/mappers"
-import { prisma } from "../lib/db"
+import db, { generateId } from "../lib/db"
 
 type QueueItem = {
   id: string
@@ -32,40 +33,40 @@ type NotePayload = {
   issueReportId?: string
 }
 
-async function validateNoteTarget(payload: NotePayload): Promise<boolean> {
+function validateNoteTarget(payload: NotePayload): boolean {
   if (payload.targetType === "EQUIPMENT_UNIT") {
     if (!payload.equipmentUnitId) return false
-    const item = await prisma.equipmentUnit.findUnique({
-      where: { id: payload.equipmentUnitId },
-      select: { id: true },
-    })
+    const item = db.prepare("SELECT id FROM EquipmentUnit WHERE id = ?").get(payload.equipmentUnitId)
     return Boolean(item)
   }
 
   if (payload.targetType === "RENTAL") {
     if (!payload.rentalId) return false
-    const item = await prisma.rental.findUnique({
-      where: { id: payload.rentalId },
-      select: { id: true },
-    })
+    const item = db.prepare("SELECT id FROM Rental WHERE id = ?").get(payload.rentalId)
     return Boolean(item)
   }
 
   if (payload.targetType === "MAINTENANCE_RECORD") {
     if (!payload.maintenanceRecordId) return false
-    const item = await prisma.maintenanceRecord.findUnique({
-      where: { id: payload.maintenanceRecordId },
-      select: { id: true },
-    })
+    const item = db.prepare("SELECT id FROM MaintenanceRecord WHERE id = ?").get(payload.maintenanceRecordId)
     return Boolean(item)
   }
 
   if (!payload.issueReportId) return false
-  const item = await prisma.issueReport.findUnique({
-    where: { id: payload.issueReportId },
-    select: { id: true },
-  })
+  const item = db.prepare("SELECT id FROM IssueReport WHERE id = ?").get(payload.issueReportId)
   return Boolean(item)
+}
+
+type UnitQueueRow = {
+  id: string
+  assetTag: string
+  status: EquipmentStatus
+  lastMaintenanceAt: string | null
+  nextMaintenanceDue: string | null
+  notesSummary: string | null
+  typeName: string
+  categoryName: string
+  defaultMaintenanceDays: number | null
 }
 
 export async function getMaintenanceQueue(days: number): Promise<QueueItem[]> {
@@ -73,45 +74,53 @@ export async function getMaintenanceQueue(days: number): Promise<QueueItem[]> {
   const cutoff = new Date(today)
   cutoff.setDate(cutoff.getDate() + days)
 
-  const list = await prisma.equipmentUnit.findMany({
-    where: {
-      isActive: true,
-      nextMaintenanceDue: {
-        lte: cutoff,
-      },
-    },
-    include: {
-      equipmentType: {
-        include: {
-          category: true,
-        },
-      },
-    },
-    orderBy: { nextMaintenanceDue: "asc" },
-  })
+  const rows = db.prepare(`
+    SELECT eu.id, eu.assetTag, eu.status, eu.lastMaintenanceAt, eu.nextMaintenanceDue,
+           eu.notesSummary, et.name AS typeName, ec.name AS categoryName,
+           et.defaultMaintenanceDays
+    FROM EquipmentUnit eu
+    JOIN EquipmentType et ON eu.equipmentTypeId = et.id
+    JOIN EquipmentCategory ec ON et.categoryId = ec.id
+    WHERE eu.isActive = 1 AND eu.nextMaintenanceDue <= ?
+    ORDER BY eu.nextMaintenanceDue ASC
+  `).all(cutoff.toISOString()) as UnitQueueRow[]
 
-  return list.map((unit) => ({
+  return rows.map((unit) => ({
     id: unit.id,
-    name: unit.equipmentType.name,
-    category: unit.equipmentType.category.name,
+    name: unit.typeName,
+    category: unit.categoryName,
     status: mapPrismaEquipmentStatusToApi(unit.status),
     qrCode: unit.assetTag,
     lastServiceDate: toIsoDate(unit.lastMaintenanceAt) ?? "",
-    maintenanceIntervalDays: unit.equipmentType.defaultMaintenanceDays ?? undefined,
+    maintenanceIntervalDays: unit.defaultMaintenanceDays ?? undefined,
     nextServiceDueDate: toIsoDate(unit.nextMaintenanceDue),
     notes: unit.notesSummary ?? undefined,
   }))
 }
 
+type IssueRow = {
+  id: string
+  equipmentUnitId: string
+  reportedById: string
+  title: string
+  description: string
+  severity: string
+  status: string
+  reportedAt: string
+  resolvedAt: string | null
+}
+
 export async function listIssueReports(input: { equipmentId?: string; status?: IssueStatus; severity?: IssueSeverity }) {
-  const issues = await prisma.issueReport.findMany({
-    where: {
-      ...(input.equipmentId ? { equipmentUnitId: input.equipmentId } : {}),
-      ...(input.status ? { status: input.status } : {}),
-      ...(input.severity ? { severity: input.severity } : {}),
-    },
-    orderBy: { reportedAt: "desc" },
-  })
+  const conditions: string[] = ["1=1"]
+  const params: unknown[] = []
+
+  if (input.equipmentId) { conditions.push("equipmentUnitId = ?"); params.push(input.equipmentId) }
+  if (input.status) { conditions.push("status = ?"); params.push(input.status) }
+  if (input.severity) { conditions.push("severity = ?"); params.push(input.severity) }
+
+  const issues = db.prepare(
+    `SELECT * FROM IssueReport WHERE ${conditions.join(" AND ")} ORDER BY reportedAt DESC`
+  ).all(...params) as IssueRow[]
 
   return issues.map((issue) => ({
     id: issue.id,
@@ -121,53 +130,39 @@ export async function listIssueReports(input: { equipmentId?: string; status?: I
     description: issue.description,
     severity: issue.severity,
     status: issue.status,
-    reportedAt: issue.reportedAt.toISOString(),
-    resolvedAt: issue.resolvedAt?.toISOString(),
+    reportedAt: new Date(issue.reportedAt).toISOString(),
+    resolvedAt: issue.resolvedAt ? new Date(issue.resolvedAt).toISOString() : undefined,
   }))
 }
 
 export async function createIssueReport(input: IssuePayload) {
-  const unit = await prisma.equipmentUnit.findFirst({
-    where: { id: input.equipmentId, isActive: true },
-    select: { id: true },
+  const unit = db.prepare(
+    "SELECT id FROM EquipmentUnit WHERE id = ? AND isActive = 1"
+  ).get(input.equipmentId) as { id: string } | undefined
+
+  if (!unit) return null
+
+  const user = db.prepare("SELECT id FROM User WHERE id = ?").get(input.reportedByUserId) as { id: string } | undefined
+  if (!user) return undefined
+
+  const issueId = generateId()
+  const now = new Date().toISOString()
+
+  const runTransaction = db.transaction(() => {
+    db.prepare(`
+      INSERT INTO IssueReport (id, equipmentUnitId, reportedById, title, description, severity, status, reportedAt)
+      VALUES (?, ?, ?, ?, ?, ?, 'OPEN', ?)
+    `).run(issueId, unit.id, user.id, input.title, input.description, input.severity, now)
+
+    db.prepare(`
+      INSERT INTO AuditLog (id, action, actorId, equipmentUnitId, issueReportId, message, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(generateId(), "ISSUE_REPORTED", user.id, unit.id, issueId, input.title, now)
   })
 
-  if (!unit) {
-    return null
-  }
+  runTransaction()
 
-  const user = await prisma.user.findUnique({
-    where: { id: input.reportedByUserId },
-    select: { id: true },
-  })
-
-  if (!user) {
-    return undefined
-  }
-
-  const issue = await prisma.$transaction(async (tx) => {
-    const created = await tx.issueReport.create({
-      data: {
-        equipmentUnitId: unit.id,
-        reportedById: user.id,
-        title: input.title,
-        description: input.description,
-        severity: input.severity,
-      },
-    })
-
-    await tx.auditLog.create({
-      data: {
-        action: "ISSUE_REPORTED",
-        actorId: user.id,
-        equipmentUnitId: unit.id,
-        issueReportId: created.id,
-        message: input.title,
-      },
-    })
-
-    return created
-  })
+  const issue = db.prepare("SELECT * FROM IssueReport WHERE id = ?").get(issueId) as IssueRow
 
   return {
     id: issue.id,
@@ -177,8 +172,8 @@ export async function createIssueReport(input: IssuePayload) {
     description: issue.description,
     severity: issue.severity,
     status: issue.status,
-    reportedAt: issue.reportedAt.toISOString(),
-    resolvedAt: issue.resolvedAt?.toISOString(),
+    reportedAt: new Date(issue.reportedAt).toISOString(),
+    resolvedAt: issue.resolvedAt ? new Date(issue.resolvedAt).toISOString() : undefined,
   }
 }
 
@@ -187,40 +182,30 @@ export async function updateIssueReportStatus(input: {
   status: IssueStatus
   actorUserId: string
 }) {
-  const [issue, actor] = await Promise.all([
-    prisma.issueReport.findUnique({ where: { id: input.issueId } }),
-    prisma.user.findUnique({ where: { id: input.actorUserId }, select: { id: true } }),
-  ])
+  const issue = db.prepare("SELECT * FROM IssueReport WHERE id = ?").get(input.issueId) as IssueRow | undefined
+  const actor = db.prepare("SELECT id FROM User WHERE id = ?").get(input.actorUserId) as { id: string } | undefined
 
-  if (!issue) {
-    return null
-  }
+  if (!issue) return null
+  if (!actor) return undefined
 
-  if (!actor) {
-    return undefined
-  }
+  const now = new Date().toISOString()
+  const resolvedAt = input.status === "RESOLVED" || input.status === "CLOSED" ? now : null
 
-  const updated = await prisma.$transaction(async (tx) => {
-    const next = await tx.issueReport.update({
-      where: { id: issue.id },
-      data: {
-        status: input.status,
-        resolvedAt: input.status === "RESOLVED" || input.status === "CLOSED" ? new Date() : null,
-      },
-    })
+  const runTransaction = db.transaction(() => {
+    db.prepare(
+      "UPDATE IssueReport SET status = ?, resolvedAt = ? WHERE id = ?"
+    ).run(input.status, resolvedAt, issue.id)
 
-    await tx.auditLog.create({
-      data: {
-        action: "STATUS_CHANGED",
-        actorId: actor.id,
-        equipmentUnitId: issue.equipmentUnitId,
-        issueReportId: issue.id,
-        message: `Issue status changed to ${input.status}`,
-      },
-    })
-
-    return next
+    db.prepare(`
+      INSERT INTO AuditLog (id, action, actorId, equipmentUnitId, issueReportId, message, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(generateId(), "STATUS_CHANGED", actor.id, issue.equipmentUnitId, issue.id,
+      `Issue status changed to ${input.status}`, now)
   })
+
+  runTransaction()
+
+  const updated = db.prepare("SELECT * FROM IssueReport WHERE id = ?").get(issue.id) as IssueRow
 
   return {
     id: updated.id,
@@ -230,9 +215,21 @@ export async function updateIssueReportStatus(input: {
     description: updated.description,
     severity: updated.severity,
     status: updated.status,
-    reportedAt: updated.reportedAt.toISOString(),
-    resolvedAt: updated.resolvedAt?.toISOString(),
+    reportedAt: new Date(updated.reportedAt).toISOString(),
+    resolvedAt: updated.resolvedAt ? new Date(updated.resolvedAt).toISOString() : undefined,
   }
+}
+
+type NoteRow = {
+  id: string
+  authorId: string
+  body: string
+  targetType: NoteTargetType
+  equipmentUnitId: string | null
+  rentalId: string | null
+  maintenanceRecordId: string | null
+  issueReportId: string | null
+  createdAt: string
 }
 
 export async function listNotes(input: {
@@ -241,16 +238,17 @@ export async function listNotes(input: {
   maintenanceRecordId?: string
   issueReportId?: string
 }) {
-  const where: Prisma.NoteWhereInput = {}
-  if (input.equipmentId) where.equipmentUnitId = input.equipmentId
-  if (input.rentalId) where.rentalId = input.rentalId
-  if (input.maintenanceRecordId) where.maintenanceRecordId = input.maintenanceRecordId
-  if (input.issueReportId) where.issueReportId = input.issueReportId
+  const conditions: string[] = ["1=1"]
+  const params: unknown[] = []
 
-  const notes = await prisma.note.findMany({
-    where,
-    orderBy: { createdAt: "desc" },
-  })
+  if (input.equipmentId) { conditions.push("equipmentUnitId = ?"); params.push(input.equipmentId) }
+  if (input.rentalId) { conditions.push("rentalId = ?"); params.push(input.rentalId) }
+  if (input.maintenanceRecordId) { conditions.push("maintenanceRecordId = ?"); params.push(input.maintenanceRecordId) }
+  if (input.issueReportId) { conditions.push("issueReportId = ?"); params.push(input.issueReportId) }
+
+  const notes = db.prepare(
+    `SELECT * FROM Note WHERE ${conditions.join(" AND ")} ORDER BY createdAt DESC`
+  ).all(...params) as NoteRow[]
 
   return notes.map((note) => ({
     id: note.id,
@@ -261,7 +259,7 @@ export async function listNotes(input: {
     rentalId: note.rentalId ?? undefined,
     maintenanceRecordId: note.maintenanceRecordId ?? undefined,
     issueReportId: note.issueReportId ?? undefined,
-    createdAt: note.createdAt.toISOString(),
+    createdAt: new Date(note.createdAt).toISOString(),
   }))
 }
 
@@ -279,44 +277,38 @@ function getAuditReferenceKey(targetType: NoteTargetType): "equipmentUnitId" | "
 }
 
 export async function createNote(input: NotePayload) {
-  const author = await prisma.user.findUnique({
-    where: { id: input.authorId },
-    select: { id: true },
+  const author = db.prepare("SELECT id FROM User WHERE id = ?").get(input.authorId) as { id: string } | undefined
+  if (!author) return undefined
+
+  const hasValidTarget = validateNoteTarget(input)
+  if (!hasValidTarget) return null
+
+  const noteId = generateId()
+  const now = new Date().toISOString()
+
+  const runTransaction = db.transaction(() => {
+    db.prepare(`
+      INSERT INTO Note (id, authorId, body, targetType, equipmentUnitId, rentalId, maintenanceRecordId, issueReportId, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(noteId, input.authorId, input.body, input.targetType,
+      input.equipmentUnitId ?? null, input.rentalId ?? null,
+      input.maintenanceRecordId ?? null, input.issueReportId ?? null, now)
+
+    const referenceKey = getAuditReferenceKey(input.targetType)
+    const refValue = referenceKey === "equipmentUnitId" ? input.equipmentUnitId
+      : referenceKey === "rentalId" ? input.rentalId
+      : referenceKey === "maintenanceRecordId" ? input.maintenanceRecordId
+      : input.issueReportId
+
+    db.prepare(`
+      INSERT INTO AuditLog (id, action, actorId, ${referenceKey}, message, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(generateId(), "NOTE_ADDED", author.id, refValue ?? null, input.body, now)
   })
 
-  if (!author) {
-    return undefined
-  }
+  runTransaction()
 
-  const hasValidTarget = await validateNoteTarget(input)
-  if (!hasValidTarget) {
-    return null
-  }
-
-  const created = await prisma.$transaction(async (tx) => {
-    const note = await tx.note.create({
-      data: input,
-    })
-
-    const referenceKey = getAuditReferenceKey(note.targetType)
-    await tx.auditLog.create({
-      data: {
-        action: "NOTE_ADDED",
-        actorId: author.id,
-        message: note.body,
-        [referenceKey]:
-          referenceKey === "equipmentUnitId"
-            ? note.equipmentUnitId
-            : referenceKey === "rentalId"
-              ? note.rentalId
-              : referenceKey === "maintenanceRecordId"
-                ? note.maintenanceRecordId
-                : note.issueReportId,
-      },
-    })
-
-    return note
-  })
+  const created = db.prepare("SELECT * FROM Note WHERE id = ?").get(noteId) as NoteRow
 
   return {
     id: created.id,
@@ -327,46 +319,45 @@ export async function createNote(input: NotePayload) {
     rentalId: created.rentalId ?? undefined,
     maintenanceRecordId: created.maintenanceRecordId ?? undefined,
     issueReportId: created.issueReportId ?? undefined,
-    createdAt: created.createdAt.toISOString(),
+    createdAt: new Date(created.createdAt).toISOString(),
   }
 }
 
 export async function deleteNote(noteId: string, actorUserId: string) {
-  const [note, actor] = await Promise.all([
-    prisma.note.findUnique({ where: { id: noteId } }),
-    prisma.user.findUnique({ where: { id: actorUserId } }),
-  ])
+  const note = db.prepare("SELECT * FROM Note WHERE id = ?").get(noteId) as NoteRow | undefined
+  const actor = db.prepare("SELECT id, name, role FROM User WHERE id = ?").get(actorUserId) as
+    { id: string; name: string; role: UserRole } | undefined
 
   if (!note) return null
   if (!actor || (actor.role !== "ADMIN" && actor.role !== "MAINTENANCE")) return undefined
 
-  await prisma.$transaction(async (tx) => {
-    await tx.note.delete({ where: { id: noteId } })
-    await tx.auditLog.create({
-      data: {
-        action: "DELETED",
-        actorId: actor.id,
-        equipmentUnitId: note.equipmentUnitId,
-        rentalId: note.rentalId,
-        maintenanceRecordId: note.maintenanceRecordId,
-        issueReportId: note.issueReportId,
-        message: `Note deleted by ${actor.name}`,
-      },
-    })
+  const runTransaction = db.transaction(() => {
+    db.prepare("DELETE FROM Note WHERE id = ?").run(noteId)
+    db.prepare(`
+      INSERT INTO AuditLog (id, action, actorId, equipmentUnitId, rentalId, maintenanceRecordId, issueReportId, message, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(generateId(), "DELETED", actor.id,
+      note.equipmentUnitId, note.rentalId, note.maintenanceRecordId, note.issueReportId,
+      `Note deleted by ${actor.name}`, new Date().toISOString())
   })
 
+  runTransaction()
   return true
 }
 
 export async function markServiced(unitId: string, performedByUserId: string, nextServiceDue?: string) {
-  const unit = await prisma.equipmentUnit.findUnique({
-    where: { id: unitId },
-    include: { equipmentType: true },
-  })
+  const unit = db.prepare(`
+    SELECT eu.*, et.defaultMaintenanceDays
+    FROM EquipmentUnit eu
+    JOIN EquipmentType et ON eu.equipmentTypeId = et.id
+    WHERE eu.id = ?
+  `).get(unitId) as (
+    { id: string; equipmentTypeId: string; status: string; defaultMaintenanceDays: number | null }
+  ) | undefined
 
   if (!unit) return null
 
-  const performer = await prisma.user.findUnique({ where: { id: performedByUserId } })
+  const performer = db.prepare("SELECT id FROM User WHERE id = ?").get(performedByUserId) as { id: string } | undefined
   if (!performer) return undefined
 
   const now = new Date()
@@ -374,50 +365,45 @@ export async function markServiced(unitId: string, performedByUserId: string, ne
 
   if (nextServiceDue) {
     nextDue = new Date(nextServiceDue)
-  } else if (unit.equipmentType.defaultMaintenanceDays) {
+  } else if (unit.defaultMaintenanceDays) {
     nextDue = new Date(now)
-    nextDue.setDate(now.getDate() + unit.equipmentType.defaultMaintenanceDays)
+    nextDue.setDate(now.getDate() + unit.defaultMaintenanceDays)
   }
 
-  const updated = await prisma.$transaction(async (tx) => {
-    const next = await tx.equipmentUnit.update({
-      where: { id: unit.id },
-      data: {
-        lastMaintenanceAt: now,
-        nextMaintenanceDue: nextDue,
-        status: "AVAILABLE",
-      },
-      include: {
-        equipmentType: {
-          include: { category: true },
-        },
-      },
-    })
+  const nowIso = now.toISOString()
+  const nextDueIso = nextDue ? nextDue.toISOString() : null
 
-    await tx.maintenanceRecord.create({
-      data: {
-        equipmentUnitId: unit.id,
-        technicianId: performer.id,
-        status: "COMPLETED",
-        trigger: "ROUTINE",
-        title: "Service completed",
-        description: "Marked serviced via automated workflow",
-        completedAt: now,
-        nextDueAt: nextDue,
-      },
-    })
+  const runTransaction = db.transaction(() => {
+    db.prepare(`
+      UPDATE EquipmentUnit SET lastMaintenanceAt = ?, nextMaintenanceDue = ?, status = 'AVAILABLE'
+      WHERE id = ?
+    `).run(nowIso, nextDueIso, unit.id)
 
-    await tx.auditLog.create({
-      data: {
-        action: "MAINTENANCE_COMPLETED",
-        actorId: performer.id,
-        equipmentUnitId: unit.id,
-        message: "Service completed and status restored to AVAILABLE",
-      },
-    })
+    db.prepare(`
+      INSERT INTO MaintenanceRecord (id, equipmentUnitId, technicianId, status, trigger, title, description, completedAt, nextDueAt, createdAt, updatedAt)
+      VALUES (?, ?, ?, 'COMPLETED', 'ROUTINE', 'Service completed', 'Marked serviced via automated workflow', ?, ?, ?, ?)
+    `).run(generateId(), unit.id, performer.id, nowIso, nextDueIso, nowIso, nowIso)
 
-    return next
+    db.prepare(`
+      INSERT INTO AuditLog (id, action, actorId, equipmentUnitId, message, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(generateId(), "MAINTENANCE_COMPLETED", performer.id, unit.id,
+      "Service completed and status restored to AVAILABLE", nowIso)
   })
+
+  runTransaction()
+
+  const updated = db.prepare(`
+    SELECT eu.id, eu.assetTag, eu.serialNumber, eu.equipmentTypeId, eu.locationId,
+           eu.status, eu.year, eu.inServiceDate, eu.nextMaintenanceDue, eu.lastMaintenanceAt,
+           eu.notesSummary, eu.isActive, eu.createdAt,
+           et.name AS typeName, et.defaultMaintenanceDays,
+           ec.name AS categoryName
+    FROM EquipmentUnit eu
+    JOIN EquipmentType et ON eu.equipmentTypeId = et.id
+    JOIN EquipmentCategory ec ON et.categoryId = ec.id
+    WHERE eu.id = ?
+  `).get(unit.id) as any
 
   return updated
 }
@@ -426,108 +412,77 @@ export async function resolveIssueReport(input: {
   issueId: string
   actorUserId: string
 }) {
-  const [issue, actor] = await Promise.all([
-    prisma.issueReport.findUnique({ where: { id: input.issueId } }),
-    prisma.user.findUnique({ where: { id: input.actorUserId } }),
-  ])
+  const issue = db.prepare("SELECT * FROM IssueReport WHERE id = ?").get(input.issueId) as IssueRow | undefined
+  const actor = db.prepare("SELECT id FROM User WHERE id = ?").get(input.actorUserId) as { id: string } | undefined
 
   if (!issue) return null
   if (!actor) return undefined
 
-  return prisma.$transaction(async (tx) => {
-    // 1. Update Issue Status
-    const updatedIssue = await tx.issueReport.update({
-      where: { id: issue.id },
-      data: {
-        status: "RESOLVED",
-        resolvedAt: new Date(),
-      },
-    })
+  const now = new Date().toISOString()
 
-    // 2. Restore Equipment Status if it was Out of Service
-    const unit = await tx.equipmentUnit.findUnique({
-      where: { id: issue.equipmentUnitId },
-    })
+  const runTransaction = db.transaction(() => {
+    db.prepare(
+      "UPDATE IssueReport SET status = 'RESOLVED', resolvedAt = ? WHERE id = ?"
+    ).run(now, issue.id)
+
+    const unit = db.prepare(
+      "SELECT id, status FROM EquipmentUnit WHERE id = ?"
+    ).get(issue.equipmentUnitId) as { id: string; status: string } | undefined
 
     if (unit && unit.status === "OUT_OF_SERVICE") {
-      await tx.equipmentUnit.update({
-        where: { id: unit.id },
-        data: { status: "AVAILABLE" },
-      })
+      db.prepare("UPDATE EquipmentUnit SET status = 'AVAILABLE' WHERE id = ?").run(unit.id)
 
-      await tx.auditLog.create({
-        data: {
-          action: "STATUS_CHANGED",
-          actorId: actor.id,
-          equipmentUnitId: unit.id,
-          message: "Status restored to AVAILABLE after issue resolution",
-        },
-      })
+      db.prepare(`
+        INSERT INTO AuditLog (id, action, actorId, equipmentUnitId, message, createdAt)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(generateId(), "STATUS_CHANGED", actor.id, unit.id,
+        "Status restored to AVAILABLE after issue resolution", now)
     }
 
-    await tx.auditLog.create({
-      data: {
-        action: "UPDATED",
-        actorId: actor.id,
-        equipmentUnitId: issue.equipmentUnitId,
-        issueReportId: issue.id,
-        message: "Issue resolved and dismissed",
-      },
-    })
-
-    return updatedIssue
+    db.prepare(`
+      INSERT INTO AuditLog (id, action, actorId, equipmentUnitId, issueReportId, message, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(generateId(), "UPDATED", actor.id, issue.equipmentUnitId, issue.id,
+      "Issue resolved and dismissed", now)
   })
+
+  runTransaction()
+
+  return db.prepare("SELECT * FROM IssueReport WHERE id = ?").get(issue.id) as IssueRow
 }
 
 export async function moveToMaintenance(input: {
   issueId: string
   actorUserId: string
 }) {
-  const [issue, actor] = await Promise.all([
-    prisma.issueReport.findUnique({ where: { id: input.issueId } }),
-    prisma.user.findUnique({ where: { id: input.actorUserId } }),
-  ])
+  const issue = db.prepare("SELECT * FROM IssueReport WHERE id = ?").get(input.issueId) as IssueRow | undefined
+  const actor = db.prepare("SELECT id FROM User WHERE id = ?").get(input.actorUserId) as { id: string } | undefined
 
   if (!issue) return null
   if (!actor) return undefined
 
-  return prisma.$transaction(async (tx) => {
-    // 1. Update Issue Status
-    await tx.issueReport.update({
-      where: { id: issue.id },
-      data: { status: "IN_PROGRESS" },
-    })
+  const now = new Date().toISOString()
+  const recordId = generateId()
 
-    // 2. Set Equipment to IN_MAINTENANCE
-    await tx.equipmentUnit.update({
-      where: { id: issue.equipmentUnitId },
-      data: { status: "IN_MAINTENANCE" },
-    })
+  const runTransaction = db.transaction(() => {
+    db.prepare("UPDATE IssueReport SET status = 'IN_PROGRESS' WHERE id = ?").run(issue.id)
 
-    // 3. Create Maintenance Record
-    const record = await tx.maintenanceRecord.create({
-      data: {
-        equipmentUnitId: issue.equipmentUnitId,
-        issueReportId: issue.id,
-        technicianId: actor.id,
-        status: "IN_PROGRESS",
-        trigger: "ISSUE_REPORTED",
-        title: `Maintenance: ${issue.title}`,
-        description: issue.description,
-        startedAt: new Date(),
-      },
-    })
+    db.prepare("UPDATE EquipmentUnit SET status = 'IN_MAINTENANCE' WHERE id = ?").run(issue.equipmentUnitId)
 
-    await tx.auditLog.create({
-      data: {
-        action: "MAINTENANCE_OPENED",
-        actorId: actor.id,
-        equipmentUnitId: issue.equipmentUnitId,
-        maintenanceRecordId: record.id,
-        message: `Maintenance started from issue: ${issue.title}`,
-      },
-    })
+    db.prepare(`
+      INSERT INTO MaintenanceRecord (id, equipmentUnitId, issueReportId, technicianId, status, trigger, title, description, startedAt, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, 'IN_PROGRESS', 'ISSUE_REPORTED', ?, ?, ?, ?, ?)
+    `).run(recordId, issue.equipmentUnitId, issue.id, actor.id,
+      `Maintenance: ${issue.title}`, issue.description, now, now, now)
 
-    return record
+    db.prepare(`
+      INSERT INTO AuditLog (id, action, actorId, equipmentUnitId, maintenanceRecordId, message, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(generateId(), "MAINTENANCE_OPENED", actor.id, issue.equipmentUnitId, recordId,
+      `Maintenance started from issue: ${issue.title}`, now)
   })
+
+  runTransaction()
+
+  return db.prepare("SELECT * FROM MaintenanceRecord WHERE id = ?").get(recordId)
 }

@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto"
-import { Prisma } from "@prisma/client"
 import { Router } from "express"
+import type { EquipmentStatus as EquipmentStatusType } from "../db/enums"
 import {
   mapApiEquipmentStatusToPrisma,
   mapAuditActionToActivityType,
@@ -8,9 +8,10 @@ import {
   toIsoDate,
   type ApiEquipmentStatus,
 } from "../db/mappers"
-import { prisma } from "../lib/db"
+import db, { generateId } from "../lib/db"
 import { requireRole } from "../middleware/requireRole"
 import { markServiced } from "../services/maintenance.service"
+import type { AuditAction } from "../db/enums"
 
 const router = Router()
 
@@ -34,13 +35,18 @@ type ServiceLogEntry = {
   performedByUserId: string
 }
 
-const equipmentInclude = {
-  equipmentType: {
-    include: {
-      category: true,
-    },
-  },
-} satisfies Prisma.EquipmentUnitInclude
+type UnitJoinRow = {
+  id: string
+  assetTag: string
+  status: EquipmentStatusType
+  lastMaintenanceAt: string | null
+  nextMaintenanceDue: string | null
+  notesSummary: string | null
+  equipmentTypeId: string
+  typeName: string
+  categoryName: string
+  defaultMaintenanceDays: number | null
+}
 
 function slugifyCode(value: string) {
   return value
@@ -51,36 +57,31 @@ function slugifyCode(value: string) {
     .slice(0, 32)
 }
 
-function toApiEquipment(unit: Prisma.EquipmentUnitGetPayload<{ include: typeof equipmentInclude }>): ApiEquipment {
+function toApiEquipment(unit: UnitJoinRow): ApiEquipment {
   return {
     id: unit.id,
-    name: unit.equipmentType.name,
-    category: unit.equipmentType.category.name,
+    name: unit.typeName,
+    category: unit.categoryName,
     status: mapPrismaEquipmentStatusToApi(unit.status),
     qrCode: unit.assetTag,
     lastServiceDate: toIsoDate(unit.lastMaintenanceAt) ?? "",
-    maintenanceIntervalDays: unit.equipmentType.defaultMaintenanceDays ?? undefined,
+    maintenanceIntervalDays: unit.defaultMaintenanceDays ?? undefined,
     nextServiceDueDate: toIsoDate(unit.nextMaintenanceDue),
     notes: unit.notesSummary ?? undefined,
   }
 }
 
-async function ensureUserExists(userId: string) {
-  return prisma.user.findUnique({ where: { id: userId }, select: { id: true } })
-}
+const UNIT_JOIN_SQL = `
+  SELECT eu.id, eu.assetTag, eu.status, eu.lastMaintenanceAt, eu.nextMaintenanceDue,
+         eu.notesSummary, eu.equipmentTypeId,
+         et.name AS typeName, ec.name AS categoryName, et.defaultMaintenanceDays
+  FROM EquipmentUnit eu
+  JOIN EquipmentType et ON eu.equipmentTypeId = et.id
+  JOIN EquipmentCategory ec ON et.categoryId = ec.id
+`
 
-function statusFilterToWhere(status?: ApiEquipmentStatus): Prisma.EquipmentUnitWhereInput {
-  if (!status) return {}
-
-  if (status === "available") {
-    return { status: { in: ["AVAILABLE"] } }
-  }
-
-  if (status === "in_use") {
-    return { status: { in: ["RESERVED", "CHECKED_OUT", "OVERDUE"] } }
-  }
-
-  return { status: { in: ["DUE_SOON_MAINTENANCE", "IN_MAINTENANCE", "OUT_OF_SERVICE"] } }
+function ensureUserExists(userId: string) {
+  return db.prepare("SELECT id FROM User WHERE id = ?").get(userId) as { id: string } | undefined
 }
 
 router.get("/alerts/maintenance", async (_req, res) => {
@@ -88,24 +89,15 @@ router.get("/alerts/maintenance", async (_req, res) => {
   const nextWeek = new Date(today)
   nextWeek.setDate(nextWeek.getDate() + 7)
 
-  const units = await prisma.equipmentUnit.findMany({
-    where: {
-      isActive: true,
-      nextMaintenanceDue: {
-        lte: nextWeek,
-      },
-    },
-    include: equipmentInclude,
-    orderBy: {
-      nextMaintenanceDue: "asc",
-    },
-  })
-
-  const alerts = units.filter((u) => Boolean(u.nextMaintenanceDue))
+  const units = db.prepare(`
+    ${UNIT_JOIN_SQL}
+    WHERE eu.isActive = 1 AND eu.nextMaintenanceDue IS NOT NULL AND eu.nextMaintenanceDue <= ?
+    ORDER BY eu.nextMaintenanceDue ASC
+  `).all(nextWeek.toISOString()) as UnitJoinRow[]
 
   res.json({
-    count: alerts.length,
-    equipment: alerts.map(toApiEquipment),
+    count: units.length,
+    equipment: units.map(toApiEquipment),
   })
 })
 
@@ -114,52 +106,43 @@ router.get("/", async (req, res) => {
   const status = typeof req.query.status === "string" ? (req.query.status as ApiEquipmentStatus) : undefined
   const category = typeof req.query.category === "string" ? req.query.category.trim() : undefined
 
-  const where: Prisma.EquipmentUnitWhereInput = {
-    isActive: true,
-    ...statusFilterToWhere(status),
-    ...(category
-      ? {
-          equipmentType: {
-            category: {
-              name: category,
-            },
-          },
-        }
-      : {}),
-    ...(search
-      ? {
-          OR: [
-            {
-              assetTag: {
-                contains: search,
-              },
-            },
-            {
-              equipmentType: {
-                name: {
-                  contains: search,
-                },
-              },
-            },
-          ],
-        }
-      : {}),
+  const conditions: string[] = ["eu.isActive = 1"]
+  const params: unknown[] = []
+
+  if (status) {
+    if (status === "available") {
+      conditions.push("eu.status IN ('AVAILABLE')")
+    } else if (status === "in_use") {
+      conditions.push("eu.status IN ('RESERVED', 'CHECKED_OUT', 'OVERDUE')")
+    } else {
+      conditions.push("eu.status IN ('DUE_SOON_MAINTENANCE', 'IN_MAINTENANCE', 'OUT_OF_SERVICE')")
+    }
   }
 
-  const units = await prisma.equipmentUnit.findMany({
-    where,
-    include: equipmentInclude,
-    orderBy: { createdAt: "desc" },
-  })
+  if (category) {
+    conditions.push("ec.name = ?")
+    params.push(category)
+  }
+
+  if (search) {
+    conditions.push("(eu.assetTag LIKE ? OR et.name LIKE ?)")
+    params.push(`%${search}%`, `%${search}%`)
+  }
+
+  const units = db.prepare(`
+    ${UNIT_JOIN_SQL}
+    WHERE ${conditions.join(" AND ")}
+    ORDER BY eu.createdAt DESC
+  `).all(...params) as UnitJoinRow[]
 
   res.json(units.map(toApiEquipment))
 })
 
 router.get("/:id", async (req, res) => {
-  const item = await prisma.equipmentUnit.findFirst({
-    where: { id: req.params.id, isActive: true },
-    include: equipmentInclude,
-  })
+  const item = db.prepare(`
+    ${UNIT_JOIN_SQL}
+    WHERE eu.id = ? AND eu.isActive = 1
+  `).get(req.params.id) as UnitJoinRow | undefined
 
   if (!item) {
     res.status(404).json({ message: "Equipment not found" })
@@ -184,58 +167,57 @@ router.post("/", requireRole("admin"), async (req, res) => {
   const qrCode = body.qrCode
   const nextStatus = body.status
 
-  const createdEquipmentId = await prisma.$transaction(async (tx) => {
-    const category = await tx.equipmentCategory.upsert({
-      where: { code: categoryCode },
-      update: {
-        name: categoryName,
-      },
-      create: {
-        name: categoryName,
-        code: categoryCode,
-      },
-    })
+  const createdEquipmentId = generateId()
 
-    const equipmentType = await tx.equipmentType.upsert({
-      where: { code: typeCode },
-      update: {
-        name: typeName,
-        categoryId: category.id,
-        defaultMaintenanceDays: body.maintenanceIntervalDays,
-      },
-      create: {
-        name: typeName,
-        code: typeCode,
-        categoryId: category.id,
-        defaultMaintenanceDays: body.maintenanceIntervalDays,
-      },
-    })
+  const runTransaction = db.transaction(() => {
+    let cat = db.prepare("SELECT id FROM EquipmentCategory WHERE code = ?").get(categoryCode) as { id: string } | undefined
+    if (cat) {
+      db.prepare("UPDATE EquipmentCategory SET name = ? WHERE code = ?").run(categoryName, categoryCode)
+    } else {
+      const catId = generateId()
+      db.prepare("INSERT INTO EquipmentCategory (id, name, code) VALUES (?, ?, ?)").run(catId, categoryName, categoryCode)
+      cat = { id: catId }
+    }
 
-    const defaultLocation = await tx.location.findFirst({ orderBy: { createdAt: "asc" } })
+    let eType = db.prepare("SELECT id FROM EquipmentType WHERE code = ?").get(typeCode) as { id: string } | undefined
+    if (eType) {
+      db.prepare("UPDATE EquipmentType SET name = ?, categoryId = ?, defaultMaintenanceDays = ? WHERE code = ?")
+        .run(typeName, cat.id, body.maintenanceIntervalDays ?? null, typeCode)
+    } else {
+      const typeId = generateId()
+      db.prepare(`
+        INSERT INTO EquipmentType (id, name, code, categoryId, defaultMaintenanceDays)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(typeId, typeName, typeCode, cat.id, body.maintenanceIntervalDays ?? null)
+      eType = { id: typeId }
+    }
+
+    const defaultLocation = db.prepare("SELECT id FROM Location ORDER BY createdAt ASC LIMIT 1").get() as { id: string } | undefined
     if (!defaultLocation) {
       throw new Error("No location exists. Seed database first.")
     }
 
-    const created = await tx.equipmentUnit.create({
-      data: {
-        assetTag: qrCode,
-        serialNumber: `SN-${randomUUID().slice(0, 8).toUpperCase()}`,
-        equipmentTypeId: equipmentType.id,
-        locationId: defaultLocation.id,
-        status: mapApiEquipmentStatusToPrisma(nextStatus),
-        lastMaintenanceAt: body.lastServiceDate ? new Date(body.lastServiceDate) : null,
-        nextMaintenanceDue: body.nextServiceDueDate ? new Date(body.nextServiceDueDate) : null,
-        notesSummary: body.notes,
-      },
-    })
-
-    return created.id
+    db.prepare(`
+      INSERT INTO EquipmentUnit (id, assetTag, serialNumber, equipmentTypeId, locationId, status, lastMaintenanceAt, nextMaintenanceDue, notesSummary)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      createdEquipmentId,
+      qrCode,
+      `SN-${randomUUID().slice(0, 8).toUpperCase()}`,
+      eType.id,
+      defaultLocation.id,
+      mapApiEquipmentStatusToPrisma(nextStatus),
+      body.lastServiceDate ? new Date(body.lastServiceDate).toISOString() : null,
+      body.nextServiceDueDate ? new Date(body.nextServiceDueDate).toISOString() : null,
+      body.notes ?? null,
+    )
   })
 
-  const equipment = await prisma.equipmentUnit.findUnique({
-    where: { id: createdEquipmentId },
-    include: equipmentInclude,
-  })
+  runTransaction()
+
+  const equipment = db.prepare(`
+    ${UNIT_JOIN_SQL} WHERE eu.id = ?
+  `).get(createdEquipmentId) as UnitJoinRow | undefined
 
   if (!equipment) {
     res.status(500).json({ message: "Failed to create equipment" })
@@ -246,10 +228,9 @@ router.post("/", requireRole("admin"), async (req, res) => {
 })
 
 router.put("/:id", requireRole("admin"), async (req, res) => {
-  const existing = await prisma.equipmentUnit.findFirst({
-    where: { id: req.params.id, isActive: true },
-    include: equipmentInclude,
-  })
+  const existing = db.prepare(`
+    ${UNIT_JOIN_SQL} WHERE eu.id = ? AND eu.isActive = 1
+  `).get(req.params.id) as UnitJoinRow | undefined
 
   if (!existing) {
     res.status(404).json({ message: "Equipment not found" })
@@ -260,75 +241,89 @@ router.put("/:id", requireRole("admin"), async (req, res) => {
 
   let equipmentTypeId = existing.equipmentTypeId
   if (body.name || body.category || body.maintenanceIntervalDays !== undefined) {
-    const categoryName = (body.category ?? existing.equipmentType.category.name).trim()
+    const categoryName = (body.category ?? existing.categoryName).trim()
     const categoryCode = slugifyCode(categoryName)
-    const typeName = (body.name ?? existing.equipmentType.name).trim()
+    const typeName = (body.name ?? existing.typeName).trim()
     const typeCode = slugifyCode(typeName)
 
-    const category = await prisma.equipmentCategory.upsert({
-      where: { code: categoryCode },
-      update: { name: categoryName },
-      create: { name: categoryName, code: categoryCode },
-    })
+    let cat = db.prepare("SELECT id FROM EquipmentCategory WHERE code = ?").get(categoryCode) as { id: string } | undefined
+    if (cat) {
+      db.prepare("UPDATE EquipmentCategory SET name = ? WHERE code = ?").run(categoryName, categoryCode)
+    } else {
+      const catId = generateId()
+      db.prepare("INSERT INTO EquipmentCategory (id, name, code) VALUES (?, ?, ?)").run(catId, categoryName, categoryCode)
+      cat = { id: catId }
+    }
 
-    const type = await prisma.equipmentType.upsert({
-      where: { code: typeCode },
-      update: {
-        name: typeName,
-        categoryId: category.id,
-        defaultMaintenanceDays: body.maintenanceIntervalDays ?? existing.equipmentType.defaultMaintenanceDays,
-      },
-      create: {
-        name: typeName,
-        code: typeCode,
-        categoryId: category.id,
-        defaultMaintenanceDays: body.maintenanceIntervalDays,
-      },
-    })
+    let eType = db.prepare("SELECT id, defaultMaintenanceDays FROM EquipmentType WHERE code = ?").get(typeCode) as
+      { id: string; defaultMaintenanceDays: number | null } | undefined
+    if (eType) {
+      db.prepare("UPDATE EquipmentType SET name = ?, categoryId = ?, defaultMaintenanceDays = ? WHERE code = ?")
+        .run(typeName, cat.id, body.maintenanceIntervalDays ?? eType.defaultMaintenanceDays, typeCode)
+    } else {
+      const typeId = generateId()
+      db.prepare(`
+        INSERT INTO EquipmentType (id, name, code, categoryId, defaultMaintenanceDays)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(typeId, typeName, typeCode, cat.id, body.maintenanceIntervalDays ?? null)
+      eType = { id: typeId, defaultMaintenanceDays: body.maintenanceIntervalDays ?? null }
+    }
 
-    equipmentTypeId = type.id
+    equipmentTypeId = eType.id
   }
 
-  const item = await prisma.equipmentUnit.update({
-    where: { id: existing.id },
-    data: {
-      equipmentTypeId,
-      status: body.status ? mapApiEquipmentStatusToPrisma(body.status) : undefined,
-      assetTag: body.qrCode,
-      lastMaintenanceAt: body.lastServiceDate ? new Date(body.lastServiceDate) : existing.lastMaintenanceAt,
-      nextMaintenanceDue:
-        body.nextServiceDueDate !== undefined
-          ? body.nextServiceDueDate
-            ? new Date(body.nextServiceDueDate)
-            : null
-          : existing.nextMaintenanceDue,
-      notesSummary: body.notes ?? existing.notesSummary,
-    },
-    include: equipmentInclude,
-  })
+  const sets: string[] = ["equipmentTypeId = ?"]
+  const params: unknown[] = [equipmentTypeId]
+
+  if (body.status) {
+    sets.push("status = ?")
+    params.push(mapApiEquipmentStatusToPrisma(body.status))
+  }
+  if (body.qrCode !== undefined) {
+    sets.push("assetTag = ?")
+    params.push(body.qrCode)
+  }
+
+  sets.push("lastMaintenanceAt = ?")
+  params.push(body.lastServiceDate
+    ? new Date(body.lastServiceDate).toISOString()
+    : existing.lastMaintenanceAt)
+
+  if (body.nextServiceDueDate !== undefined) {
+    sets.push("nextMaintenanceDue = ?")
+    params.push(body.nextServiceDueDate ? new Date(body.nextServiceDueDate).toISOString() : null)
+  } else {
+    sets.push("nextMaintenanceDue = ?")
+    params.push(existing.nextMaintenanceDue)
+  }
+
+  sets.push("notesSummary = ?")
+  params.push(body.notes ?? existing.notesSummary)
+
+  params.push(existing.id)
+  db.prepare(`UPDATE EquipmentUnit SET ${sets.join(", ")} WHERE id = ?`).run(...params)
+
+  const item = db.prepare(`${UNIT_JOIN_SQL} WHERE eu.id = ?`).get(existing.id) as UnitJoinRow
 
   res.json(toApiEquipment(item))
 })
 
 router.delete("/:id", requireRole("admin"), async (req, res) => {
-  const item = await prisma.equipmentUnit.findUnique({ where: { id: req.params.id } })
+  const item = db.prepare("SELECT id, isActive FROM EquipmentUnit WHERE id = ?").get(req.params.id) as
+    { id: string; isActive: number } | undefined
+
   if (!item || !item.isActive) {
     res.status(404).json({ message: "Equipment not found" })
     return
   }
 
-  await prisma.equipmentUnit.update({
-    where: { id: item.id },
-    data: { isActive: false },
-  })
-
+  db.prepare("UPDATE EquipmentUnit SET isActive = 0 WHERE id = ?").run(item.id)
   res.status(204).end()
 })
 
 router.patch("/:id/status", requireRole("admin", "maintenance"), async (req, res) => {
-  const item = await prisma.equipmentUnit.findFirst({
-    where: { id: req.params.id, isActive: true },
-  })
+  const item = db.prepare("SELECT id FROM EquipmentUnit WHERE id = ? AND isActive = 1").get(req.params.id) as
+    { id: string } | undefined
 
   if (!item) {
     res.status(404).json({ message: "Equipment not found" })
@@ -343,40 +338,33 @@ router.patch("/:id/status", requireRole("admin", "maintenance"), async (req, res
     return
   }
 
-  const actor = await ensureUserExists(actorUserId)
+  const actor = ensureUserExists(actorUserId)
   if (!actor) {
     res.status(400).json({ message: "actorUserId is required" })
     return
   }
 
-  const updated = await prisma.$transaction(async (tx) => {
-    const unit = await tx.equipmentUnit.update({
-      where: { id: item.id },
-      data: { status: mapApiEquipmentStatusToPrisma(status) },
-      include: equipmentInclude,
-    })
+  const now = new Date().toISOString()
 
-    await tx.auditLog.create({
-      data: {
-        action: "STATUS_CHANGED",
-        actorId: actor.id,
-        equipmentUnitId: item.id,
-        message: `Status changed to ${status}`,
-      },
-    })
+  const runTransaction = db.transaction(() => {
+    db.prepare("UPDATE EquipmentUnit SET status = ? WHERE id = ?")
+      .run(mapApiEquipmentStatusToPrisma(status), item.id)
 
-    return unit
+    db.prepare(`
+      INSERT INTO AuditLog (id, action, actorId, equipmentUnitId, message, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(generateId(), "STATUS_CHANGED", actor.id, item.id, `Status changed to ${status}`, now)
   })
+
+  runTransaction()
+
+  const updated = db.prepare(`${UNIT_JOIN_SQL} WHERE eu.id = ?`).get(item.id) as UnitJoinRow
 
   res.json(toApiEquipment(updated))
 })
 
-// New endpoint: Report Issue
 router.post("/:id/report-issue", requireRole("field", "maintenance", "admin"), async (req, res) => {
-  const item = await prisma.equipmentUnit.findFirst({
-    where: { id: req.params.id, isActive: true },
-    include: equipmentInclude,
-  })
+  const item = db.prepare(`${UNIT_JOIN_SQL} WHERE eu.id = ? AND eu.isActive = 1`).get(req.params.id) as UnitJoinRow | undefined
 
   if (!item) {
     res.status(404).json({ message: "Equipment not found" })
@@ -384,10 +372,10 @@ router.post("/:id/report-issue", requireRole("field", "maintenance", "admin"), a
   }
 
   const { severity, description, actorUserId, title } = req.body as {
-    severity: string;
-    description: string;
-    actorUserId: string;
-    title?: string;
+    severity: string
+    description: string
+    actorUserId: string
+    title?: string
   }
 
   if (!severity || !description || !actorUserId) {
@@ -395,61 +383,45 @@ router.post("/:id/report-issue", requireRole("field", "maintenance", "admin"), a
     return
   }
 
-  const actor = await ensureUserExists(actorUserId)
+  const actor = ensureUserExists(actorUserId)
   if (!actor) {
     res.status(400).json({ message: "Invalid actorUserId" })
     return
   }
 
-  // Create IssueReport
-  const issue = await prisma.issueReport.create({
-    data: {
-      equipmentUnitId: item.id,
-      reportedById: actor.id,
-      title: title || `Issue reported: ${severity.toUpperCase()}`,
-      description,
-      severity: severity.toUpperCase() as any, // normalize to match Prisma enum
-    },
-  })
+  const issueId = generateId()
+  const now = new Date().toISOString()
 
-  // If high severity, set equipment status to OUT_OF_SERVICE
+  db.prepare(`
+    INSERT INTO IssueReport (id, equipmentUnitId, reportedById, title, description, severity, status, reportedAt)
+    VALUES (?, ?, ?, ?, ?, ?, 'OPEN', ?)
+  `).run(issueId, item.id, actor.id, title || `Issue reported: ${severity.toUpperCase()}`,
+    description, severity.toUpperCase(), now)
+
   let updatedUnit = item
   if (severity.toUpperCase() === "HIGH" || severity.toUpperCase() === "CRITICAL") {
-    updatedUnit = await prisma.equipmentUnit.update({
-      where: { id: item.id },
-      data: { status: "OUT_OF_SERVICE" },
-      include: equipmentInclude,
-    })
-    await prisma.auditLog.create({
-      data: {
-        action: "STATUS_CHANGED",
-        actorId: actor.id,
-        equipmentUnitId: item.id,
-        message: "Status changed to OUT_OF_SERVICE due to high severity issue",
-      },
-    })
+    db.prepare("UPDATE EquipmentUnit SET status = 'OUT_OF_SERVICE' WHERE id = ?").run(item.id)
+    db.prepare(`
+      INSERT INTO AuditLog (id, action, actorId, equipmentUnitId, message, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(generateId(), "STATUS_CHANGED", actor.id, item.id,
+      "Status changed to OUT_OF_SERVICE due to high severity issue", now)
+    updatedUnit = db.prepare(`${UNIT_JOIN_SQL} WHERE eu.id = ?`).get(item.id) as UnitJoinRow
   }
 
-  // Log the issue creation in audit log
-  await prisma.auditLog.create({
-    data: {
-      action: "ISSUE_REPORTED",
-      actorId: actor.id,
-      equipmentUnitId: item.id,
-      issueReportId: issue.id,
-      message: `Issue reported with severity ${severity}`,
-    },
-  })
+  db.prepare(`
+    INSERT INTO AuditLog (id, action, actorId, equipmentUnitId, issueReportId, message, createdAt)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(generateId(), "ISSUE_REPORTED", actor.id, item.id, issueId,
+    `Issue reported with severity ${severity}`, now)
+
+  const issue = db.prepare("SELECT * FROM IssueReport WHERE id = ?").get(issueId)
 
   res.status(201).json({ issue, equipment: toApiEquipment(updatedUnit) })
 })
 
-
 router.post("/:id/checkout", async (req, res) => {
-  const item = await prisma.equipmentUnit.findFirst({
-    where: { id: req.params.id, isActive: true },
-    include: equipmentInclude,
-  })
+  const item = db.prepare(`${UNIT_JOIN_SQL} WHERE eu.id = ? AND eu.isActive = 1`).get(req.params.id) as UnitJoinRow | undefined
 
   if (!item) {
     res.status(404).json({ message: "Equipment not found" })
@@ -461,7 +433,7 @@ router.post("/:id/checkout", async (req, res) => {
     return
   }
 
-  if (item.nextMaintenanceDue && item.nextMaintenanceDue <= new Date()) {
+  if (item.nextMaintenanceDue && new Date(item.nextMaintenanceDue) <= new Date()) {
     res.status(400).json({ message: "Equipment service overdue. Maintenance required." })
     return
   }
@@ -472,39 +444,32 @@ router.post("/:id/checkout", async (req, res) => {
     return
   }
 
-  const actor = await ensureUserExists(actorUserId)
+  const actor = ensureUserExists(actorUserId)
   if (!actor) {
     res.status(400).json({ message: "actorUserId is required" })
     return
   }
 
-  const updated = await prisma.$transaction(async (tx) => {
-    const unit = await tx.equipmentUnit.update({
-      where: { id: item.id },
-      data: { status: "CHECKED_OUT" },
-      include: equipmentInclude,
-    })
+  const now = new Date().toISOString()
 
-    await tx.auditLog.create({
-      data: {
-        action: "CHECKED_OUT",
-        actorId: actor.id,
-        equipmentUnitId: item.id,
-        message: "Checked out",
-      },
-    })
+  const runTransaction = db.transaction(() => {
+    db.prepare("UPDATE EquipmentUnit SET status = 'CHECKED_OUT' WHERE id = ?").run(item.id)
 
-    return unit
+    db.prepare(`
+      INSERT INTO AuditLog (id, action, actorId, equipmentUnitId, message, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(generateId(), "CHECKED_OUT", actor.id, item.id, "Checked out", now)
   })
+
+  runTransaction()
+
+  const updated = db.prepare(`${UNIT_JOIN_SQL} WHERE eu.id = ?`).get(item.id) as UnitJoinRow
 
   res.json(toApiEquipment(updated))
 })
 
 router.post("/:id/checkin", async (req, res) => {
-  const item = await prisma.equipmentUnit.findFirst({
-    where: { id: req.params.id, isActive: true },
-    include: equipmentInclude,
-  })
+  const item = db.prepare(`${UNIT_JOIN_SQL} WHERE eu.id = ? AND eu.isActive = 1`).get(req.params.id) as UnitJoinRow | undefined
 
   if (!item) {
     res.status(404).json({ message: "Equipment not found" })
@@ -517,30 +482,26 @@ router.post("/:id/checkin", async (req, res) => {
     return
   }
 
-  const actor = await ensureUserExists(actorUserId)
+  const actor = ensureUserExists(actorUserId)
   if (!actor) {
     res.status(400).json({ message: "actorUserId is required" })
     return
   }
 
-  const updated = await prisma.$transaction(async (tx) => {
-    const unit = await tx.equipmentUnit.update({
-      where: { id: item.id },
-      data: { status: "AVAILABLE" },
-      include: equipmentInclude,
-    })
+  const now = new Date().toISOString()
 
-    await tx.auditLog.create({
-      data: {
-        action: "RETURNED",
-        actorId: actor.id,
-        equipmentUnitId: item.id,
-        message: "Checked in",
-      },
-    })
+  const runTransaction = db.transaction(() => {
+    db.prepare("UPDATE EquipmentUnit SET status = 'AVAILABLE' WHERE id = ?").run(item.id)
 
-    return unit
+    db.prepare(`
+      INSERT INTO AuditLog (id, action, actorId, equipmentUnitId, message, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(generateId(), "RETURNED", actor.id, item.id, "Checked in", now)
   })
+
+  runTransaction()
+
+  const updated = db.prepare(`${UNIT_JOIN_SQL} WHERE eu.id = ?`).get(item.id) as UnitJoinRow
 
   res.json(toApiEquipment(updated))
 })
@@ -566,32 +527,27 @@ router.post("/:id/mark-serviced", requireRole("maintenance", "admin"), async (re
     return
   }
 
-  res.json(toApiEquipment(result))
+  const unit = db.prepare(`${UNIT_JOIN_SQL} WHERE eu.id = ?`).get(req.params.id) as UnitJoinRow
+  res.json(toApiEquipment(unit))
 })
 
 router.get("/:id/service-logs", async (req, res) => {
-  const item = await prisma.equipmentUnit.findFirst({
-    where: { id: req.params.id, isActive: true },
-    select: { id: true },
-  })
+  const item = db.prepare("SELECT id FROM EquipmentUnit WHERE id = ? AND isActive = 1").get(req.params.id) as { id: string } | undefined
 
   if (!item) {
     res.status(404).json({ message: "Equipment not found" })
     return
   }
 
-  const logs = await prisma.maintenanceRecord.findMany({
-    where: { equipmentUnitId: item.id },
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      equipmentUnitId: true,
-      completedAt: true,
-      createdAt: true,
-      description: true,
-      technicianId: true,
-    },
-  })
+  const logs = db.prepare(`
+    SELECT id, equipmentUnitId, completedAt, createdAt, description, technicianId
+    FROM MaintenanceRecord
+    WHERE equipmentUnitId = ?
+    ORDER BY createdAt DESC
+  `).all(item.id) as {
+    id: string; equipmentUnitId: string; completedAt: string | null;
+    createdAt: string; description: string | null; technicianId: string | null
+  }[]
 
   const data: ServiceLogEntry[] = logs.map((entry) => ({
     id: entry.id,
@@ -605,10 +561,7 @@ router.get("/:id/service-logs", async (req, res) => {
 })
 
 router.post("/:id/service-logs", requireRole("maintenance", "admin"), async (req, res) => {
-  const item = await prisma.equipmentUnit.findFirst({
-    where: { id: req.params.id, isActive: true },
-    select: { id: true },
-  })
+  const item = db.prepare("SELECT id FROM EquipmentUnit WHERE id = ? AND isActive = 1").get(req.params.id) as { id: string } | undefined
 
   if (!item) {
     res.status(404).json({ message: "Equipment not found" })
@@ -624,45 +577,33 @@ router.post("/:id/service-logs", requireRole("maintenance", "admin"), async (req
     return
   }
 
-  const performer = await ensureUserExists(performedByUserId)
+  const performer = ensureUserExists(performedByUserId)
   if (!performer) {
     res.status(400).json({ message: "performedByUserId is required" })
     return
   }
 
-  const completedAt = new Date(date)
+  const completedAt = new Date(date).toISOString()
+  const recordId = generateId()
+  const now = new Date().toISOString()
 
-  const entry = await prisma.$transaction(async (tx) => {
-    const record = await tx.maintenanceRecord.create({
-      data: {
-        equipmentUnitId: item.id,
-        technicianId: performer.id,
-        status: "COMPLETED",
-        trigger: "ROUTINE",
-        title: "Service log",
-        description: note,
-        completedAt,
-      },
-      select: {
-        id: true,
-        equipmentUnitId: true,
-        completedAt: true,
-        description: true,
-        technicianId: true,
-      },
-    })
+  const runTransaction = db.transaction(() => {
+    db.prepare(`
+      INSERT INTO MaintenanceRecord (id, equipmentUnitId, technicianId, status, trigger, title, description, completedAt, createdAt, updatedAt)
+      VALUES (?, ?, ?, 'COMPLETED', 'ROUTINE', 'Service log', ?, ?, ?, ?)
+    `).run(recordId, item.id, performer.id, note, completedAt, now, now)
 
-    await tx.auditLog.create({
-      data: {
-        action: "MAINTENANCE_COMPLETED",
-        actorId: performer.id,
-        equipmentUnitId: item.id,
-        message: note,
-      },
-    })
-
-    return record
+    db.prepare(`
+      INSERT INTO AuditLog (id, action, actorId, equipmentUnitId, message, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(generateId(), "MAINTENANCE_COMPLETED", performer.id, item.id, note, now)
   })
+
+  runTransaction()
+
+  const entry = db.prepare(
+    "SELECT id, equipmentUnitId, completedAt, description, technicianId FROM MaintenanceRecord WHERE id = ?"
+  ).get(recordId) as { id: string; equipmentUnitId: string; completedAt: string | null; description: string | null; technicianId: string | null }
 
   res.status(201).json({
     id: entry.id,
@@ -674,9 +615,7 @@ router.post("/:id/service-logs", requireRole("maintenance", "admin"), async (req
 })
 
 router.post("/:id/notes", async (req, res) => {
-  const item = await prisma.equipmentUnit.findFirst({
-    where: { id: req.params.id, isActive: true },
-  })
+  const item = db.prepare("SELECT id FROM EquipmentUnit WHERE id = ? AND isActive = 1").get(req.params.id) as { id: string } | undefined
 
   if (!item) {
     res.status(404).json({ message: "Equipment not found" })
@@ -690,41 +629,35 @@ router.post("/:id/notes", async (req, res) => {
     return
   }
 
-  const author = await ensureUserExists(authorId)
+  const author = ensureUserExists(authorId)
   if (!author) {
     res.status(400).json({ message: "Invalid authorId" })
     return
   }
 
-  await prisma.$transaction(async (tx) => {
-    const createdNote = await tx.note.create({
-      data: {
-        body: note,
-        authorId: author.id,
-        targetType: "EQUIPMENT_UNIT",
-        equipmentUnitId: item.id,
-      },
-    })
+  const now = new Date().toISOString()
+  const noteId = generateId()
 
-    await tx.auditLog.create({
-      data: {
-        action: "NOTE_ADDED",
-        actorId: author.id,
-        equipmentUnitId: item.id,
-        noteId: createdNote.id,
-        message: `Field Note: ${note.length > 50 ? note.slice(0, 47) + "..." : note}`,
-      },
-    })
+  const runTransaction = db.transaction(() => {
+    db.prepare(`
+      INSERT INTO Note (id, body, authorId, targetType, equipmentUnitId, createdAt)
+      VALUES (?, ?, ?, 'EQUIPMENT_UNIT', ?, ?)
+    `).run(noteId, note, author.id, item.id, now)
+
+    db.prepare(`
+      INSERT INTO AuditLog (id, action, actorId, equipmentUnitId, noteId, message, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(generateId(), "NOTE_ADDED", author.id, item.id, noteId,
+      `Field Note: ${note.length > 50 ? note.slice(0, 47) + "..." : note}`, now)
   })
+
+  runTransaction()
 
   res.status(201).json({ message: "Note added successfully" })
 })
 
 router.get("/:id/activity", async (req, res) => {
-  const item = await prisma.equipmentUnit.findFirst({
-    where: { id: req.params.id, isActive: true },
-    select: { id: true },
-  })
+  const item = db.prepare("SELECT id FROM EquipmentUnit WHERE id = ? AND isActive = 1").get(req.params.id) as { id: string } | undefined
 
   if (!item) {
     res.status(404).json({ message: "Equipment not found" })
@@ -733,26 +666,23 @@ router.get("/:id/activity", async (req, res) => {
 
   const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : 10
 
-  const logs = await prisma.auditLog.findMany({
-    where: { equipmentUnitId: item.id },
-    orderBy: { createdAt: "desc" },
-    take: Number.isFinite(limit) ? limit : 10,
-    select: {
-      id: true,
-      equipmentUnitId: true,
-      action: true,
-      createdAt: true,
-      actorId: true,
-      message: true,
-    },
-  })
+  const logs = db.prepare(`
+    SELECT id, equipmentUnitId, action, createdAt, actorId, message
+    FROM AuditLog
+    WHERE equipmentUnitId = ?
+    ORDER BY createdAt DESC
+    LIMIT ?
+  `).all(item.id, Number.isFinite(limit) ? limit : 10) as {
+    id: string; equipmentUnitId: string | null; action: AuditAction;
+    createdAt: string; actorId: string | null; message: string
+  }[]
 
   res.json(
     logs.map((a) => ({
       id: a.id,
       equipmentId: a.equipmentUnitId ?? item.id,
       type: mapAuditActionToActivityType(a.action),
-      timestamp: a.createdAt.toISOString(),
+      timestamp: new Date(a.createdAt).toISOString(),
       actorUserId: a.actorId ?? "",
       summary: a.message,
     })),

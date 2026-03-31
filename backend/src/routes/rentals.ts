@@ -1,7 +1,7 @@
-import { Prisma, RentalStatus } from "@prisma/client"
+import { RentalStatus } from "../db/enums"
 import { Router } from "express"
 import { mapPrismaRentalStatusToApi, toIsoDate, type ApiRentalStatus } from "../db/mappers"
-import { prisma } from "../lib/db"
+import db from "../lib/db"
 import {
   createRentalRequest,
   RentalLifecycleError,
@@ -29,95 +29,118 @@ type ApiRentalDetail = ApiRental & {
   timeline: Array<{ label: string; at: string }>
 }
 
-const rentalInclude = {
-  equipmentUnit: {
-    include: {
-      equipmentType: true,
-    },
-  },
-  requester: true,
-} satisfies Prisma.RentalInclude
+type RentalJoinRow = {
+  id: string
+  equipmentUnitId: string | null
+  equipmentTypeId: string
+  requesterId: string
+  status: RentalStatus
+  reason: string
+  requestedStart: string
+  requestedEnd: string
+  createdAt: string
+  updatedAt: string
+  equipmentTypeName: string
+  requesterName: string
+}
 
-function toApiRental(rental: Prisma.RentalGetPayload<{ include: typeof rentalInclude }>): ApiRental {
+function toApiRental(row: RentalJoinRow): ApiRental {
   return {
-    id: rental.id,
-    equipmentId: rental.equipmentUnitId ?? "",
-    equipmentTypeId: rental.equipmentTypeId,
-    equipmentName: rental.equipmentUnit?.equipmentType.name ?? "Equipment",
-    requestedBy: rental.requesterId,
-    requestedByName: rental.requester.name,
-    status: mapPrismaRentalStatusToApi(rental.status),
-    startDate: toIsoDate(rental.requestedStart) ?? "",
-    endDate: toIsoDate(rental.requestedEnd),
-    notes: rental.reason,
-    createdAt: rental.createdAt.toISOString(),
-    updatedAt: rental.updatedAt.toISOString(),
+    id: row.id,
+    equipmentId: row.equipmentUnitId ?? "",
+    equipmentTypeId: row.equipmentTypeId,
+    equipmentName: row.equipmentTypeName ?? "Equipment",
+    requestedBy: row.requesterId,
+    requestedByName: row.requesterName,
+    status: mapPrismaRentalStatusToApi(row.status),
+    startDate: toIsoDate(row.requestedStart) ?? "",
+    endDate: toIsoDate(row.requestedEnd),
+    notes: row.reason,
+    createdAt: new Date(row.createdAt).toISOString(),
+    updatedAt: new Date(row.updatedAt).toISOString(),
   }
 }
 
-function statusFilterToWhere(status?: ApiRentalStatus): Prisma.RentalWhereInput {
-  if (!status) return {}
+function statusFilterToSql(status?: ApiRentalStatus): { clause: string; params: string[] } {
+  if (!status) return { clause: "", params: [] }
 
   if (status === "pending") {
-    return { status: RentalStatus.PENDING }
+    return { clause: "AND r.status = ?", params: [RentalStatus.PENDING] }
   }
 
   if (status === "approved") {
-    return { status: { in: [RentalStatus.APPROVED, RentalStatus.RESERVED] } }
+    return { clause: "AND r.status IN (?, ?)", params: [RentalStatus.APPROVED, RentalStatus.RESERVED] }
   }
 
   if (status === "active") {
-    return { status: { in: [RentalStatus.CHECKED_OUT, RentalStatus.OVERDUE] } }
+    return { clause: "AND r.status IN (?, ?)", params: [RentalStatus.CHECKED_OUT, RentalStatus.OVERDUE] }
   }
 
   if (status === "returned") {
-    return { status: RentalStatus.RETURNED }
+    return { clause: "AND r.status = ?", params: [RentalStatus.RETURNED] }
   }
 
-  return { status: { in: [RentalStatus.REJECTED, RentalStatus.CANCELLED] } }
+  return { clause: "AND r.status IN (?, ?)", params: [RentalStatus.REJECTED, RentalStatus.CANCELLED] }
 }
 
 router.get("/", async (req, res) => {
   const status = typeof req.query.status === "string" ? (req.query.status as ApiRentalStatus) : undefined
   const requestedBy = typeof req.query.requestedBy === "string" ? req.query.requestedBy : undefined
 
-  const list = await prisma.rental.findMany({
-    where: {
-      ...statusFilterToWhere(status),
-      ...(requestedBy ? { requesterId: requestedBy } : {}),
-    },
-    include: rentalInclude,
-    orderBy: { createdAt: "desc" },
-  })
+  const { clause: statusClause, params: statusParams } = statusFilterToSql(status)
+  const conditions = ["1=1", statusClause]
+  const params: unknown[] = [...statusParams]
 
-  res.json(list.map(toApiRental))
+  if (requestedBy) {
+    conditions.push("AND r.requesterId = ?")
+    params.push(requestedBy)
+  }
+
+  const rows = db.prepare(`
+    SELECT r.id, r.equipmentUnitId, r.equipmentTypeId, r.requesterId, r.status,
+           r.reason, r.requestedStart, r.requestedEnd, r.createdAt, r.updatedAt,
+           COALESCE(et_unit.name, et.name) AS equipmentTypeName,
+           u.name AS requesterName
+    FROM Rental r
+    LEFT JOIN EquipmentUnit eu ON r.equipmentUnitId = eu.id
+    LEFT JOIN EquipmentType et_unit ON eu.equipmentTypeId = et_unit.id
+    JOIN EquipmentType et ON r.equipmentTypeId = et.id
+    JOIN User u ON r.requesterId = u.id
+    WHERE ${conditions.join(" ")}
+    ORDER BY r.createdAt DESC
+  `).all(...params) as RentalJoinRow[]
+
+  res.json(rows.map(toApiRental))
 })
 
 router.get("/:id", async (req, res) => {
-  const rental = await prisma.rental.findUnique({
-    where: { id: req.params.id },
-    include: rentalInclude,
-  })
+  const row = db.prepare(`
+    SELECT r.id, r.equipmentUnitId, r.equipmentTypeId, r.requesterId, r.status,
+           r.reason, r.requestedStart, r.requestedEnd, r.createdAt, r.updatedAt,
+           COALESCE(et_unit.name, et.name) AS equipmentTypeName,
+           u.name AS requesterName
+    FROM Rental r
+    LEFT JOIN EquipmentUnit eu ON r.equipmentUnitId = eu.id
+    LEFT JOIN EquipmentType et_unit ON eu.equipmentTypeId = et_unit.id
+    JOIN EquipmentType et ON r.equipmentTypeId = et.id
+    JOIN User u ON r.requesterId = u.id
+    WHERE r.id = ?
+  `).get(req.params.id) as RentalJoinRow | undefined
 
-  if (!rental) {
+  if (!row) {
     res.status(404).json({ message: "Rental not found" })
     return
   }
 
-  const timeline = await prisma.auditLog.findMany({
-    where: { rentalId: rental.id },
-    orderBy: { createdAt: "asc" },
-    select: {
-      message: true,
-      createdAt: true,
-    },
-  })
+  const timeline = db.prepare(
+    "SELECT message, createdAt FROM AuditLog WHERE rentalId = ? ORDER BY createdAt ASC"
+  ).all(row.id) as { message: string; createdAt: string }[]
 
   const detail: ApiRentalDetail = {
-    ...toApiRental(rental),
-    timeline: timeline.map((item: any) => ({
+    ...toApiRental(row),
+    timeline: timeline.map((item) => ({
       label: item.message,
-      at: item.createdAt.toISOString(),
+      at: new Date(item.createdAt).toISOString(),
     })),
   }
 

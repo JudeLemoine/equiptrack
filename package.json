@@ -10,7 +10,6 @@
     "dev": "npx concurrently \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\""
   },
   "dependencies": {
-    "@prisma/adapter-better-sqlite3": "^7.5.0",
     "better-sqlite3": "^12.8.0"
   }
 }

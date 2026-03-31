@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express"
 import { mapPrismaRoleToApi } from "../db/mappers"
-import { prisma } from "../lib/db"
+import db from "../lib/db"
+import type { UserRole } from "../db/enums"
 
 type RequestWithUser = Request & {
   user?: {
@@ -43,10 +44,9 @@ export async function attachUser(req: Request, _res: Response, next: NextFunctio
     return
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, role: true },
-  })
+  const user = db.prepare("SELECT id, role FROM User WHERE id = ?").get(userId) as
+    | { id: string; role: UserRole }
+    | undefined
 
   if (user) {
     request.user = {

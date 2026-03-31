@@ -1,104 +1,106 @@
 import {
   AuditAction,
-  EquipmentStatus as PrismaEquipmentStatus,
-  RentalStatus as PrismaRentalStatus,
-  UserRole as PrismaUserRole,
-} from "@prisma/client"
+  EquipmentStatus,
+  RentalStatus,
+  UserRole,
+} from "./enums"
 
 export type ApiRole = "admin" | "field" | "maintenance"
 export type ApiEquipmentStatus = "available" | "in_use" | "maintenance"
 export type ApiRentalStatus = "pending" | "approved" | "active" | "returned" | "rejected"
 
-export function mapApiRoleToPrisma(role: ApiRole): PrismaUserRole {
+export function mapApiRoleToPrisma(role: ApiRole): UserRole {
   switch (role) {
     case "admin":
-      return PrismaUserRole.ADMIN
+      return UserRole.ADMIN
     case "field":
-      return PrismaUserRole.FIELD_WORKER
+      return UserRole.FIELD_WORKER
     case "maintenance":
-      return PrismaUserRole.MAINTENANCE
+      return UserRole.MAINTENANCE
   }
 }
 
-export function mapPrismaRoleToApi(role: PrismaUserRole): ApiRole {
+export function mapPrismaRoleToApi(role: UserRole): ApiRole {
   switch (role) {
-    case PrismaUserRole.ADMIN:
+    case UserRole.ADMIN:
       return "admin"
-    case PrismaUserRole.FIELD_WORKER:
+    case UserRole.FIELD_WORKER:
       return "field"
-    case PrismaUserRole.MAINTENANCE:
+    case UserRole.MAINTENANCE:
       return "maintenance"
   }
 }
 
-export function mapPrismaEquipmentStatusToApi(status: PrismaEquipmentStatus): ApiEquipmentStatus {
+export function mapPrismaEquipmentStatusToApi(status: EquipmentStatus): ApiEquipmentStatus {
   switch (status) {
-    case PrismaEquipmentStatus.AVAILABLE:
+    case EquipmentStatus.AVAILABLE:
       return "available"
-    case PrismaEquipmentStatus.RESERVED:
-    case PrismaEquipmentStatus.CHECKED_OUT:
-    case PrismaEquipmentStatus.OVERDUE:
+    case EquipmentStatus.RESERVED:
+    case EquipmentStatus.CHECKED_OUT:
+    case EquipmentStatus.OVERDUE:
       return "in_use"
-    case PrismaEquipmentStatus.DUE_SOON_MAINTENANCE:
-    case PrismaEquipmentStatus.IN_MAINTENANCE:
-    case PrismaEquipmentStatus.OUT_OF_SERVICE:
-    case PrismaEquipmentStatus.MAINTENANCE:
+    case EquipmentStatus.DUE_SOON_MAINTENANCE:
+    case EquipmentStatus.IN_MAINTENANCE:
+    case EquipmentStatus.OUT_OF_SERVICE:
+    case EquipmentStatus.MAINTENANCE:
       return "maintenance"
   }
 }
 
-export function mapApiEquipmentStatusToPrisma(status: ApiEquipmentStatus): PrismaEquipmentStatus {
+export function mapApiEquipmentStatusToPrisma(status: ApiEquipmentStatus): EquipmentStatus {
   switch (status) {
     case "available":
-      return PrismaEquipmentStatus.AVAILABLE
+      return EquipmentStatus.AVAILABLE
     case "in_use":
-      return PrismaEquipmentStatus.CHECKED_OUT
+      return EquipmentStatus.CHECKED_OUT
     case "maintenance":
-      return PrismaEquipmentStatus.IN_MAINTENANCE
+      return EquipmentStatus.IN_MAINTENANCE
   }
 }
 
-export function mapPrismaRentalStatusToApi(status: PrismaRentalStatus): ApiRentalStatus {
+export function mapPrismaRentalStatusToApi(status: RentalStatus): ApiRentalStatus {
   switch (status) {
-    case PrismaRentalStatus.PENDING:
+    case RentalStatus.PENDING:
       return "pending"
-    case PrismaRentalStatus.APPROVED:
-    case PrismaRentalStatus.RESERVED:
+    case RentalStatus.APPROVED:
+    case RentalStatus.RESERVED:
       return "approved"
-    case PrismaRentalStatus.CHECKED_OUT:
-    case PrismaRentalStatus.OVERDUE:
+    case RentalStatus.CHECKED_OUT:
+    case RentalStatus.OVERDUE:
       return "active"
-    case PrismaRentalStatus.RETURNED:
+    case RentalStatus.RETURNED:
       return "returned"
-    case PrismaRentalStatus.REJECTED:
-    case PrismaRentalStatus.CANCELLED:
+    case RentalStatus.REJECTED:
+    case RentalStatus.CANCELLED:
       return "rejected"
   }
 }
 
-export function mapApiRentalStatusToPrisma(status: ApiRentalStatus): PrismaRentalStatus {
+export function mapApiRentalStatusToPrisma(status: ApiRentalStatus): RentalStatus {
   switch (status) {
     case "pending":
-      return PrismaRentalStatus.PENDING
+      return RentalStatus.PENDING
     case "approved":
-      return PrismaRentalStatus.APPROVED
+      return RentalStatus.APPROVED
     case "active":
-      return PrismaRentalStatus.CHECKED_OUT
+      return RentalStatus.CHECKED_OUT
     case "returned":
-      return PrismaRentalStatus.RETURNED
+      return RentalStatus.RETURNED
     case "rejected":
-      return PrismaRentalStatus.REJECTED
+      return RentalStatus.REJECTED
   }
 }
 
-export function toIsoDate(value?: Date | null): string | undefined {
+export function toIsoDate(value?: Date | string | null): string | undefined {
   if (!value) return undefined
-  return value.toISOString().slice(0, 10)
+  if (value instanceof Date) return value.toISOString().slice(0, 10)
+  return new Date(value).toISOString().slice(0, 10)
 }
 
-export function toIsoDateTime(value?: Date | null): string | undefined {
+export function toIsoDateTime(value?: Date | string | null): string | undefined {
   if (!value) return undefined
-  return value.toISOString()
+  if (value instanceof Date) return value.toISOString()
+  return new Date(value).toISOString()
 }
 
 export function mapAuditActionToActivityType(action: AuditAction): "checkout" | "checkin" | "service" | "issue" | "status_change" {

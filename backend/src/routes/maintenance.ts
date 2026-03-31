@@ -1,5 +1,5 @@
 import { Router } from "express"
-import { IssueSeverity, IssueStatus, NoteTargetType } from "@prisma/client"
+import { IssueSeverity, IssueStatus, NoteTargetType } from "../db/enums"
 import { requireRole } from "../middleware/requireRole"
 import {
   createIssueReport,

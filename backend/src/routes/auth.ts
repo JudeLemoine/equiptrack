@@ -1,5 +1,6 @@
 import { Router } from "express"
-import { prisma } from "../lib/db"
+import db from "../lib/db"
+import { generateId } from "../lib/db"
 import { mapApiRoleToPrisma, type ApiRole } from "../db/mappers"
 import * as authService from "../services/authService"
 
@@ -14,22 +15,17 @@ router.post("/login", async (req, res) => {
   try {
     let authUser = await authService.findUserByRole(role)
 
-    // Check for Data / Auto-Seed if database is empty or user is missing
     if (!authUser) {
       console.log(`User for role ${role} not found. Checking if database is empty...`)
-      const userCount = await prisma.user.count()
-      
-      if (userCount === 0) {
+      const row = db.prepare("SELECT COUNT(*) as count FROM User").get() as { count: number }
+
+      if (row.count === 0) {
         console.log("Database is empty. Creating default test user...")
-        const newUser = await prisma.user.create({
-          data: {
-            name: "Default Admin",
-            email: "admin@equiptrack.dev",
-            role: mapApiRoleToPrisma("admin"),
-          }
-        })
-        
-        // If the requested role was admin, we can proceed with this user
+        const id = generateId()
+        db.prepare(
+          "INSERT INTO User (id, name, email, role) VALUES (?, ?, ?, ?)"
+        ).run(id, "Default Admin", "admin@equiptrack.dev", mapApiRoleToPrisma("admin"))
+
         if (role === "admin") {
           authUser = await authService.findUserByRole("admin")
         }
@@ -40,15 +36,13 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ message: "invalid role" })
     }
 
-    // Verify Password (dummy)
     const isPasswordValid = await authService.verifyPassword(authUser, req.body?.password)
     if (!isPasswordValid) {
       return res.status(401).json({ message: "invalid credentials" })
     }
 
-    // Use JWT_SECRET if needed, currently dummy token used as per frontend
-    const token = process.env.JWT_SECRET 
-      ? `jwt-token-${authUser.id}` // Placeholder for real JWT signing
+    const token = process.env.JWT_SECRET
+      ? `jwt-token-${authUser.id}`
       : `dev-token-${authUser.id}`
 
     res.json({

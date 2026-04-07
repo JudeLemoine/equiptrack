@@ -232,7 +232,7 @@ function main() {
     const users: { id: string; role: string; name: string }[] = []
 
     const adminProfiles = [
-      { name: "Robert MacMillan", position: "Operations Director" },
+      { name: "Administrator", position: "Operations Director" },
       { name: "Sarah Jenkins", position: "Fleet Manager" },
       { name: "David Chen", position: "Site Superintendent" },
       { name: "Amanda Torres", position: "Logistics Coordinator" },

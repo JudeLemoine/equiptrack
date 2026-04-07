@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
-import { getCurrentRole, isAuthenticated } from '../lib/auth'
+import { isAuthenticated } from '../lib/auth'
+import { useImpersonation } from './ImpersonationContext'
 import type { UserRole } from '../types/auth'
 
 type ProtectedRouteProps = {
@@ -8,14 +9,14 @@ type ProtectedRouteProps = {
 
 export default function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
   const location = useLocation()
+  const { effectiveRole } = useImpersonation()
 
   if (!isAuthenticated()) {
     return <Navigate replace state={{ from: location }} to="/login" />
   }
 
   if (allowedRoles?.length) {
-    const role = getCurrentRole()
-    if (!role || !allowedRoles.includes(role)) {
+    if (!effectiveRole || !allowedRoles.includes(effectiveRole as UserRole)) {
       return <Navigate replace to="/" />
     }
   }

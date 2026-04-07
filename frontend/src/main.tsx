@@ -9,6 +9,14 @@ import { queryClient } from './lib/queryClient'
 import { theme } from './theme'
 import './index.css'
 
+const SESSION_VERSION = '1'
+const SESSION_VERSION_KEY = 'equptrack_session_version'
+
+if (localStorage.getItem(SESSION_VERSION_KEY) !== SESSION_VERSION) {
+  localStorage.removeItem('equptrack_session')
+  localStorage.setItem(SESSION_VERSION_KEY, SESSION_VERSION)
+}
+
 async function enableMocking() {
   const useMocks = import.meta.env.VITE_USE_MOCKS === 'true'
 

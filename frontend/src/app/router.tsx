@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import AppLayout from './AppLayout'
 import ProtectedRoute from './ProtectedRoute'
+import { ImpersonationProvider, useImpersonation } from './ImpersonationContext'
 import LoginPage from '../features/auth/LoginPage'
 import AdminDashboardPage from '../features/admin/pages/AdminDashboardPage'
 import AdminEquipmentPage from '../features/admin/pages/AdminEquipmentPage'
@@ -16,27 +17,18 @@ import MaintenanceEquipmentPage from '../features/maintenance/pages/MaintenanceE
 import MaintenanceEquipmentDetailPage from '../features/maintenance/pages/MaintenanceEquipmentDetailPage'
 import UserProfilePage from '../features/user/pages/UserProfilePage'
 import NotFoundPage from './NotFoundPage'
-import { getCurrentRole } from '../lib/auth'
 
 function RootRedirect() {
-  const role = getCurrentRole()
+  const { effectiveRole } = useImpersonation()
 
-  if (role === 'admin') {
-    return <Navigate replace to="/admin/dashboard" />
-  }
-
-  if (role === 'field') {
-    return <Navigate replace to="/field/dashboard" />
-  }
-
-  if (role === 'maintenance') {
-    return <Navigate replace to="/maintenance/dashboard" />
-  }
+  if (effectiveRole === 'admin') return <Navigate replace to="/admin/dashboard" />
+  if (effectiveRole === 'field') return <Navigate replace to="/field/dashboard" />
+  if (effectiveRole === 'maintenance') return <Navigate replace to="/maintenance/dashboard" />
 
   return <Navigate replace to="/login" />
 }
 
-export default function AppRouter() {
+function AppRoutes() {
   return (
     <Routes>
       <Route element={<LoginPage />} path="/login" />
@@ -71,5 +63,13 @@ export default function AppRouter() {
 
       <Route element={<NotFoundPage />} path="*" />
     </Routes>
+  )
+}
+
+export default function AppRouter() {
+  return (
+    <ImpersonationProvider>
+      <AppRoutes />
+    </ImpersonationProvider>
   )
 }

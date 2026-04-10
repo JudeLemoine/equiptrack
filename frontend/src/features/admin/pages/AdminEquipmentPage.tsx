@@ -204,6 +204,7 @@ export default function AdminEquipmentPage() {
         onSearchValueChange={setSearch}
         searchPlaceholder="Search equipment by name"
         searchValue={search}
+        pageSize={25}
       />
 
       <Dialog onOpenChange={setCreateOpen} open={isCreateOpen}>

@@ -17,12 +17,49 @@ import {
   DialogTitle,
 } from '../../../components/ui/dialog'
 import { Button } from '../../../components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card'
 import { TextField } from '@mui/material'
 import { Label } from '../../../components/ui/label'
+import { Select } from '../../../components/ui/select'
 import { listMaintenanceQueue, markEquipmentServiced } from '../../../services/equipmentService'
-import type { Equipment } from '../../../types/equipment'
+import type { Equipment, IssueSeverity } from '../../../types/equipment'
 import { formatDate } from '../../../lib/utils'
 import { getSession } from '../../../lib/auth'
+
+type Priority = 'overdue' | 'critical' | 'upcoming' | 'scheduled'
+
+function derivePriority(nextServiceDueDate?: string): Priority {
+  if (!nextServiceDueDate) return 'scheduled'
+  const now = new Date()
+  const due = new Date(nextServiceDueDate)
+  const diffDays = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  if (diffDays < 0) return 'overdue'
+  if (diffDays <= 3) return 'critical'
+  if (diffDays <= 7) return 'upcoming'
+  return 'scheduled'
+}
+
+const priorityConfig: Record<Priority, { label: string; className: string }> = {
+  overdue: { label: 'Overdue', className: 'text-red-700 bg-red-50 border-red-200' },
+  critical: { label: 'Critical', className: 'text-orange-700 bg-orange-50 border-orange-200' },
+  upcoming: { label: 'Upcoming', className: 'text-amber-700 bg-amber-50 border-amber-200' },
+  scheduled: { label: 'Scheduled', className: 'text-blue-700 bg-blue-50 border-blue-200' },
+}
+
+const priorityOptions: Array<{ label: string; value: Priority | 'all' }> = [
+  { label: 'All priorities', value: 'all' },
+  { label: 'Overdue', value: 'overdue' },
+  { label: 'Critical (≤3 days)', value: 'critical' },
+  { label: 'Upcoming (≤7 days)', value: 'upcoming' },
+  { label: 'Scheduled', value: 'scheduled' },
+]
+
+const severityConfig: Record<IssueSeverity, { label: string; className: string }> = {
+  LOW: { label: 'Low', className: 'text-blue-700 bg-blue-50 border-blue-200' },
+  MEDIUM: { label: 'Medium', className: 'text-amber-700 bg-amber-50 border-amber-200' },
+  HIGH: { label: 'High', className: 'text-orange-700 bg-orange-50 border-orange-200' },
+  CRITICAL: { label: 'Critical', className: 'text-red-700 bg-red-50 border-red-200' },
+}
 
 export default function MaintenanceEquipmentPage() {
   const queryClient = useQueryClient()
@@ -31,12 +68,40 @@ export default function MaintenanceEquipmentPage() {
   const userId = session?.user.id ?? ''
   const [selectedItem, setSelectedItem] = useState<Equipment | null>(null)
   const [manualNextDueDate, setManualNextDueDate] = useState('')
+  const [search, setSearch] = useState('')
+  const [priorityFilter, setPriorityFilter] = useState<Priority | 'all'>('all')
+  const [severityFilter, setSeverityFilter] = useState<IssueSeverity | 'all' | 'none'>('all')
 
   const equipmentQuery = useQuery({
     queryKey: ['maintenance-queue'],
     queryFn: () => listMaintenanceQueue(14),
     placeholderData: keepPreviousData,
   })
+
+  const filteredData = useMemo(() => {
+    let items = equipmentQuery.data ?? []
+
+    if (search) {
+      const term = search.toLowerCase()
+      items = items.filter((item) =>
+        item.name.toLowerCase().includes(term) ||
+        item.category.toLowerCase().includes(term) ||
+        item.qrCode?.toLowerCase().includes(term)
+      )
+    }
+
+    if (priorityFilter !== 'all') {
+      items = items.filter((item) => derivePriority(item.nextServiceDueDate) === priorityFilter)
+    }
+
+    if (severityFilter === 'none') {
+      items = items.filter((item) => !item.severity)
+    } else if (severityFilter !== 'all') {
+      items = items.filter((item) => item.severity === severityFilter)
+    }
+
+    return items
+  }, [equipmentQuery.data, search, priorityFilter, severityFilter])
 
   const completeServiceMutation = useMutation({
     mutationFn: (payload: { id: string; nextServiceDueDate?: string }) =>
@@ -69,6 +134,55 @@ export default function MaintenanceEquipmentPage() {
         header: 'Category',
       },
       {
+        id: 'priority',
+        header: 'Priority',
+        cell: ({ row }) => {
+          const p = derivePriority(row.original.nextServiceDueDate)
+          const cfg = priorityConfig[p]
+          return (
+            <span className={`inline-block w-20 text-center py-0.5 rounded text-xs font-semibold border ${cfg.className}`}>
+              {cfg.label}
+            </span>
+          )
+        },
+      },
+      {
+        id: 'severity',
+        header: () => {
+          const cycle: Array<IssueSeverity | 'all' | 'none'> = ['all', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL', 'none']
+          const currentIdx = cycle.indexOf(severityFilter)
+          const nextVal = cycle[(currentIdx + 1) % cycle.length]
+          const label = severityFilter === 'all'
+            ? 'Severity'
+            : severityFilter === 'none'
+              ? 'Severity: None'
+              : `Severity: ${severityConfig[severityFilter].label}`
+          return (
+            <button
+              type="button"
+              onClick={() => setSeverityFilter(nextVal)}
+              className={`flex items-center gap-1 text-left font-medium transition-colors ${severityFilter !== 'all' ? 'text-slate-900' : 'text-slate-600 hover:text-slate-900'}`}
+            >
+              {label}
+              {severityFilter !== 'all' && (
+                <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-slate-900" />
+              )}
+            </button>
+          )
+        },
+        enableSorting: false,
+        cell: ({ row }) => {
+          const sev = row.original.severity
+          if (!sev) return <span className="text-xs text-slate-400">—</span>
+          const cfg = severityConfig[sev]
+          return (
+            <span className={`inline-block w-20 text-center py-0.5 rounded text-xs font-semibold border ${cfg.className}`}>
+              {cfg.label}
+            </span>
+          )
+        },
+      },
+      {
         accessorKey: 'status',
         header: 'Status',
         cell: ({ row }) => <StatusBadge status={row.original.status} />,
@@ -94,7 +208,7 @@ export default function MaintenanceEquipmentPage() {
         ),
       },
     ],
-    [],
+    [severityFilter],
   )
 
   if (equipmentQuery.isLoading) {
@@ -122,11 +236,40 @@ export default function MaintenanceEquipmentPage() {
         title="Maintenance Queue"
       />
 
+      <Card>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base">Filters</CardTitle>
+          <CardDescription>Search and filter the maintenance queue.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="max-w-xs space-y-2">
+              <Label htmlFor="priorityFilter">Priority</Label>
+              <Select
+                id="priorityFilter"
+                onChange={(event) => setPriorityFilter(event.target.value as Priority | 'all')}
+                value={priorityFilter}
+              >
+                {priorityOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <DataTable
         columns={columns}
-        data={equipmentQuery.data ?? []}
-        emptyDescription="No equipment is due for maintenance in the selected window."
+        data={filteredData}
+        emptyDescription="No equipment matches the current filters."
         emptyTitle="Maintenance queue is empty"
+        onSearchValueChange={setSearch}
+        searchPlaceholder="Search by name, category, or asset tag"
+        searchValue={search}
+        pageSize={25}
       />
 
       <Dialog onOpenChange={(open) => !open && setSelectedItem(null)} open={Boolean(selectedItem)}>

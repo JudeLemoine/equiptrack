@@ -159,20 +159,18 @@ export default function UserProfilePage() {
             </div>
             <div>
               <Label className="text-slate-500">Email</Label>
-              <div className="flex items-center gap-2 mt-1">
-                <p className="font-medium">{user.email}</p>
-                {isOwnProfile && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => toast.info('Email update is not yet available.')}
-                  >
-                    <Mail className="h-3 w-3 mr-1" />
-                    Update Email
-                  </Button>
-                )}
-              </div>
+              <p className="font-medium mt-1">{user.email}</p>
+              {isOwnProfile && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 h-7 text-xs"
+                  onClick={() => toast.info('Email update is not yet available.')}
+                >
+                  <Mail className="h-3 w-3 mr-1" />
+                  Update Email
+                </Button>
+              )}
             </div>
             <div>
               <Label className="text-slate-500">Role</Label>

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   LogOut,
@@ -26,6 +26,7 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { clearSession, getSession, setSession } from '../lib/auth'
+import ErrorBoundary from '../components/ErrorBoundary'
 import { Avatar, AvatarFallback } from '../components/ui/avatar'
 import {
   DropdownMenu,
@@ -583,7 +584,9 @@ export default function AppLayout() {
       <SecondaryNavWrapper />
 
       <main className="mx-auto w-full max-w-7xl p-4 md:p-8">
-        <Outlet />
+        <ErrorBoundary>
+          <Outlet />
+        </ErrorBoundary>
       </main>
 
       {showImpersonateDialog && (

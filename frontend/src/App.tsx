@@ -5,7 +5,7 @@ export default function App() {
   return (
     <>
       <AppRouter />
-      <Toaster position="top-right" richColors offset="60px" />
+      <Toaster position="top-right" richColors closeButton offset="60px" />
     </>
   )
 }

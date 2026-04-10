@@ -1,5 +1,7 @@
 export type EquipmentStatus = 'available' | 'in_use' | 'maintenance'
 
+export type IssueSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+
 export type Equipment = {
   id: string
   name: string
@@ -10,6 +12,7 @@ export type Equipment = {
   maintenanceIntervalDays?: number
   nextServiceDueDate?: string
   notes?: string
+  severity?: IssueSeverity
 }
 
 export type CreateEquipmentDTO = {

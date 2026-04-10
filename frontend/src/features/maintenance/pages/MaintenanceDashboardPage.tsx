@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import { Wrench, CheckCircle2, Activity, AlertCircle } from 'lucide-react'
@@ -10,9 +10,12 @@ import Loader from '../../../components/Loader'
 import PageHeader from '../../../components/PageHeader'
 import { Button } from '../../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card'
+import { Label } from '../../../components/ui/label'
+import { Select } from '../../../components/ui/select'
 import { getSession } from '../../../lib/auth'
 import { getMaintenanceSummary } from '../../../services/dashboardService'
 import { listIssueReports, resolveIssue, moveToMaintenance } from '../../../services/maintenanceService'
+import type { IssueSeverity } from '../../../services/maintenanceService'
 import { formatDateTime } from '../../../lib/utils'
 
 const SEVERITY_RANK: Record<string, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 }
@@ -22,6 +25,7 @@ export default function MaintenanceDashboardPage() {
   const queryClient = useQueryClient()
   const session = getSession()
   const userId = session?.user.id ?? ''
+  const [severityFilter, setSeverityFilter] = useState<IssueSeverity | 'all'>('all')
 
   const summaryQuery = useQuery({
     queryKey: ['maintenance-summary'],
@@ -51,13 +55,16 @@ export default function MaintenanceDashboardPage() {
     },
   })
 
-  const sortedIssues = useMemo(() => {
-    return [...(issuesQuery.data ?? [])].sort((a, b) => {
+  const filteredSortedIssues = useMemo(() => {
+    const items = issuesQuery.data ?? []
+    const filtered =
+      severityFilter === 'all' ? items : items.filter((issue) => issue.severity === severityFilter)
+    return [...filtered].sort((a, b) => {
       const severityDiff = (SEVERITY_RANK[a.severity] ?? 99) - (SEVERITY_RANK[b.severity] ?? 99)
       if (severityDiff !== 0) return severityDiff
       return new Date(b.reportedAt).getTime() - new Date(a.reportedAt).getTime()
     })
-  }, [issuesQuery.data])
+  }, [issuesQuery.data, severityFilter])
 
   if (summaryQuery.isLoading || issuesQuery.isLoading) {
     return <Loader label="Loading maintenance dashboard..." />
@@ -208,9 +215,23 @@ export default function MaintenanceDashboardPage() {
           <AlertCircle className="h-5 w-5 text-red-600" />
           <h2 className="text-xl font-bold text-slate-900">Reported Issues Queue</h2>
         </div>
+        <div className="max-w-xs space-y-2">
+          <Label htmlFor="severityFilter">Severity</Label>
+          <Select
+            id="severityFilter"
+            value={severityFilter}
+            onChange={(e) => setSeverityFilter(e.target.value as IssueSeverity | 'all')}
+          >
+            <option value="all">All severities</option>
+            <option value="LOW">Low</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="HIGH">High</option>
+            <option value="CRITICAL">Critical</option>
+          </Select>
+        </div>
         <DataTable
           columns={issueColumns}
-          data={sortedIssues}
+          data={filteredSortedIssues}
           emptyDescription="No active issue reports found."
           emptyTitle="Queue Clear"
         />

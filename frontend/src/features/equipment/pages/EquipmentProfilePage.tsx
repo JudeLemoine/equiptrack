@@ -28,6 +28,8 @@ import {
   reportIssue,
   addEquipmentNote,
 } from '../../../services/equipmentService'
+import { listMaintenanceNotes, addMaintenanceNote } from '../../../services/maintenanceService'
+import type { MaintenanceNote } from '../../../services/maintenanceService'
 import { listServiceLogsByEquipment } from '../../../services/serviceLogService'
 import type { ActivityEvent } from '../../../types/activity'
 import type { ServiceLogEntry } from '../../../types/serviceLog'
@@ -51,6 +53,7 @@ export default function EquipmentProfilePage() {
   const [issueSeverity, setIssueSeverity] = useState('low')
   const [issueDescription, setIssueDescription] = useState('')
   const [fieldNote, setFieldNote] = useState('')
+  const [techNote, setTechNote] = useState('')
 
   const role = session?.user.role
   const userId = session?.user.id ?? ''
@@ -74,6 +77,12 @@ export default function EquipmentProfilePage() {
     queryFn: () => listActivityByEquipment(id as string, 10),
   })
 
+  const { data: techNotes } = useQuery({
+    enabled: Boolean(id),
+    queryKey: ['tech-notes', id],
+    queryFn: () => listMaintenanceNotes(id as string),
+  })
+
   // Theme Colors
   const navy = "#1A4889"
   const gold = "#EBBA38"
@@ -82,6 +91,7 @@ export default function EquipmentProfilePage() {
     await queryClient.invalidateQueries({ queryKey: ['equipment', id] })
     await queryClient.invalidateQueries({ queryKey: ['service-logs', id] })
     await queryClient.invalidateQueries({ queryKey: ['activity', id] })
+    await queryClient.invalidateQueries({ queryKey: ['tech-notes', id] })
   }
 
   // Mutations
@@ -114,6 +124,21 @@ export default function EquipmentProfilePage() {
       setFieldNote('')
       await refreshAll()
       toast.success('Note added to equipment history.')
+    }
+  })
+
+  const addTechNoteMutation = useMutation({
+    mutationFn: async () => {
+      return addMaintenanceNote({
+        body: techNote,
+        authorId: userId,
+        equipmentId: id as string,
+      })
+    },
+    onSuccess: async () => {
+      setTechNote('')
+      await refreshAll()
+      toast.success('Technician note added.')
     }
   })
 
@@ -233,13 +258,42 @@ export default function EquipmentProfilePage() {
           </CardContent>
         </Card>
 
-        {/* Quick Actions Card */}
         <Card>
           <CardHeader><CardTitle>Technician Notes</CardTitle></CardHeader>
-          <CardContent>
-            <p className="text-sm text-slate-600 italic">
-              {equipment.notes || "No permanent notes on file."}
-            </p>
+          <CardContent className="space-y-4">
+            {equipment.notes && (
+              <p className="text-sm text-slate-600 italic">{equipment.notes}</p>
+            )}
+            {techNotes && techNotes.length > 0 ? (
+              <div className="space-y-3">
+                {techNotes.map((note: MaintenanceNote) => (
+                  <div key={note.id} className="border-l-2 border-indigo-200 pl-3 py-1">
+                    <p className="text-sm text-slate-700">{note.body}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{formatDateTime(note.createdAt)}</p>
+                  </div>
+                ))}
+              </div>
+            ) : !equipment.notes ? (
+              <p className="text-sm text-slate-500 italic">No technician notes on file.</p>
+            ) : null}
+            {role === 'maintenance' && (
+              <div className="pt-2 border-t border-slate-100 space-y-2">
+                <Textarea
+                  placeholder="Add a technician note..."
+                  value={techNote}
+                  onChange={(e) => setTechNote(e.target.value)}
+                  className="min-h-[60px] text-sm"
+                />
+                <Button
+                  size="sm"
+                  style={{ backgroundColor: navy }}
+                  onClick={() => addTechNoteMutation.mutate()}
+                  disabled={!techNote.trim() || addTechNoteMutation.isPending}
+                >
+                  {addTechNoteMutation.isPending ? 'Saving...' : 'Add Note'}
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -277,16 +331,21 @@ export default function EquipmentProfilePage() {
           <CardHeader><CardTitle>Recent History</CardTitle></CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {activity && activity.length > 0 ? (
-                activity.map((log: ActivityEvent) => (
-                  <div key={log.id} className="border-l-2 border-slate-200 pl-4 py-1">
-                    <p className="text-sm font-medium">{log.summary}</p>
-                    <p className="text-xs text-slate-500">{formatDateTime(log.timestamp)}</p>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-slate-500 py-2">No recent history on file</p>
-              )}
+              {(() => {
+                const historyItems = activity?.filter(
+                  (log: ActivityEvent) => !log.summary.startsWith('Technician Note:')
+                ) ?? []
+                return historyItems.length > 0 ? (
+                  historyItems.map((log: ActivityEvent) => (
+                    <div key={log.id} className="border-l-2 border-slate-200 pl-4 py-1">
+                      <p className="text-sm font-medium">{log.summary}</p>
+                      <p className="text-xs text-slate-500">{formatDateTime(log.timestamp)}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-500 py-2">No recent history on file</p>
+                )
+              })()}
             </div>
           </CardContent>
         </Card>

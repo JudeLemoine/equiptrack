@@ -13,6 +13,7 @@ type QueueItem = {
   maintenanceIntervalDays?: number
   nextServiceDueDate?: string
   notes?: string
+  severity?: IssueSeverity
 }
 
 type IssuePayload = {
@@ -67,6 +68,7 @@ type UnitQueueRow = {
   typeName: string
   categoryName: string
   defaultMaintenanceDays: number | null
+  severityRank: number | null
 }
 
 export async function getMaintenanceQueue(days: number): Promise<QueueItem[]> {
@@ -77,13 +79,23 @@ export async function getMaintenanceQueue(days: number): Promise<QueueItem[]> {
   const rows = db.prepare(`
     SELECT eu.id, eu.assetTag, eu.status, eu.lastMaintenanceAt, eu.nextMaintenanceDue,
            eu.notesSummary, et.name AS typeName, ec.name AS categoryName,
-           et.defaultMaintenanceDays
+           et.defaultMaintenanceDays,
+           ir.severityRank
     FROM EquipmentUnit eu
     JOIN EquipmentType et ON eu.equipmentTypeId = et.id
     JOIN EquipmentCategory ec ON et.categoryId = ec.id
+    LEFT JOIN (
+      SELECT equipmentUnitId,
+             MAX(CASE severity WHEN 'CRITICAL' THEN 4 WHEN 'HIGH' THEN 3 WHEN 'MEDIUM' THEN 2 WHEN 'LOW' THEN 1 END) AS severityRank
+      FROM IssueReport
+      WHERE status NOT IN ('RESOLVED', 'CLOSED')
+      GROUP BY equipmentUnitId
+    ) ir ON ir.equipmentUnitId = eu.id
     WHERE eu.isActive = 1 AND eu.nextMaintenanceDue <= ?
     ORDER BY eu.nextMaintenanceDue ASC
   `).all(cutoff.toISOString()) as UnitQueueRow[]
+
+  const rankToSeverity: Record<number, IssueSeverity> = { 1: "LOW", 2: "MEDIUM", 3: "HIGH", 4: "CRITICAL" }
 
   return rows.map((unit) => ({
     id: unit.id,
@@ -95,6 +107,7 @@ export async function getMaintenanceQueue(days: number): Promise<QueueItem[]> {
     maintenanceIntervalDays: unit.defaultMaintenanceDays ?? undefined,
     nextServiceDueDate: toIsoDate(unit.nextMaintenanceDue),
     notes: unit.notesSummary ?? undefined,
+    severity: unit.severityRank ? rankToSeverity[unit.severityRank] : undefined,
   }))
 }
 
@@ -300,10 +313,14 @@ export async function createNote(input: NotePayload) {
       : referenceKey === "maintenanceRecordId" ? input.maintenanceRecordId
       : input.issueReportId
 
+    const auditMessage = input.targetType === "EQUIPMENT_UNIT"
+      ? `Technician Note: ${input.body}`
+      : input.body
+
     db.prepare(`
       INSERT INTO AuditLog (id, action, actorId, ${referenceKey}, message, createdAt)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run(generateId(), "NOTE_ADDED", author.id, refValue ?? null, input.body, now)
+    `).run(generateId(), "NOTE_ADDED", author.id, refValue ?? null, auditMessage, now)
   })
 
   runTransaction()

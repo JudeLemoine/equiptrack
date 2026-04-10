@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import { Wrench, CheckCircle2, Activity, AlertCircle } from 'lucide-react'
@@ -9,9 +10,12 @@ import Loader from '../../../components/Loader'
 import PageHeader from '../../../components/PageHeader'
 import { Button } from '../../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card'
+import { Label } from '../../../components/ui/label'
+import { Select } from '../../../components/ui/select'
 import { getSession } from '../../../lib/auth'
 import { getMaintenanceSummary } from '../../../services/dashboardService'
 import { listIssueReports, resolveIssue, moveToMaintenance } from '../../../services/maintenanceService'
+import type { IssueSeverity } from '../../../services/maintenanceService'
 import { formatDateTime } from '../../../lib/utils'
 
 export default function MaintenanceDashboardPage() {
@@ -19,6 +23,7 @@ export default function MaintenanceDashboardPage() {
   const queryClient = useQueryClient()
   const session = getSession()
   const userId = session?.user.id ?? ''
+  const [severityFilter, setSeverityFilter] = useState<IssueSeverity | 'all'>('all')
 
   const summaryQuery = useQuery({
     queryKey: ['maintenance-summary'],
@@ -47,6 +52,12 @@ export default function MaintenanceDashboardPage() {
       toast.success('Equipment moved to maintenance')
     },
   })
+
+  const filteredIssues = useMemo(() => {
+    const items = issuesQuery.data ?? []
+    if (severityFilter === 'all') return items
+    return items.filter((issue) => issue.severity === severityFilter)
+  }, [issuesQuery.data, severityFilter])
 
   if (summaryQuery.isLoading || issuesQuery.isLoading) {
     return <Loader label="Loading maintenance dashboard..." />
@@ -197,9 +208,23 @@ export default function MaintenanceDashboardPage() {
           <AlertCircle className="h-5 w-5 text-red-600" />
           <h2 className="text-xl font-bold text-slate-900">Reported Issues Queue</h2>
         </div>
+        <div className="max-w-xs space-y-2">
+          <Label htmlFor="severityFilter">Severity</Label>
+          <Select
+            id="severityFilter"
+            value={severityFilter}
+            onChange={(e) => setSeverityFilter(e.target.value as IssueSeverity | 'all')}
+          >
+            <option value="all">All severities</option>
+            <option value="LOW">Low</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="HIGH">High</option>
+            <option value="CRITICAL">Critical</option>
+          </Select>
+        </div>
         <DataTable
           columns={issueColumns}
-          data={issuesQuery.data ?? []}
+          data={filteredIssues}
           emptyDescription="No active issue reports found."
           emptyTitle="Queue Clear"
         />

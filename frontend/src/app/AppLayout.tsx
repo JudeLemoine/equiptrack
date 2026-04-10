@@ -1,7 +1,9 @@
+import { useEffect } from 'react'
 import { Link, Outlet, useNavigate } from 'react-router-dom'
 import { LogOut, User, Wrench, HardHat, Truck, ClipboardList, Settings } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { clearSession, getSession, setSession } from '../lib/auth'
+import ErrorBoundary from '../components/ErrorBoundary'
 import { Avatar, AvatarFallback } from '../components/ui/avatar'
 import {
   DropdownMenu,
@@ -26,13 +28,11 @@ export default function AppLayout() {
   const navigate = useNavigate()
   const session = getSession()
 
-  // Fetch user data to keep avatar current
   const userQuery = useQuery({
     queryKey: ['current-user-avatar', session?.user?.id],
     queryFn: async () => {
       if (!session?.user?.id) return null
       const user = await getUser(session.user.id)
-      // Update session cache with latest avatar
       if (user && session) {
         const updated = {
           ...session,
@@ -44,7 +44,15 @@ export default function AppLayout() {
     },
     enabled: !!session?.user?.id,
     staleTime: 30_000,
+    retry: false,
   })
+
+  useEffect(() => {
+    if (userQuery.isError) {
+      clearSession()
+      navigate('/login', { replace: true })
+    }
+  }, [userQuery.isError, navigate])
 
   const avatarIcon = userQuery.data?.avatarUrl || session?.user?.avatarUrl
   const isAvatarIcon = userQuery.data?.isAvatarIcon ?? session?.user?.isAvatarIcon
@@ -120,7 +128,9 @@ export default function AppLayout() {
       </header>
 
       <main className="mx-auto w-full max-w-7xl p-4 md:p-8">
-        <Outlet />
+        <ErrorBoundary>
+          <Outlet />
+        </ErrorBoundary>
       </main>
     </div>
   )

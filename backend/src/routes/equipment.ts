@@ -409,11 +409,12 @@ router.post("/:id/report-issue", requireRole("field", "maintenance", "admin"), a
     updatedUnit = db.prepare(`${UNIT_JOIN_SQL} WHERE eu.id = ?`).get(item.id) as UnitJoinRow
   }
 
+  const descSnippet = description.length > 120 ? description.slice(0, 117) + "..." : description
   db.prepare(`
     INSERT INTO AuditLog (id, action, actorId, equipmentUnitId, issueReportId, message, createdAt)
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `).run(generateId(), "ISSUE_REPORTED", actor.id, item.id, issueId,
-    `Issue reported with severity ${severity}`, now)
+    `Issue reported [${severity.toUpperCase()}]: ${descSnippet}`, now)
 
   const issue = db.prepare("SELECT * FROM IssueReport WHERE id = ?").get(issueId)
 

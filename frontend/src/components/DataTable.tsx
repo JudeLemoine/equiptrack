@@ -1,6 +1,7 @@
 import {
   flexRender,
   getCoreRowModel,
+  getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
   type ColumnDef,
@@ -8,7 +9,7 @@ import {
   type SortingState,
 } from '@tanstack/react-table'
 import { useState } from 'react'
-import { ArrowDown, ArrowUp, ArrowUpDown, Search, ChevronDown, ChevronUp } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, Search, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Input } from './ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
 import { Button } from './ui/button'
@@ -22,6 +23,7 @@ type DataTableProps<TData> = {
   onSearchValueChange?: (value: string) => void
   emptyTitle: string
   emptyDescription?: string
+  pageSize?: number
 }
 
 function MobileAccordionRow<TData>({ row }: { row: Row<TData> }) {
@@ -75,8 +77,10 @@ export default function DataTable<TData>({
   onSearchValueChange,
   emptyTitle,
   emptyDescription,
+  pageSize,
 }: DataTableProps<TData>) {
   const [sorting, setSorting] = useState<SortingState>([])
+  const paginationEnabled = typeof pageSize === 'number' && pageSize > 0
 
   const table = useReactTable({
     data,
@@ -85,9 +89,46 @@ export default function DataTable<TData>({
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    ...(paginationEnabled
+      ? {
+          getPaginationRowModel: getPaginationRowModel(),
+          initialState: { pagination: { pageSize } },
+        }
+      : {}),
   })
 
   const hasRows = table.getRowModel().rows.length > 0
+
+  const paginationControls = paginationEnabled && table.getPageCount() > 1 && (
+    <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3">
+      <p className="text-sm text-slate-600">
+        Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+        <span className="ml-2 text-slate-400">
+          ({data.length} total)
+        </span>
+      </p>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => table.previousPage()}
+          disabled={!table.getCanPreviousPage()}
+        >
+          <ChevronLeft className="h-4 w-4 mr-1" />
+          Previous
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => table.nextPage()}
+          disabled={!table.getCanNextPage()}
+        >
+          Next
+          <ChevronRight className="h-4 w-4 ml-1" />
+        </Button>
+      </div>
+    </div>
+  )
 
   return (
     <div className="space-y-4">
@@ -180,6 +221,8 @@ export default function DataTable<TData>({
           </div>
         )}
       </div>
+
+      {paginationControls}
     </div>
   )
 }

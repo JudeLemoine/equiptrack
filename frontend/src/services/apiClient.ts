@@ -40,7 +40,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
     }
 
     const userMessage = extractErrorMessage(details, response.status)
-    toast.error(userMessage)
+    toast.error(userMessage, { id: `api-error-${response.status}-${userMessage}` })
 
     throw new ApiRequestError({
       message: userMessage,

@@ -1,0 +1,147 @@
+import { useMemo, useState } from 'react'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import type { ColumnDef } from '@tanstack/react-table'
+import { useNavigate } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
+import DataTable from '../../../components/DataTable'
+import ErrorState from '../../../components/ErrorState'
+import Loader from '../../../components/Loader'
+import PageHeader from '../../../components/PageHeader'
+import StatusBadge from '../../../components/StatusBadge'
+import { Button } from '../../../components/ui/button'
+import { Tabs, TabsList, TabsTrigger } from '../../../components/ui/tabs'
+import { getSession } from '../../../lib/auth'
+import { formatDate } from '../../../lib/utils'
+import { listRentals } from '../../../services/rentalService'
+import type { Rental, RentalStatus } from '../../../types/rental'
+
+const RENTAL_STATUS_RANK: Record<string, number> = { active: 0, pending: 1, approved: 2, returned: 3, rejected: 4 }
+
+const tabs: Array<{ label: string; value: RentalStatus | 'all' }> = [
+  { label: 'All', value: 'all' },
+  { label: 'Pending', value: 'pending' },
+  { label: 'Active', value: 'active' },
+  { label: 'Returned', value: 'returned' },
+]
+
+export default function FieldRentalsPage() {
+  const navigate = useNavigate()
+  const [status, setStatus] = useState<RentalStatus | 'all'>('all')
+  const session = getSession()
+  const userId = session?.user.id ?? ''
+
+  const rentalsQuery = useQuery({
+    enabled: Boolean(userId),
+    queryKey: ['rentals', 'field', userId, status],
+    queryFn: () => listRentals({ requestedBy: userId, status }),
+    placeholderData: keepPreviousData,
+  })
+
+  const columns = useMemo<ColumnDef<Rental>[]>(
+    () => [
+      {
+        accessorKey: 'equipmentName',
+        header: 'Equipment',
+      },
+      {
+        accessorKey: 'status',
+        header: 'Status',
+        cell: ({ row }) => <StatusBadge status={row.original.status} />,
+      },
+      {
+        accessorKey: 'startDate',
+        header: 'Start',
+        cell: ({ row }) => formatDate(row.original.startDate),
+      },
+      {
+        accessorKey: 'endDate',
+        header: 'End',
+        cell: ({ row }) => formatDate(row.original.endDate),
+      },
+      {
+        id: 'message',
+        header: 'Message',
+        enableSorting: false,
+        cell: ({ row }) => {
+          const statusValue = row.original.status
+          if (statusValue === 'pending') {
+            return <p className="text-sm text-amber-700">Waiting for admin approval.</p>
+          }
+          if (statusValue === 'active') {
+            return <p className="text-sm text-slate-600">Return process is handled by admin.</p>
+          }
+          if (statusValue === 'rejected') {
+            return <p className="text-sm text-red-700">Request was rejected.</p>
+          }
+          return <p className="text-sm text-emerald-700">Rental completed.</p>
+        },
+      },
+      {
+        id: 'actions',
+        header: 'View',
+        enableSorting: false,
+        cell: ({ row }) => (
+          <Button
+            onClick={() => navigate(`/field/equipment/${row.original.equipmentId}`)}
+            size="sm"
+            variant="ghost"
+            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+          >
+            View Profile
+          </Button>
+        ),
+      },
+    ],
+    [navigate],
+  )
+
+  const sortedRentals = useMemo(() => {
+    return [...(rentalsQuery.data ?? [])].sort((a, b) =>
+      (RENTAL_STATUS_RANK[a.status] ?? 99) - (RENTAL_STATUS_RANK[b.status] ?? 99)
+    )
+  }, [rentalsQuery.data])
+
+  if (rentalsQuery.isLoading) {
+    return <Loader label="Loading your rentals..." />
+  }
+
+  if (rentalsQuery.isError) {
+    return (
+      <ErrorState
+        error={rentalsQuery.error}
+        onRetry={() => rentalsQuery.refetch()}
+        title="Could not load rentals"
+      />
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <Button className="mb-4" onClick={() => navigate(-1)} size="sm" variant="outline">
+        <ArrowLeft className="mr-2 h-4 w-4" />
+        Back
+      </Button>
+      <PageHeader
+        subtitle="Track request status and active assignments"
+        title="My Requests"
+      />
+
+      <Tabs onValueChange={(value) => setStatus(value as RentalStatus | 'all')} value={status}>
+        <TabsList>
+          {tabs.map((tab) => (
+            <TabsTrigger key={tab.value} value={tab.value}>
+              {tab.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+
+      <DataTable
+        columns={columns}
+        data={sortedRentals}
+        emptyDescription="You do not have rentals in this state."
+        emptyTitle="No rentals found"
+      />
+    </div>
+  )
+}

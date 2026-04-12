@@ -5,4 +5,9 @@ export type User = {
   name: string
   email: string
   role: UserRole
+  department?: string | null
+  phoneNumber?: string | null
+  position?: string | null
+  avatarUrl?: string | null
+  isAvatarIcon?: boolean
 }

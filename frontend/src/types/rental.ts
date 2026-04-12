@@ -1,8 +1,9 @@
-export type RentalStatus = 'pending' | 'active' | 'returned' | 'rejected'
+export type RentalStatus = 'pending' | 'approved' | 'active' | 'returned' | 'rejected'
 
 export type Rental = {
   id: string
   equipmentId: string
+  equipmentTypeId: string
   equipmentName: string
   requestedBy: string
   requestedByName: string
@@ -32,5 +33,6 @@ export type CreateRentalRequestDTO = {
 }
 
 export type UpdateRentalStatusDTO = {
-  status: Extract<RentalStatus, 'active' | 'returned' | 'rejected'>
+  status: Extract<RentalStatus, 'active' | 'returned' | 'rejected' | 'approved'>
+  assignedEquipmentId?: string
 }

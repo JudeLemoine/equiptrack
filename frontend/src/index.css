@@ -8,6 +8,8 @@
   color: #0f172a;
   background-color: #f1f5f9;
   font-family: Manrope, 'IBM Plex Sans', 'Avenir Next', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 * {
@@ -25,4 +27,50 @@ body {
 
 #root {
   min-height: 100vh;
+}
+
+/* ── Global transition defaults ───────────────────────────────── */
+button, a, input, select, textarea {
+  transition: all 0.15s ease;
+}
+
+/* ── Card consistency ─────────────────────────────────────────── */
+.rounded-xl {
+  border-radius: 0.75rem;
+}
+
+/* ── Table polish ─────────────────────────────────────────────── */
+table tbody tr {
+  transition: background-color 0.1s ease;
+}
+table tbody tr:hover {
+  background-color: rgba(241, 245, 249, 0.7);
+}
+table th {
+  white-space: nowrap;
+}
+table td {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+/* ── MUI overrides for consistency ────────────────────────────── */
+.MuiOutlinedInput-root {
+  font-family: inherit !important;
+  font-size: 0.875rem !important;
+}
+.MuiOutlinedInput-notchedOutline {
+  border-color: rgb(226, 232, 240) !important;
+}
+.MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+  border-color: rgb(148, 163, 184) !important;
+}
+.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: rgb(var(--brand-navy-rgb)) !important;
+  border-width: 2px !important;
+}
+
+/* ── Sonner toast styling ─────────────────────────────────────── */
+[data-sonner-toast] {
+  font-family: inherit !important;
 }

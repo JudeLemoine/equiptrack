@@ -1,3 +1,5 @@
+import { toast } from 'sonner'
+import { getSession } from '../lib/auth'
 import type { ApiError } from '../types/api'
 
 const baseUrl = import.meta.env.VITE_API_URL ?? ''
@@ -14,6 +16,19 @@ export class ApiRequestError extends Error implements ApiError {
   }
 }
 
+function extractErrorMessage(details: unknown, status: number): string {
+  if (details && typeof details === 'object') {
+    const obj = details as Record<string, unknown>
+    if (typeof obj.message === 'string' && obj.message.length > 0) return obj.message
+    if (typeof obj.error === 'string' && obj.error.length > 0) return obj.error
+  }
+  if (status === 401) return 'Session expired. Please log in again.'
+  if (status === 403) return 'You do not have permission to perform this action.'
+  if (status === 404) return 'The requested resource was not found.'
+  if (status === 409) return 'This action conflicts with the current state.'
+  return `Something went wrong (${status}). Please try again.`
+}
+
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     let details: unknown
@@ -24,8 +39,11 @@ async function handleResponse<T>(response: Response): Promise<T> {
       details = undefined
     }
 
+    const userMessage = extractErrorMessage(details, response.status)
+    toast.error(userMessage)
+
     throw new ApiRequestError({
-      message: `Request failed with status ${response.status}`,
+      message: userMessage,
       status: response.status,
       details,
     })
@@ -43,6 +61,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (init?.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
+  }
+
+  // Automatically attach auth token if available
+  const session = getSession()
+  if (session?.token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${session.token}`)
+  }
+
+  // Also support x-user-id for backend compatibility
+  if (session?.user?.id && !headers.has('x-user-id')) {
+    headers.set('x-user-id', session.user.id)
   }
 
   try {

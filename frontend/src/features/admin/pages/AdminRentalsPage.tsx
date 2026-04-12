@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ColumnDef } from '@tanstack/react-table'
 import { toast } from 'sonner'
+import { useNavigate } from 'react-router-dom'
+import { ArrowLeft, MoreHorizontal, Check, X, LogOut, RotateCcw } from 'lucide-react'
 import DataTable from '../../../components/DataTable'
 import ErrorState from '../../../components/ErrorState'
 import Loader from '../../../components/Loader'
@@ -25,6 +27,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../../components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../../../components/ui/dropdown-menu'
 import { Tabs, TabsList, TabsTrigger } from '../../../components/ui/tabs'
 import { formatDate, formatDateTime } from '../../../lib/utils'
 import { getRentalById, listRentals, updateRentalStatus } from '../../../services/rentalService'
@@ -40,19 +48,25 @@ type RentalAction = {
 const tabMap: Array<{ label: string; value: RentalStatus | 'all' }> = [
   { label: 'All', value: 'all' },
   { label: 'Pending', value: 'pending' },
+  { label: 'Approved', value: 'approved' },
   { label: 'Active', value: 'active' },
   { label: 'Returned', value: 'returned' },
 ]
 
+import ApproveRentalDialog from '../components/ApproveRentalDialog'
+
 export default function AdminRentalsPage() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [status, setStatus] = useState<RentalStatus | 'all'>('all')
   const [selectedRentalId, setSelectedRentalId] = useState<string | null>(null)
   const [action, setAction] = useState<RentalAction | null>(null)
+  const [approveDialog, setApproveDialog] = useState<{ id: string; typeId: string; start: string; end?: string } | null>(null)
 
   const rentalsQuery = useQuery({
     queryKey: ['rentals', { status }],
     queryFn: () => listRentals({ status }),
+    placeholderData: keepPreviousData,
   })
 
   const rentalDetailQuery = useQuery({
@@ -106,59 +120,89 @@ export default function AdminRentalsPage() {
         enableSorting: false,
         cell: ({ row }) => {
           const rental = row.original
+          const hasStatusActions = ['pending', 'approved', 'active'].includes(rental.status)
+
           return (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex items-center gap-2">
               <Button onClick={() => setSelectedRentalId(rental.id)} size="sm" variant="secondary">
                 View
               </Button>
-              {rental.status === 'pending' ? (
-                <>
-                  <Button
-                    onClick={() =>
-                      setAction({
-                        id: rental.id,
-                        nextStatus: 'active',
-                        title: 'Approve rental request?',
-                        description: 'Approving marks equipment as in use.',
-                      })
-                    }
-                    size="sm"
-                    variant="success"
-                  >
-                    Approve
-                  </Button>
-                  <Button
-                    onClick={() =>
-                      setAction({
-                        id: rental.id,
-                        nextStatus: 'rejected',
-                        title: 'Reject rental request?',
-                        description: 'The request will move to rejected state.',
-                      })
-                    }
-                    size="sm"
-                    variant="destructive"
-                  >
-                    Reject
-                  </Button>
-                </>
-              ) : null}
-              {rental.status === 'active' ? (
-                <Button
-                  onClick={() =>
-                    setAction({
-                      id: rental.id,
-                      nextStatus: 'returned',
-                      title: 'Mark rental as returned?',
-                      description: 'This sets linked equipment back to available.',
-                    })
-                  }
-                  size="sm"
-                  variant="default"
-                >
-                  Mark returned
-                </Button>
-              ) : null}
+              
+              {hasStatusActions && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {rental.status === 'pending' && (
+                      <>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            setApproveDialog({
+                              id: rental.id,
+                              typeId: rental.equipmentTypeId,
+                              start: rental.startDate,
+                              end: rental.endDate,
+                            })
+                          }
+                          className="cursor-pointer"
+                        >
+                          <Check className="mr-2 h-4 w-4 text-green-600" />
+                          <span>Approve</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            setAction({
+                              id: rental.id,
+                              nextStatus: 'rejected',
+                              title: 'Reject rental request?',
+                              description: 'The request will move to rejected state.',
+                            })
+                          }
+                          className="cursor-pointer"
+                        >
+                          <X className="mr-2 h-4 w-4 text-red-600" />
+                          <span>Reject</span>
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                    {rental.status === 'approved' && (
+                      <DropdownMenuItem
+                        onClick={() =>
+                          setAction({
+                            id: rental.id,
+                            nextStatus: 'active',
+                            title: 'Check out rental?',
+                            description: 'This marks the equipment as checked out by the user.',
+                          })
+                        }
+                        className="cursor-pointer"
+                      >
+                        <LogOut className="mr-2 h-4 w-4 text-blue-600" />
+                        <span>Check out</span>
+                      </DropdownMenuItem>
+                    )}
+                    {rental.status === 'active' && (
+                      <DropdownMenuItem
+                        onClick={() =>
+                          setAction({
+                            id: rental.id,
+                            nextStatus: 'returned',
+                            title: 'Mark rental as returned?',
+                            description: 'This sets linked equipment back to available.',
+                          })
+                        }
+                        className="cursor-pointer"
+                      >
+                        <RotateCcw className="mr-2 h-4 w-4 text-green-600" />
+                        <span>Mark returned</span>
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
           )
         },
@@ -183,6 +227,10 @@ export default function AdminRentalsPage() {
 
   return (
     <div className="space-y-6">
+      <Button className="mb-4" onClick={() => navigate(-1)} size="sm" variant="outline">
+        <ArrowLeft className="mr-2 h-4 w-4" />
+        Back
+      </Button>
       <PageHeader
         subtitle="Review requests and manage status transitions"
         title="Rentals"
@@ -263,6 +311,17 @@ export default function AdminRentalsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {approveDialog ? (
+        <ApproveRentalDialog
+          endDate={approveDialog.end}
+          equipmentTypeId={approveDialog.typeId}
+          onClose={() => setApproveDialog(null)}
+          open={true}
+          rentalId={approveDialog.id}
+          startDate={approveDialog.start}
+        />
+      ) : null}
     </div>
   )
 }

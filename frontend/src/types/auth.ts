@@ -5,6 +5,8 @@ export type AuthUser = {
   name: string
   role: UserRole
   email: string
+  avatarUrl?: string
+  isAvatarIcon?: boolean
 }
 
 export type Session = {

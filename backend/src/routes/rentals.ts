@@ -1,156 +1,206 @@
+import { RentalStatus } from "../db/enums"
 import { Router } from "express"
+import { mapPrismaRentalStatusToApi, toIsoDate, type ApiRentalStatus } from "../db/mappers"
+import db from "../lib/db"
 import {
-  equipment,
-  getEquipmentById,
-  getRentalById,
-  getUserById,
-  newId,
-  rentalTimelines,
-  rentals,
-  type Rental,
-  type RentalDetail,
-  type RentalStatus,
-} from "../db/store"
+  createRentalRequest,
+  RentalLifecycleError,
+  transitionRentalStatus,
+} from "../services/rental-lifecycle.service"
 
 const router = Router()
 
-function pushTimeline(rentalId: string, label: string) {
-  if (!rentalTimelines[rentalId]) rentalTimelines[rentalId] = []
-  rentalTimelines[rentalId].push({ label, at: new Date().toISOString() })
+type ApiRental = {
+  id: string
+  equipmentId: string
+  equipmentTypeId: string
+  equipmentName: string
+  requestedBy: string
+  requestedByName: string
+  status: ApiRentalStatus
+  startDate: string
+  endDate?: string
+  notes?: string
+  createdAt: string
+  updatedAt: string
 }
 
-router.get("/", (req, res) => {
-  const status = typeof req.query.status === "string" ? (req.query.status as RentalStatus) : undefined
+type ApiRentalDetail = ApiRental & {
+  timeline: Array<{ label: string; at: string }>
+}
+
+type RentalJoinRow = {
+  id: string
+  equipmentUnitId: string | null
+  equipmentTypeId: string
+  requesterId: string
+  status: RentalStatus
+  reason: string
+  requestedStart: string
+  requestedEnd: string
+  createdAt: string
+  updatedAt: string
+  equipmentTypeName: string
+  requesterName: string
+}
+
+function toApiRental(row: RentalJoinRow): ApiRental {
+  return {
+    id: row.id,
+    equipmentId: row.equipmentUnitId ?? "",
+    equipmentTypeId: row.equipmentTypeId,
+    equipmentName: row.equipmentTypeName ?? "Equipment",
+    requestedBy: row.requesterId,
+    requestedByName: row.requesterName,
+    status: mapPrismaRentalStatusToApi(row.status),
+    startDate: toIsoDate(row.requestedStart) ?? "",
+    endDate: toIsoDate(row.requestedEnd),
+    notes: row.reason,
+    createdAt: new Date(row.createdAt).toISOString(),
+    updatedAt: new Date(row.updatedAt).toISOString(),
+  }
+}
+
+function statusFilterToSql(status?: ApiRentalStatus): { clause: string; params: string[] } {
+  if (!status) return { clause: "", params: [] }
+
+  if (status === "pending") {
+    return { clause: "AND r.status = ?", params: [RentalStatus.PENDING] }
+  }
+
+  if (status === "approved") {
+    return { clause: "AND r.status IN (?, ?)", params: [RentalStatus.APPROVED, RentalStatus.RESERVED] }
+  }
+
+  if (status === "active") {
+    return { clause: "AND r.status IN (?, ?)", params: [RentalStatus.CHECKED_OUT, RentalStatus.OVERDUE] }
+  }
+
+  if (status === "returned") {
+    return { clause: "AND r.status = ?", params: [RentalStatus.RETURNED] }
+  }
+
+  return { clause: "AND r.status IN (?, ?)", params: [RentalStatus.REJECTED, RentalStatus.CANCELLED] }
+}
+
+router.get("/", async (req, res) => {
+  const status = typeof req.query.status === "string" ? (req.query.status as ApiRentalStatus) : undefined
   const requestedBy = typeof req.query.requestedBy === "string" ? req.query.requestedBy : undefined
 
-  let list = rentals.slice()
+  const { clause: statusClause, params: statusParams } = statusFilterToSql(status)
+  const conditions = ["1=1", statusClause]
+  const params: unknown[] = [...statusParams]
 
-  if (status) list = list.filter((r) => r.status === status)
-  if (requestedBy) list = list.filter((r) => r.requestedBy === requestedBy)
+  if (requestedBy) {
+    conditions.push("AND r.requesterId = ?")
+    params.push(requestedBy)
+  }
 
-  res.json(list)
+  const rows = db.prepare(`
+    SELECT r.id, r.equipmentUnitId, r.equipmentTypeId, r.requesterId, r.status,
+           r.reason, r.requestedStart, r.requestedEnd, r.createdAt, r.updatedAt,
+           COALESCE(et_unit.name, et.name) AS equipmentTypeName,
+           u.name AS requesterName
+    FROM Rental r
+    LEFT JOIN EquipmentUnit eu ON r.equipmentUnitId = eu.id
+    LEFT JOIN EquipmentType et_unit ON eu.equipmentTypeId = et_unit.id
+    JOIN EquipmentType et ON r.equipmentTypeId = et.id
+    JOIN User u ON r.requesterId = u.id
+    WHERE ${conditions.join(" ")}
+    ORDER BY r.createdAt DESC
+  `).all(...params) as RentalJoinRow[]
+
+  res.json(rows.map(toApiRental))
 })
 
-router.get("/:id", (req, res) => {
-  const rental = getRentalById(req.params.id)
+router.get("/:id", async (req, res) => {
+  const row = db.prepare(`
+    SELECT r.id, r.equipmentUnitId, r.equipmentTypeId, r.requesterId, r.status,
+           r.reason, r.requestedStart, r.requestedEnd, r.createdAt, r.updatedAt,
+           COALESCE(et_unit.name, et.name) AS equipmentTypeName,
+           u.name AS requesterName
+    FROM Rental r
+    LEFT JOIN EquipmentUnit eu ON r.equipmentUnitId = eu.id
+    LEFT JOIN EquipmentType et_unit ON eu.equipmentTypeId = et_unit.id
+    JOIN EquipmentType et ON r.equipmentTypeId = et.id
+    JOIN User u ON r.requesterId = u.id
+    WHERE r.id = ?
+  `).get(req.params.id) as RentalJoinRow | undefined
 
-  if (!rental) {
+  if (!row) {
     res.status(404).json({ message: "Rental not found" })
     return
   }
 
-  const detail: RentalDetail = {
-    ...rental,
-    timeline: rentalTimelines[rental.id] ?? [],
+  const timeline = db.prepare(
+    "SELECT message, createdAt FROM AuditLog WHERE rentalId = ? ORDER BY createdAt ASC"
+  ).all(row.id) as { message: string; createdAt: string }[]
+
+  const detail: ApiRentalDetail = {
+    ...toApiRental(row),
+    timeline: timeline.map((item) => ({
+      label: item.message,
+      at: new Date(item.createdAt).toISOString(),
+    })),
   }
 
   res.json(detail)
 })
 
-router.post("/", (req, res) => {
+router.post("/", async (req, res) => {
   const equipmentId = req.body?.equipmentId as string | undefined
   const requestedBy = req.body?.requestedBy as string | undefined
   const startDate = req.body?.startDate as string | undefined
   const endDate = req.body?.endDate as string | undefined
   const notes = req.body?.notes as string | undefined
 
-  if (!equipmentId || !requestedBy || !startDate) {
-    res.status(400).json({ message: "equipmentId, requestedBy, startDate are required" })
-    return
-  }
-
-  const eq = getEquipmentById(equipmentId)
-  const user = getUserById(requestedBy)
-
-  if (!eq) {
-    res.status(404).json({ message: "Equipment not found" })
-    return
-  }
-
-  if (!user) {
-    res.status(404).json({ message: "User not found" })
-    return
-  }
-
-  if (eq.status === "maintenance") {
-    res.status(400).json({ message: "Equipment is under maintenance and cannot be rented" })
-    return
-  }
-
-  if (eq.status === "in_use") {
-    res.status(400).json({ message: "Equipment already in use" })
-    return
-  }
-
-  if (eq.nextServiceDueDate) {
-    const today = new Date()
-    const serviceDate = new Date(eq.nextServiceDueDate)
-
-    if (serviceDate <= today) {
-      res.status(400).json({
-        message: "Equipment service overdue and must be maintained before rental",
-      })
+  try {
+    const rental = await createRentalRequest({
+      equipmentId: equipmentId ?? "",
+      requestedByUserId: requestedBy ?? "",
+      startDate: startDate ?? "",
+      endDate,
+      notes,
+    })
+    res.status(201).json(rental)
+  } catch (error) {
+    if (error instanceof RentalLifecycleError) {
+      res.status(error.statusCode).json({ message: error.message })
       return
     }
+    throw error
   }
-
-  const now = new Date().toISOString()
-
-  const rental: Rental = {
-    id: newId(),
-    equipmentId: eq.id,
-    equipmentName: eq.name,
-    requestedBy: user.id,
-    requestedByName: user.name,
-    status: "pending",
-    startDate,
-    endDate,
-    notes,
-    createdAt: now,
-    updatedAt: now,
-  }
-
-  rentals.unshift(rental)
-
-  rentalTimelines[rental.id] = [
-    { label: "Created", at: now },
-    { label: "Pending", at: now },
-  ]
-
-  res.status(201).json(rental)
 })
 
-router.patch("/:id/status", (req, res) => {
-  const rental = getRentalById(req.params.id)
+router.patch("/:id/status", async (req, res) => {
+  const requestedStatus = req.body?.status as string | undefined
+  const actorUserId = (req.body?.actorUserId as string | undefined)
+    ?? (req.headers["x-user-id"] as string | undefined)
+    ?? ((req as any).user?.id as string | undefined)
+  const assignedEquipmentId = req.body?.assignedEquipmentId as string | undefined
+  const rejectionReason = req.body?.rejectionReason as string | undefined
 
-  if (!rental) {
-    res.status(404).json({ message: "Rental not found" })
+  if (!requestedStatus || !actorUserId) {
+    res.status(400).json({ message: "status and actorUserId are required" })
     return
   }
 
-  const status = req.body?.status as Extract<RentalStatus, "active" | "returned" | "rejected"> | undefined
-
-  if (!status) {
-    res.status(400).json({ message: "status is required" })
-    return
+  try {
+    const rental = await transitionRentalStatus({
+      rentalId: req.params.id,
+      requestedStatus: requestedStatus as Parameters<typeof transitionRentalStatus>[0]["requestedStatus"],
+      actorUserId,
+      assignedEquipmentId,
+      rejectionReason,
+    })
+    res.json(rental)
+  } catch (error) {
+    if (error instanceof RentalLifecycleError) {
+      res.status(error.statusCode).json({ message: error.message })
+      return
+    }
+    throw error
   }
-
-  rental.status = status
-  rental.updatedAt = new Date().toISOString()
-
-  if (status === "active") {
-    const eq = getEquipmentById(rental.equipmentId)
-    if (eq) eq.status = "in_use"
-    pushTimeline(rental.id, "Active")
-  } else if (status === "returned") {
-    const eq = getEquipmentById(rental.equipmentId)
-    if (eq) eq.status = "available"
-    pushTimeline(rental.id, "Returned")
-  } else if (status === "rejected") {
-    pushTimeline(rental.id, "Rejected")
-  }
-
-  res.json(rental)
 })
 
 export default router

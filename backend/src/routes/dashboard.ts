@@ -1,45 +1,98 @@
 import { Router } from "express"
-import { equipment, rentals, type EquipmentStatus } from "../db/store"
+import { EquipmentStatus, RentalStatus } from "../db/enums"
+import db from "../lib/db"
 
 const router = Router()
 
-router.get("/admin-summary", (req, res) => {
-  const byStatus: Record<EquipmentStatus, number> = {
+router.get("/admin-summary", async (req, res) => {
+  const byStatus: Record<"available" | "in_use" | "maintenance", number> = {
     available: 0,
     in_use: 0,
     maintenance: 0,
   }
 
-  for (const e of equipment) byStatus[e.status]++
+  const units = db.prepare("SELECT status FROM EquipmentUnit").all() as { status: string }[]
 
-  const pendingRentalRequests = rentals.filter((r) => r.status === "pending").length
-  const activeRentals = rentals.filter((r) => r.status === "active").length
+  for (const unit of units) {
+    if (unit.status === EquipmentStatus.AVAILABLE) {
+      byStatus.available++
+      continue
+    }
+
+    if (
+      unit.status === EquipmentStatus.CHECKED_OUT ||
+      unit.status === EquipmentStatus.RESERVED ||
+      unit.status === EquipmentStatus.OVERDUE
+    ) {
+      byStatus.in_use++
+      continue
+    }
+
+    byStatus.maintenance++
+  }
+
+  const pendingRow = db.prepare(
+    "SELECT COUNT(*) as count FROM Rental WHERE status IN (?, ?, ?)"
+  ).get(RentalStatus.PENDING, RentalStatus.APPROVED, RentalStatus.RESERVED) as { count: number }
+
+  const activeRow = db.prepare(
+    "SELECT COUNT(*) as count FROM Rental WHERE status IN (?, ?)"
+  ).get(RentalStatus.CHECKED_OUT, RentalStatus.OVERDUE) as { count: number }
 
   res.json({
-    totalEquipment: equipment.length,
+    totalEquipment: units.length,
     byStatus,
-    pendingRentalRequests,
-    activeRentals,
+    pendingRentalRequests: pendingRow.count,
+    activeRentals: activeRow.count,
   })
 })
 
-router.get("/field-summary", (req, res) => {
+router.get("/field-summary", async (req, res) => {
   const userId = typeof req.query.userId === "string" ? req.query.userId : ""
-  const myPendingRequests = rentals.filter((r) => r.requestedBy === userId && r.status === "pending").length
-  const myActiveRentals = rentals.filter((r) => r.requestedBy === userId && r.status === "active").length
-  const recommendedEquipmentIds = equipment.filter((e) => e.status === "available").slice(0, 3).map((e) => e.id)
+
+  const pendingRow = db.prepare(
+    "SELECT COUNT(*) as count FROM Rental WHERE requesterId = ? AND status IN (?, ?, ?)"
+  ).get(userId, RentalStatus.PENDING, RentalStatus.APPROVED, RentalStatus.RESERVED) as { count: number }
+
+  const activeRow = db.prepare(
+    "SELECT COUNT(*) as count FROM Rental WHERE requesterId = ? AND status IN (?, ?)"
+  ).get(userId, RentalStatus.CHECKED_OUT, RentalStatus.OVERDUE) as { count: number }
+
+  const recommended = db.prepare(
+    "SELECT id FROM EquipmentUnit WHERE status = ? AND isActive = 1 ORDER BY createdAt DESC LIMIT 3"
+  ).all(EquipmentStatus.AVAILABLE) as { id: string }[]
 
   res.json({
-    myPendingRequests,
-    myActiveRentals,
-    recommendedEquipmentIds,
+    myPendingRequests: pendingRow.count,
+    myActiveRentals: activeRow.count,
+    recommendedEquipmentIds: recommended.map((e) => e.id),
   })
 })
 
-router.get("/maintenance-summary", (req, res) => {
-  const maintenanceEquipment = equipment.filter((e) => e.status === "maintenance").length
-  const availableEquipment = equipment.filter((e) => e.status === "available").length
-  const inUseEquipment = equipment.filter((e) => e.status === "in_use").length
+router.get("/maintenance-summary", async (req, res) => {
+  const units = db.prepare("SELECT status FROM EquipmentUnit").all() as { status: string }[]
+
+  let maintenanceEquipment = 0
+  let availableEquipment = 0
+  let inUseEquipment = 0
+
+  for (const unit of units) {
+    if (unit.status === EquipmentStatus.AVAILABLE) {
+      availableEquipment++
+      continue
+    }
+
+    if (
+      unit.status === EquipmentStatus.CHECKED_OUT ||
+      unit.status === EquipmentStatus.RESERVED ||
+      unit.status === EquipmentStatus.OVERDUE
+    ) {
+      inUseEquipment++
+      continue
+    }
+
+    maintenanceEquipment++
+  }
 
   res.json({
     maintenanceEquipment,

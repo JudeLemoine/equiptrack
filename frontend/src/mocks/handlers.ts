@@ -69,6 +69,7 @@ let rentalsDb: Rental[] = [
   {
     id: 'rent-1',
     equipmentId: 'eq-2',
+    equipmentTypeId: 'type-1',
     equipmentName: 'Wheel Loader 244L',
     requestedBy: 'field-1',
     requestedByName: 'Jordan Vega',
@@ -81,6 +82,7 @@ let rentalsDb: Rental[] = [
   {
     id: 'rent-2',
     equipmentId: 'eq-6',
+    equipmentTypeId: 'type-2',
     equipmentName: 'Skid Steer S66',
     requestedBy: 'field-2',
     requestedByName: 'Samir Patel',
@@ -94,6 +96,7 @@ let rentalsDb: Rental[] = [
   {
     id: 'rent-3',
     equipmentId: 'eq-11',
+    equipmentTypeId: 'type-3',
     equipmentName: 'Dump Truck DT-12',
     requestedBy: 'field-1',
     requestedByName: 'Jordan Vega',
@@ -106,6 +109,7 @@ let rentalsDb: Rental[] = [
   {
     id: 'rent-4',
     equipmentId: 'eq-5',
+    equipmentTypeId: 'type-4',
     equipmentName: 'Backhoe Loader 420',
     requestedBy: 'field-2',
     requestedByName: 'Samir Patel',
@@ -640,6 +644,7 @@ export const handlers = [
     const rental: Rental = {
       id: `rent-${crypto.randomUUID()}`,
       equipmentId: equipment.id,
+      equipmentTypeId: 'mock-type',
       equipmentName: equipment.name,
       requestedBy: requester.id,
       requestedByName: requester.name,

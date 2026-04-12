@@ -1,11 +1,14 @@
 import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import type { ColumnDef } from '@tanstack/react-table'
+import { useNavigate } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
 import DataTable from '../../../components/DataTable'
 import ErrorState from '../../../components/ErrorState'
 import Loader from '../../../components/Loader'
 import PageHeader from '../../../components/PageHeader'
 import StatusBadge from '../../../components/StatusBadge'
+import { Button } from '../../../components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '../../../components/ui/tabs'
 import { getSession } from '../../../lib/auth'
 import { formatDate } from '../../../lib/utils'
@@ -20,6 +23,7 @@ const tabs: Array<{ label: string; value: RentalStatus | 'all' }> = [
 ]
 
 export default function FieldRentalsPage() {
+  const navigate = useNavigate()
   const [status, setStatus] = useState<RentalStatus | 'all'>('all')
   const session = getSession()
   const userId = session?.user.id ?? ''
@@ -28,6 +32,7 @@ export default function FieldRentalsPage() {
     enabled: Boolean(userId),
     queryKey: ['rentals', 'field', userId, status],
     queryFn: () => listRentals({ requestedBy: userId, status }),
+    placeholderData: keepPreviousData,
   })
 
   const columns = useMemo<ColumnDef<Rental>[]>(
@@ -69,8 +74,23 @@ export default function FieldRentalsPage() {
           return <p className="text-sm text-emerald-700">Rental completed.</p>
         },
       },
+      {
+        id: 'actions',
+        header: 'View',
+        enableSorting: false,
+        cell: ({ row }) => (
+          <Button
+            onClick={() => navigate(`/field/equipment/${row.original.equipmentId}`)}
+            size="sm"
+            variant="ghost"
+            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+          >
+            View Profile
+          </Button>
+        ),
+      },
     ],
-    [],
+    [navigate],
   )
 
   if (rentalsQuery.isLoading) {
@@ -89,6 +109,10 @@ export default function FieldRentalsPage() {
 
   return (
     <div className="space-y-6">
+      <Button className="mb-4" onClick={() => navigate(-1)} size="sm" variant="outline">
+        <ArrowLeft className="mr-2 h-4 w-4" />
+        Back
+      </Button>
       <PageHeader
         subtitle="Track request status and active assignments"
         title="My Requests"

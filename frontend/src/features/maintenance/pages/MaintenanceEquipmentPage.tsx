@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ColumnDef } from '@tanstack/react-table'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
+import { ArrowLeft } from 'lucide-react'
 import DataTable from '../../../components/DataTable'
 import ErrorState from '../../../components/ErrorState'
 import Loader from '../../../components/Loader'
@@ -16,7 +17,7 @@ import {
   DialogTitle,
 } from '../../../components/ui/dialog'
 import { Button } from '../../../components/ui/button'
-import { Input } from '../../../components/ui/input'
+import { TextField } from '@mui/material'
 import { Label } from '../../../components/ui/label'
 import { listMaintenanceQueue, markEquipmentServiced } from '../../../services/equipmentService'
 import type { Equipment } from '../../../types/equipment'
@@ -25,6 +26,7 @@ import { getSession } from '../../../lib/auth'
 
 export default function MaintenanceEquipmentPage() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const session = getSession()
   const userId = session?.user.id ?? ''
   const [selectedItem, setSelectedItem] = useState<Equipment | null>(null)
@@ -33,6 +35,7 @@ export default function MaintenanceEquipmentPage() {
   const equipmentQuery = useQuery({
     queryKey: ['maintenance-queue'],
     queryFn: () => listMaintenanceQueue(14),
+    placeholderData: keepPreviousData,
   })
 
   const completeServiceMutation = useMutation({
@@ -110,6 +113,10 @@ export default function MaintenanceEquipmentPage() {
 
   return (
     <div className="space-y-6">
+      <Button className="mb-4" onClick={() => navigate(-1)} size="sm" variant="outline">
+        <ArrowLeft className="mr-2 h-4 w-4" />
+        Back
+      </Button>
       <PageHeader
         subtitle="Items due in the next 14 days or already overdue"
         title="Maintenance Queue"
@@ -136,11 +143,16 @@ export default function MaintenanceEquipmentPage() {
               <p className="text-sm"><span className="font-medium">Configured interval:</span> {selectedItem.maintenanceIntervalDays ?? '-'} days</p>
               <div className="space-y-2">
                 <Label htmlFor="manualNextDueDate">Manual next due date (required if no interval)</Label>
-                <Input
+                <TextField
                   id="manualNextDueDate"
-                  onChange={(event) => setManualNextDueDate(event.target.value)}
                   type="date"
+                  fullWidth
+                  size="small"
                   value={manualNextDueDate}
+                  onChange={(event) => setManualNextDueDate(event.target.value)}
+                  slotProps={{ inputLabel: { shrink: true } }}
+                  variant="outlined"
+                  sx={{ '& .MuiOutlinedInput-root': { height: '40px', borderRadius: '8px', backgroundColor: 'white' } }}
                 />
               </div>
               <div className="flex justify-end">

@@ -118,7 +118,10 @@ router.get("/notes", async (req, res) => {
     typeof req.query.maintenanceRecordId === "string" ? req.query.maintenanceRecordId : undefined
   const issueReportId = typeof req.query.issueReportId === "string" ? req.query.issueReportId : undefined
 
-  const notes = await listNotes({ equipmentId, rentalId, maintenanceRecordId, issueReportId })
+  const notes = await listNotes({
+    equipmentId, rentalId, maintenanceRecordId, issueReportId,
+    authorRoles: ["MAINTENANCE", "ADMIN"],
+  })
   res.json(notes)
 })
 

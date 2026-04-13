@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useParams, useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
+import { Trash2 } from 'lucide-react'
 import ErrorState from '../../../components/ErrorState'
 import Loader from '../../../components/Loader'
 import PageHeader from '../../../components/PageHeader'
@@ -15,6 +16,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../../components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../../../components/ui/alert-dialog'
+import { Input } from '../../../components/ui/input'
 import { Label } from '../../../components/ui/label'
 import { Textarea } from '../../../components/ui/textarea'
 import { getSession } from '../../../lib/auth'
@@ -24,11 +36,15 @@ import { TextField } from '@mui/material'
 import {
   checkoutEquipment,
   getEquipment,
+  updateEquipment,
   markEquipmentServiced,
   reportIssue,
   addEquipmentNote,
+  clearServiceLogs,
+  clearActivity,
+  clearTechNotes,
 } from '../../../services/equipmentService'
-import { listMaintenanceNotes, addMaintenanceNote } from '../../../services/maintenanceService'
+import { listMaintenanceNotes, addMaintenanceNote, deleteMaintenanceNote } from '../../../services/maintenanceService'
 import type { MaintenanceNote } from '../../../services/maintenanceService'
 import { listServiceLogsByEquipment } from '../../../services/serviceLogService'
 import type { ActivityEvent } from '../../../types/activity'
@@ -47,13 +63,27 @@ export default function EquipmentProfilePage() {
   // Dialog States
   const [isReportIssueOpen, setReportIssueOpen] = useState(false)
   const [isMarkServicedOpen, setMarkServicedOpen] = useState(false)
+  const [isEditAssetOpen, setEditAssetOpen] = useState(false)
   const [manualNextDueDate, setManualNextDueDate] = useState('')
+
+  // Confirmation dialog states (admin clear actions)
+  const [confirmClearServiceLogs, setConfirmClearServiceLogs] = useState(false)
+  const [confirmClearHistory, setConfirmClearHistory] = useState(false)
+  const [confirmClearTechNotes, setConfirmClearTechNotes] = useState(false)
 
   // Form States
   const [issueSeverity, setIssueSeverity] = useState('low')
   const [issueDescription, setIssueDescription] = useState('')
   const [fieldNote, setFieldNote] = useState('')
   const [techNote, setTechNote] = useState('')
+
+  // Edit Asset form states
+  const [editName, setEditName] = useState('')
+  const [editCategory, setEditCategory] = useState('')
+  const [editQrCode, setEditQrCode] = useState('')
+  const [editInterval, setEditInterval] = useState('')
+  const [editNextDue, setEditNextDue] = useState('')
+  const [editNotes, setEditNotes] = useState('')
 
   const role = session?.user.role
   const userId = session?.user.id ?? ''
@@ -179,6 +209,56 @@ export default function EquipmentProfilePage() {
     }
   })
 
+  const editAssetMutation = useMutation({
+    mutationFn: async () => {
+      return updateEquipment(id as string, {
+        name: editName || undefined,
+        category: editCategory || undefined,
+        qrCode: editQrCode || undefined,
+        maintenanceIntervalDays: editInterval ? Number(editInterval) : undefined,
+        nextServiceDueDate: editNextDue || undefined,
+        notes: editNotes,
+      })
+    },
+    onSuccess: async () => {
+      setEditAssetOpen(false)
+      await refreshAll()
+      toast.success('Asset updated successfully.')
+    },
+  })
+
+  const openEditDialog = () => {
+    if (equipment) {
+      setEditName(equipment.name)
+      setEditCategory(equipment.category)
+      setEditQrCode(equipment.qrCode)
+      setEditInterval(equipment.maintenanceIntervalDays?.toString() ?? '')
+      setEditNextDue(equipment.nextServiceDueDate ?? '')
+      setEditNotes(equipment.notes ?? '')
+    }
+    setEditAssetOpen(true)
+  }
+
+  const clearServiceLogsMutation = useMutation({
+    mutationFn: () => clearServiceLogs(id as string),
+    onSuccess: async () => { await refreshAll(); toast.success('Service logs cleared.') },
+  })
+
+  const clearActivityMutation = useMutation({
+    mutationFn: () => clearActivity(id as string),
+    onSuccess: async () => { await refreshAll(); toast.success('Recent history cleared.') },
+  })
+
+  const clearTechNotesMutation = useMutation({
+    mutationFn: () => clearTechNotes(id as string),
+    onSuccess: async () => { await refreshAll(); toast.success('Technician notes cleared.') },
+  })
+
+  const deleteTechNoteMutation = useMutation({
+    mutationFn: (noteId: string) => deleteMaintenanceNote(noteId, userId),
+    onSuccess: async () => { await refreshAll(); toast.success('Note removed.') },
+  })
+
   const canCheckout = equipment?.status === 'available' && startDate && endDate
 
   if (isLoading) return <Loader label="Loading Asset Profile..." />
@@ -215,7 +295,7 @@ export default function EquipmentProfilePage() {
             )}
             
             {role === 'admin' && (
-              <Button variant="secondary">Edit Asset</Button>
+              <Button variant="secondary" onClick={openEditDialog}>Edit Asset</Button>
             )}
           </div>
         }
@@ -259,7 +339,19 @@ export default function EquipmentProfilePage() {
         </Card>
 
         <Card>
-          <CardHeader><CardTitle>Technician Notes</CardTitle></CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle>Technician Notes</CardTitle>
+            {role === 'admin' && techNotes && techNotes.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 h-7 px-2"
+                onClick={() => setConfirmClearTechNotes(true)}
+              >
+                Clear All
+              </Button>
+            )}
+          </CardHeader>
           <CardContent className="space-y-4">
             {equipment.notes && (
               <p className="text-sm text-slate-600 italic">{equipment.notes}</p>
@@ -267,9 +359,22 @@ export default function EquipmentProfilePage() {
             {techNotes && techNotes.length > 0 ? (
               <div className="space-y-3">
                 {techNotes.map((note: MaintenanceNote) => (
-                  <div key={note.id} className="border-l-2 border-indigo-200 pl-3 py-1">
-                    <p className="text-sm text-slate-700">{note.body}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">{formatDateTime(note.createdAt)}</p>
+                  <div key={note.id} className="border-l-2 border-indigo-200 pl-3 py-1 flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm text-slate-700">{note.body}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{formatDateTime(note.createdAt)}</p>
+                    </div>
+                    {(role === 'maintenance' || role === 'admin') && (
+                      <button
+                        type="button"
+                        className="shrink-0 p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        title="Remove note"
+                        onClick={() => deleteTechNoteMutation.mutate(note.id)}
+                        disabled={deleteTechNoteMutation.isPending}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -328,7 +433,19 @@ export default function EquipmentProfilePage() {
       {/* Activity & Service History */}
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle>Recent History</CardTitle></CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle>Recent History</CardTitle>
+            {role === 'admin' && activity && activity.filter((l: ActivityEvent) => !l.summary.startsWith('Technician Note:')).length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 h-7 px-2"
+                onClick={() => setConfirmClearHistory(true)}
+              >
+                Clear All
+              </Button>
+            )}
+          </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {(() => {
@@ -351,7 +468,19 @@ export default function EquipmentProfilePage() {
         </Card>
 
         <Card>
-          <CardHeader><CardTitle>Service Logs</CardTitle></CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle>Service Logs</CardTitle>
+            {role === 'admin' && serviceLogs && serviceLogs.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 h-7 px-2"
+                onClick={() => setConfirmClearServiceLogs(true)}
+              >
+                Clear All
+              </Button>
+            )}
+          </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {serviceLogs && serviceLogs.length > 0 ? (
@@ -449,6 +578,134 @@ export default function EquipmentProfilePage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* EDIT ASSET DIALOG */}
+      <Dialog open={isEditAssetOpen} onOpenChange={setEditAssetOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Asset</DialogTitle>
+            <DialogDescription>Update equipment details. Leave a field unchanged to keep its current value.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label htmlFor="editName">Name</Label>
+                <Input id="editName" value={editName} onChange={(e) => setEditName(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="editCategory">Category</Label>
+                <Input id="editCategory" value={editCategory} onChange={(e) => setEditCategory(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="editQrCode">Asset Tag / QR Code</Label>
+                <Input id="editQrCode" value={editQrCode} onChange={(e) => setEditQrCode(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="editInterval">Maintenance Interval (days)</Label>
+                <Input id="editInterval" type="number" value={editInterval} onChange={(e) => setEditInterval(e.target.value)} />
+              </div>
+              <div className="space-y-1 sm:col-span-2">
+                <Label htmlFor="editNextDue">Next Service Due Date</Label>
+                <TextField
+                  id="editNextDue"
+                  type="date"
+                  fullWidth
+                  size="small"
+                  value={editNextDue}
+                  onChange={(e) => setEditNextDue(e.target.value)}
+                  slotProps={{ inputLabel: { shrink: true } }}
+                  variant="outlined"
+                  sx={{ '& .MuiOutlinedInput-root': { height: '40px', borderRadius: '8px', backgroundColor: 'white' } }}
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="editNotes">Notes</Label>
+              <Textarea id="editNotes" className="min-h-[60px] text-sm" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setEditAssetOpen(false)}>Cancel</Button>
+              <Button
+                style={{ backgroundColor: navy }}
+                disabled={editAssetMutation.isPending}
+                onClick={() => editAssetMutation.mutate()}
+              >
+                {editAssetMutation.isPending ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ADMIN CLEAR CONFIRMATIONS */}
+      <AlertDialog open={confirmClearServiceLogs} onOpenChange={setConfirmClearServiceLogs}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear Service Logs?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all service log entries for this equipment. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel asChild><Button variant="outline">Cancel</Button></AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button
+                variant="destructive"
+                disabled={clearServiceLogsMutation.isPending}
+                onClick={() => clearServiceLogsMutation.mutate()}
+              >
+                {clearServiceLogsMutation.isPending ? 'Clearing...' : 'Clear Service Logs'}
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmClearHistory} onOpenChange={setConfirmClearHistory}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear Recent History?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all activity history entries for this equipment. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel asChild><Button variant="outline">Cancel</Button></AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button
+                variant="destructive"
+                disabled={clearActivityMutation.isPending}
+                onClick={() => clearActivityMutation.mutate()}
+              >
+                {clearActivityMutation.isPending ? 'Clearing...' : 'Clear History'}
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmClearTechNotes} onOpenChange={setConfirmClearTechNotes}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear Technician Notes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all technician notes for this equipment. Field notes will not be affected. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel asChild><Button variant="outline">Cancel</Button></AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button
+                variant="destructive"
+                disabled={clearTechNotesMutation.isPending}
+                onClick={() => clearTechNotesMutation.mutate()}
+              >
+                {clearTechNotesMutation.isPending ? 'Clearing...' : 'Clear Notes'}
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

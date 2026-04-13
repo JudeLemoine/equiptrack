@@ -111,8 +111,9 @@ export const apiClient = {
       method: 'PATCH',
       body: JSON.stringify(body),
     }),
-  delete: <T>(path: string) =>
+  delete: <T>(path: string, body?: unknown) =>
     request<T>(path, {
       method: 'DELETE',
+      ...(body ? { body: JSON.stringify(body) } : {}),
     }),
 }

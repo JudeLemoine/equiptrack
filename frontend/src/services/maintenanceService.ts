@@ -46,6 +46,10 @@ export function moveToMaintenance(id: string, actorUserId: string): Promise<unkn
   })
 }
 
+export function deleteMaintenanceNote(noteId: string, actorUserId: string): Promise<void> {
+  return apiClient.delete<void>(`/api/maintenance/notes/${noteId}`, { actorUserId })
+}
+
 export function listMaintenanceNotes(equipmentId: string): Promise<MaintenanceNote[]> {
   return apiClient.get<MaintenanceNote[]>(`/api/maintenance/notes?equipmentId=${equipmentId}`)
 }

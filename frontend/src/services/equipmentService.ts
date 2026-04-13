@@ -92,6 +92,18 @@ export function listMaintenanceQueue(days = 14): Promise<Equipment[]> {
   return apiClient.get<Equipment[]>(`/api/maintenance/queue?days=${days}`)
 }
 
+export function clearServiceLogs(equipmentId: string): Promise<void> {
+  return apiClient.delete<void>(`/api/equipment/${equipmentId}/service-logs`)
+}
+
+export function clearActivity(equipmentId: string): Promise<void> {
+  return apiClient.delete<void>(`/api/equipment/${equipmentId}/activity`)
+}
+
+export function clearTechNotes(equipmentId: string): Promise<void> {
+  return apiClient.delete<void>(`/api/equipment/${equipmentId}/tech-notes`)
+}
+
 export function reportIssue(
   equipmentId: string,
   data: { severity: string; title: string; description: string; reportedById: string },

@@ -409,12 +409,11 @@ router.post("/:id/report-issue", requireRole("field", "maintenance", "admin"), a
     updatedUnit = db.prepare(`${UNIT_JOIN_SQL} WHERE eu.id = ?`).get(item.id) as UnitJoinRow
   }
 
-  const descSnippet = description.length > 120 ? description.slice(0, 117) + "..." : description
   db.prepare(`
     INSERT INTO AuditLog (id, action, actorId, equipmentUnitId, issueReportId, message, createdAt)
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `).run(generateId(), "ISSUE_REPORTED", actor.id, item.id, issueId,
-    `Issue reported [${severity.toUpperCase()}]: ${descSnippet}`, now)
+    `Issue reported [${severity.toUpperCase()}]: ${description}`, now)
 
   const issue = db.prepare("SELECT * FROM IssueReport WHERE id = ?").get(issueId)
 
@@ -660,6 +659,34 @@ router.post("/:id/notes", async (req, res) => {
   runTransaction()
 
   res.status(201).json({ message: "Note added successfully" })
+})
+
+router.delete("/:id/service-logs", requireRole("admin"), async (req, res) => {
+  const item = db.prepare("SELECT id FROM EquipmentUnit WHERE id = ? AND isActive = 1").get(req.params.id) as { id: string } | undefined
+  if (!item) { res.status(404).json({ message: "Equipment not found" }); return }
+
+  db.prepare("DELETE FROM MaintenanceRecord WHERE equipmentUnitId = ?").run(item.id)
+  res.status(204).end()
+})
+
+router.delete("/:id/activity", requireRole("admin"), async (req, res) => {
+  const item = db.prepare("SELECT id FROM EquipmentUnit WHERE id = ? AND isActive = 1").get(req.params.id) as { id: string } | undefined
+  if (!item) { res.status(404).json({ message: "Equipment not found" }); return }
+
+  db.prepare("DELETE FROM AuditLog WHERE equipmentUnitId = ?").run(item.id)
+  res.status(204).end()
+})
+
+router.delete("/:id/tech-notes", requireRole("admin"), async (req, res) => {
+  const item = db.prepare("SELECT id FROM EquipmentUnit WHERE id = ? AND isActive = 1").get(req.params.id) as { id: string } | undefined
+  if (!item) { res.status(404).json({ message: "Equipment not found" }); return }
+
+  db.prepare(`
+    DELETE FROM Note WHERE equipmentUnitId = ? AND authorId IN (
+      SELECT id FROM User WHERE role IN ('MAINTENANCE', 'ADMIN')
+    )
+  `).run(item.id)
+  res.status(204).end()
 })
 
 router.get("/:id/activity", async (req, res) => {

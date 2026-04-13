@@ -171,7 +171,8 @@ export async function createIssueReport(input: IssuePayload) {
     db.prepare(`
       INSERT INTO AuditLog (id, action, actorId, equipmentUnitId, issueReportId, message, createdAt)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(generateId(), "ISSUE_REPORTED", user.id, unit.id, issueId, input.title, now)
+    `).run(generateId(), "ISSUE_REPORTED", user.id, unit.id, issueId,
+      `Issue reported [${input.severity}]: ${input.description}`, now)
   })
 
   runTransaction()
@@ -251,17 +252,26 @@ export async function listNotes(input: {
   rentalId?: string
   maintenanceRecordId?: string
   issueReportId?: string
+  authorRoles?: string[]
 }) {
   const conditions: string[] = ["1=1"]
   const params: unknown[] = []
 
-  if (input.equipmentId) { conditions.push("equipmentUnitId = ?"); params.push(input.equipmentId) }
-  if (input.rentalId) { conditions.push("rentalId = ?"); params.push(input.rentalId) }
-  if (input.maintenanceRecordId) { conditions.push("maintenanceRecordId = ?"); params.push(input.maintenanceRecordId) }
-  if (input.issueReportId) { conditions.push("issueReportId = ?"); params.push(input.issueReportId) }
+  if (input.equipmentId) { conditions.push("n.equipmentUnitId = ?"); params.push(input.equipmentId) }
+  if (input.rentalId) { conditions.push("n.rentalId = ?"); params.push(input.rentalId) }
+  if (input.maintenanceRecordId) { conditions.push("n.maintenanceRecordId = ?"); params.push(input.maintenanceRecordId) }
+  if (input.issueReportId) { conditions.push("n.issueReportId = ?"); params.push(input.issueReportId) }
+
+  let joinClause = ""
+  if (input.authorRoles && input.authorRoles.length > 0) {
+    joinClause = "JOIN User u ON n.authorId = u.id"
+    const placeholders = input.authorRoles.map(() => "?").join(", ")
+    conditions.push(`u.role IN (${placeholders})`)
+    params.push(...input.authorRoles)
+  }
 
   const notes = db.prepare(
-    `SELECT * FROM Note WHERE ${conditions.join(" AND ")} ORDER BY createdAt DESC`
+    `SELECT n.* FROM Note n ${joinClause} WHERE ${conditions.join(" AND ")} ORDER BY n.createdAt DESC`
   ).all(...params) as NoteRow[]
 
   return notes.map((note) => ({

@@ -8,6 +8,7 @@ import dashboardRoutes from "./routes/dashboard"
 import maintenanceRoutes from "./routes/maintenance"
 import { attachUser } from "./middleware/attachUser"
 import availabilityRoutes from "./routes/availability"
+import calendarRoutes from "./routes/calendar"
 
 const app = express()
 
@@ -21,6 +22,7 @@ app.use("/api/dashboard", dashboardRoutes)
 app.use("/api/maintenance", maintenanceRoutes)
 app.use("/api/availability", availabilityRoutes)
 
+app.use("/api/calendar", calendarRoutes)
 app.use("/api/equipment", equipmentRoutes)
 app.use("/api/rentals", rentalRoutes)
 

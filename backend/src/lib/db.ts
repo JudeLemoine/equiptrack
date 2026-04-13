@@ -10,6 +10,22 @@ const schemaSQL = readFileSync(join(__dirname, "..", "db", "schema.sql"), "utf-8
 db.exec(schemaSQL)
 
 try { db.exec("ALTER TABLE User ADD COLUMN passwordHash TEXT") } catch { /* already exists */ }
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS CalendarEvent (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT,
+    date TEXT NOT NULL,
+    startTime TEXT,
+    endTime TEXT,
+    color TEXT NOT NULL DEFAULT '#3b82f6',
+    visibilityType TEXT NOT NULL DEFAULT 'ALL',
+    visibilityRoles TEXT NOT NULL DEFAULT '[]',
+    visibilityUserIds TEXT NOT NULL DEFAULT '[]',
+    createdById TEXT NOT NULL REFERENCES User(id),
+    createdAt TEXT NOT NULL DEFAULT (datetime('now'))
+  )`)
+} catch { /* already exists */ }
 
 export function generateId(): string {
   return randomUUID()

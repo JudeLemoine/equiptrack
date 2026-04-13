@@ -19,6 +19,7 @@ import MaintenanceEquipmentDetailPage from '../features/maintenance/pages/Mainte
 import MaintenanceAllEquipmentPage from '../features/maintenance/pages/MaintenanceAllEquipmentPage'
 import MaintenanceIssuesPage from '../features/maintenance/pages/MaintenanceIssuesPage'
 import UserProfilePage from '../features/user/pages/UserProfilePage'
+import CalendarPage from '../features/calendar/CalendarPage'
 import NotFoundPage from './NotFoundPage'
 
 function RootRedirect() {
@@ -40,6 +41,7 @@ function AppRoutes() {
         <Route element={<AppLayout />}>
           <Route element={<RootRedirect />} index />
           <Route element={<UserProfilePage />} path="/profile/:id?" />
+          <Route element={<CalendarPage />} path="/calendar" />
 
           <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
             <Route element={<AdminDashboardPage />} path="/admin/dashboard" />

@@ -35,6 +35,7 @@ import {
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu'
 import iconColor from '../assets/logos/icon_color.png'
+import CalendarPopup from '../features/calendar/components/CalendarPopup'
 import { getUser, listUsers } from '../services/userService'
 import { getAdminSummary, getFieldSummary } from '../services/dashboardService'
 import { listIssueReports } from '../services/maintenanceService'
@@ -348,6 +349,7 @@ function RoleTopBar({ onLogout, onImpersonate }: { onLogout: () => void; onImper
   const userId = effectiveSession?.user.id
 
   const [notifOpen, setNotifOpen] = useState(false)
+  const [calendarOpen, setCalendarOpen] = useState(false)
   const clock = useLiveClock()
   const notifications = useNotifications(role, userId)
   const unreadCount = notifications.length
@@ -371,7 +373,9 @@ function RoleTopBar({ onLogout, onImpersonate }: { onLogout: () => void; onImper
   const isAvatarIcon = avatarQuery.data?.isAvatarIcon ?? realSession?.user?.isAvatarIcon
 
   return (
-    <header className="sticky top-0 z-10 w-full flex items-center px-4 h-12 shadow-sm" style={{ background: theme.bg, borderBottom: `1px solid ${theme.border}` }}>
+    <>
+    {calendarOpen && <div className="fixed inset-0 z-40" onClick={() => setCalendarOpen(false)} />}
+    <header className="sticky top-0 z-50 w-full flex items-center px-4 h-12 shadow-sm" style={{ background: theme.bg, borderBottom: `1px solid ${theme.border}` }}>
       <div className="flex-1 flex items-center">
         <Link to="/" className="flex items-center gap-2 shrink-0">
           <img alt="EquipTrack icon" className="h-7 w-7 rounded object-contain" src={iconColor} />
@@ -384,9 +388,24 @@ function RoleTopBar({ onLogout, onImpersonate }: { onLogout: () => void; onImper
         </Link>
       </div>
 
-      <div className="flex flex-col items-center leading-none select-none">
-        <span className="text-white font-semibold text-sm tabular-nums">{clock.time}</span>
-        <span className="text-white/60 text-[10px] mt-0.5">{clock.date}</span>
+      <div className="relative">
+        <button
+          onClick={() => { setCalendarOpen(v => !v); setNotifOpen(false) }}
+          className="flex flex-col items-center leading-none px-3 py-1 rounded-lg hover:bg-white/10 transition-colors"
+        >
+          <span className="text-white font-semibold text-sm tabular-nums">{clock.time}</span>
+          <span className="text-white/60 text-[10px] mt-0.5">{clock.date}</span>
+        </button>
+        {calendarOpen && (
+          <CalendarPopup
+            isAdmin={role === 'admin'}
+            onClose={() => setCalendarOpen(false)}
+            onCreateEvent={() => {
+              setCalendarOpen(false)
+              navigate('/calendar')
+            }}
+          />
+        )}
       </div>
 
       <div className="flex-1 flex items-center justify-end gap-1">
@@ -454,6 +473,7 @@ function RoleTopBar({ onLogout, onImpersonate }: { onLogout: () => void; onImper
         </DropdownMenu>
       </div>
     </header>
+    </>
   )
 }
 

@@ -1,8 +1,8 @@
 import express from "express"
 import cors from "cors"
 import path from "path"
-import { existsSync } from "fs"
 import { execSync } from "child_process"
+import db from "./lib/db"
 import rentalRoutes from "./routes/rentals"
 import equipmentRoutes from "./routes/equipment"
 import authRoutes from "./routes/auth"
@@ -16,9 +16,9 @@ import calendarRoutes from "./routes/calendar"
 const isProduction = process.env.NODE_ENV === "production"
 
 if (isProduction) {
-  const dbPath = path.join(process.cwd(), "dev.db")
-  if (!existsSync(dbPath)) {
-    console.log("No database found — seeding...")
+  const { count } = db.prepare("SELECT COUNT(*) as count FROM User").get() as { count: number }
+  if (count === 0) {
+    console.log("No users found — seeding...")
     execSync(`npx tsx "${path.join(__dirname, "../db/seed.ts")}"`, { stdio: "inherit" })
     console.log("Seed complete.")
   }

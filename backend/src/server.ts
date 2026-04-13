@@ -19,7 +19,7 @@ if (isProduction) {
   const { count } = db.prepare("SELECT COUNT(*) as count FROM User").get() as { count: number }
   if (count === 0) {
     console.log("No users found — seeding...")
-    execSync(`npx tsx "${path.join(__dirname, "../db/seed.ts")}"`, { stdio: "inherit" })
+    execSync(`npx tsx "${path.join(__dirname, "db/seed.ts")}"`, { stdio: "inherit" })
     console.log("Seed complete.")
   }
 }

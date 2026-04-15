@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ColumnDef } from '@tanstack/react-table'
 import { toast } from 'sonner'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeft, MoreHorizontal, Check, X, LogOut, RotateCcw } from 'lucide-react'
 import DataTable from '../../../components/DataTable'
 import ErrorState from '../../../components/ErrorState'
@@ -60,7 +60,11 @@ import ApproveRentalDialog from '../components/ApproveRentalDialog'
 export default function AdminRentalsPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const [status, setStatus] = useState<RentalStatus | 'all'>('all')
+  const location = useLocation()
+  const locationState = location.state as { statusFilter?: RentalStatus | 'all' } | null
+  const [status, setStatus] = useState<RentalStatus | 'all'>(
+    locationState?.statusFilter ?? 'all'
+  )
   const [selectedRentalId, setSelectedRentalId] = useState<string | null>(null)
   const [action, setAction] = useState<RentalAction | null>(null)
   const [approveDialog, setApproveDialog] = useState<{ id: string; typeId: string; start: string; end?: string } | null>(null)

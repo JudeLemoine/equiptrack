@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Plus, ArrowLeft, Search, Pencil, Trash2 } from 'lucide-react'
 import ErrorState from '../../../components/ErrorState'
@@ -45,9 +45,13 @@ const STATUS_FILTERS: Array<{ label: string; value: EquipmentStatus | 'all' }> =
 export default function AdminEquipmentPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const location = useLocation()
+  const locationState = location.state as { statusFilter?: EquipmentStatus | 'all' } | null
 
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<EquipmentStatus | 'all'>('all')
+  const [statusFilter, setStatusFilter] = useState<EquipmentStatus | 'all'>(
+    locationState?.statusFilter ?? 'all'
+  )
   const [isCreateOpen, setCreateOpen] = useState(false)
   const [editItem, setEditItem] = useState<Equipment | null>(null)
   const [deleteItem, setDeleteItem] = useState<Equipment | null>(null)

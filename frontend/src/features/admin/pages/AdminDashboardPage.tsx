@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Activity, CheckCircle2, Clock3, Package, Wrench, Users, ClipboardList } from 'lucide-react'
 import { Card as MuiCard, CardActionArea, Typography, Box } from '@mui/material'
 import ErrorState from '../../../components/ErrorState'
@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { getAdminSummary } from '../../../services/dashboardService'
 
 export default function AdminDashboardPage() {
+  const navigate = useNavigate()
   const summaryQuery = useQuery({
     queryKey: ['admin-summary'],
     queryFn: getAdminSummary,
@@ -34,36 +35,60 @@ export default function AdminDashboardPage() {
       value: summaryQuery.data.totalEquipment,
       icon: Package,
       description: 'All tracked assets',
+      color: 'text-slate-700',
+      iconBg: 'bg-slate-100',
+      to: '/admin/equipment',
+      state: {},
     },
     {
       title: 'Available',
       value: summaryQuery.data.byStatus.available,
       icon: CheckCircle2,
       description: 'Ready for rental',
+      color: 'text-emerald-600',
+      iconBg: 'bg-emerald-50',
+      to: '/admin/equipment',
+      state: { statusFilter: 'available' },
     },
     {
       title: 'In Use',
       value: summaryQuery.data.byStatus.in_use,
       icon: Activity,
       description: 'Currently rented',
+      color: 'text-blue-600',
+      iconBg: 'bg-blue-50',
+      to: '/admin/equipment',
+      state: { statusFilter: 'in_use' },
     },
     {
       title: 'Maintenance',
       value: summaryQuery.data.byStatus.maintenance,
       icon: Wrench,
       description: 'Needs service',
+      color: 'text-amber-600',
+      iconBg: 'bg-amber-50',
+      to: '/admin/equipment',
+      state: { statusFilter: 'maintenance' },
     },
     {
       title: 'Pending Requests',
       value: summaryQuery.data.pendingRentalRequests,
       icon: Clock3,
       description: 'Awaiting admin action',
+      color: 'text-orange-600',
+      iconBg: 'bg-orange-50',
+      to: '/admin/rentals',
+      state: { statusFilter: 'pending' },
     },
     {
       title: 'Active Rentals',
       value: summaryQuery.data.activeRentals,
       icon: Activity,
       description: 'Ongoing equipment use',
+      color: 'text-blue-600',
+      iconBg: 'bg-blue-50',
+      to: '/admin/rentals',
+      state: { statusFilter: 'active' },
     },
   ]
 
@@ -112,16 +137,27 @@ export default function AdminDashboardPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {cards.map((card) => (
-          <Card key={card.title}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
-              <card.icon className="h-4 w-4 text-slate-500" />
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-semibold text-slate-900">{card.value}</p>
-              <CardDescription className="mt-1">{card.description}</CardDescription>
-            </CardContent>
-          </Card>
+          <button
+            key={card.title}
+            onClick={() => navigate(card.to, { state: card.state })}
+            className="text-left group focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded-xl"
+          >
+            <Card className="h-full transition-all duration-150 group-hover:shadow-md group-hover:border-slate-300 cursor-pointer">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
+                <div className={`flex items-center justify-center h-8 w-8 rounded-lg ${card.iconBg}`}>
+                  <card.icon className={`h-4 w-4 ${card.color}`} />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className={`text-3xl font-bold ${card.color}`}>{card.value}</p>
+                <CardDescription className="mt-1">{card.description}</CardDescription>
+                <p className="mt-2 text-xs font-medium text-slate-400 group-hover:text-slate-600 transition-colors">
+                  Click to view →
+                </p>
+              </CardContent>
+            </Card>
+          </button>
         ))}
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ClipboardList, Hammer, Package } from 'lucide-react'
 import { Card as MuiCard, CardActionArea, Typography, Box } from '@mui/material'
 import ErrorState from '../../../components/ErrorState'
@@ -10,6 +10,7 @@ import { getSession } from '../../../lib/auth'
 import { getFieldSummary } from '../../../services/dashboardService'
 
 export default function FieldDashboardPage() {
+  const navigate = useNavigate()
   const session = getSession()
   const userId = session?.user.id ?? ''
 
@@ -69,26 +70,46 @@ export default function FieldDashboardPage() {
       </Box>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">My Pending Requests</CardTitle>
-            <CardDescription>Requests waiting for admin approval</CardDescription>
-          </CardHeader>
-          <CardContent className="flex items-center justify-between">
-            <p className="text-3xl font-semibold">{summaryQuery.data.myPendingRequests}</p>
-            <ClipboardList className="h-5 w-5 text-slate-500" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">My Active Rentals</CardTitle>
-            <CardDescription>Equipment currently assigned to your jobs</CardDescription>
-          </CardHeader>
-          <CardContent className="flex items-center justify-between">
-            <p className="text-3xl font-semibold">{summaryQuery.data.myActiveRentals}</p>
-            <Hammer className="h-5 w-5 text-slate-500" />
-          </CardContent>
-        </Card>
+        <button
+          onClick={() => navigate('/field/rentals', { state: { statusFilter: 'pending' } })}
+          className="text-left group focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded-xl"
+        >
+          <Card className="h-full transition-all duration-150 group-hover:shadow-md group-hover:border-slate-300 cursor-pointer">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">My Pending Requests</CardTitle>
+              <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-orange-50">
+                <ClipboardList className="h-4 w-4 text-orange-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold text-orange-600">{summaryQuery.data.myPendingRequests}</p>
+              <CardDescription className="mt-1">Requests waiting for admin approval</CardDescription>
+              <p className="mt-2 text-xs font-medium text-slate-400 group-hover:text-slate-600 transition-colors">
+                Click to view →
+              </p>
+            </CardContent>
+          </Card>
+        </button>
+        <button
+          onClick={() => navigate('/field/rentals', { state: { statusFilter: 'active' } })}
+          className="text-left group focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded-xl"
+        >
+          <Card className="h-full transition-all duration-150 group-hover:shadow-md group-hover:border-slate-300 cursor-pointer">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">My Active Rentals</CardTitle>
+              <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-blue-50">
+                <Hammer className="h-4 w-4 text-blue-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold text-blue-600">{summaryQuery.data.myActiveRentals}</p>
+              <CardDescription className="mt-1">Equipment currently assigned to your jobs</CardDescription>
+              <p className="mt-2 text-xs font-medium text-slate-400 group-hover:text-slate-600 transition-colors">
+                Click to view →
+              </p>
+            </CardContent>
+          </Card>
+        </button>
       </div>
 
     </div>

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import type { ColumnDef } from '@tanstack/react-table'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import DataTable from '../../../components/DataTable'
 import ErrorState from '../../../components/ErrorState'
@@ -26,7 +26,11 @@ const tabs: Array<{ label: string; value: RentalStatus | 'all' }> = [
 
 export default function FieldRentalsPage() {
   const navigate = useNavigate()
-  const [status, setStatus] = useState<RentalStatus | 'all'>('all')
+  const location = useLocation()
+  const locationState = location.state as { statusFilter?: RentalStatus | 'all' } | null
+  const [status, setStatus] = useState<RentalStatus | 'all'>(
+    locationState?.statusFilter ?? 'all'
+  )
   const session = getSession()
   const userId = session?.user.id ?? ''
 

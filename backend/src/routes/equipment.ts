@@ -25,6 +25,8 @@ type ApiEquipment = {
   maintenanceIntervalDays?: number
   nextServiceDueDate?: string
   notes?: string
+  assignedToUserId?: string
+  assignedToName?: string
 }
 
 type ServiceLogEntry = {
@@ -46,6 +48,8 @@ type UnitJoinRow = {
   typeName: string
   categoryName: string
   defaultMaintenanceDays: number | null
+  assignedToUserId: string | null
+  assignedToName: string | null
 }
 
 function slugifyCode(value: string) {
@@ -68,16 +72,20 @@ function toApiEquipment(unit: UnitJoinRow): ApiEquipment {
     maintenanceIntervalDays: unit.defaultMaintenanceDays ?? undefined,
     nextServiceDueDate: toIsoDate(unit.nextMaintenanceDue),
     notes: unit.notesSummary ?? undefined,
+    assignedToUserId: unit.assignedToUserId ?? undefined,
+    assignedToName: unit.assignedToName ?? undefined,
   }
 }
 
 const UNIT_JOIN_SQL = `
   SELECT eu.id, eu.assetTag, eu.status, eu.lastMaintenanceAt, eu.nextMaintenanceDue,
-         eu.notesSummary, eu.equipmentTypeId,
-         et.name AS typeName, ec.name AS categoryName, et.defaultMaintenanceDays
+         eu.notesSummary, eu.equipmentTypeId, eu.assignedToUserId,
+         et.name AS typeName, ec.name AS categoryName, et.defaultMaintenanceDays,
+         au.name AS assignedToName
   FROM EquipmentUnit eu
   JOIN EquipmentType et ON eu.equipmentTypeId = et.id
   JOIN EquipmentCategory ec ON et.categoryId = ec.id
+  LEFT JOIN User au ON eu.assignedToUserId = au.id
 `
 
 function ensureUserExists(userId: string) {
@@ -458,7 +466,8 @@ router.post("/:id/checkout", async (req, res) => {
   const now = new Date().toISOString()
 
   const runTransaction = db.transaction(() => {
-    db.prepare("UPDATE EquipmentUnit SET status = 'CHECKED_OUT' WHERE id = ?").run(item.id)
+    db.prepare("UPDATE EquipmentUnit SET status = 'CHECKED_OUT', assignedToUserId = ? WHERE id = ?")
+      .run(actor.id, item.id)
 
     db.prepare(`
       INSERT INTO AuditLog (id, action, actorId, equipmentUnitId, message, createdAt)
@@ -496,7 +505,7 @@ router.post("/:id/checkin", async (req, res) => {
   const now = new Date().toISOString()
 
   const runTransaction = db.transaction(() => {
-    db.prepare("UPDATE EquipmentUnit SET status = 'AVAILABLE' WHERE id = ?").run(item.id)
+    db.prepare("UPDATE EquipmentUnit SET status = 'AVAILABLE', assignedToUserId = NULL WHERE id = ?").run(item.id)
 
     db.prepare(`
       INSERT INTO AuditLog (id, action, actorId, equipmentUnitId, message, createdAt)
@@ -508,6 +517,70 @@ router.post("/:id/checkin", async (req, res) => {
 
   const updated = db.prepare(`${UNIT_JOIN_SQL} WHERE eu.id = ?`).get(item.id) as UnitJoinRow
 
+  res.json(toApiEquipment(updated))
+})
+
+// Assign (or unassign) a field worker to a piece of equipment
+router.patch("/:id/assign", requireRole("admin"), async (req, res) => {
+  const item = db.prepare("SELECT id, status FROM EquipmentUnit WHERE id = ? AND isActive = 1").get(req.params.id) as
+    { id: string; status: EquipmentStatusType } | undefined
+
+  if (!item) {
+    res.status(404).json({ message: "Equipment not found" })
+    return
+  }
+
+  const { assignedToUserId, actorUserId } = req.body as {
+    assignedToUserId: string | null
+    actorUserId: string
+  }
+
+  if (!actorUserId) {
+    res.status(400).json({ message: "actorUserId is required" })
+    return
+  }
+
+  const actor = ensureUserExists(actorUserId)
+  if (!actor) {
+    res.status(400).json({ message: "Invalid actorUserId" })
+    return
+  }
+
+  // If assigning, validate the target user exists
+  if (assignedToUserId) {
+    const target = db.prepare("SELECT id, name FROM User WHERE id = ?").get(assignedToUserId) as
+      { id: string; name: string } | undefined
+    if (!target) {
+      res.status(400).json({ message: "Assigned user not found" })
+      return
+    }
+  }
+
+  const now = new Date().toISOString()
+
+  db.transaction(() => {
+    // Determine new status when assigning/unassigning
+    // Field-use statuses: CHECKED_OUT / RESERVED / OVERDUE
+    // Maintenance statuses: IN_MAINTENANCE / DUE_SOON_MAINTENANCE / OUT_OF_SERVICE
+    // Only touch status when assigning to/from AVAILABLE
+    let newStatus: string = item.status
+    if (assignedToUserId && item.status === "AVAILABLE") newStatus = "CHECKED_OUT"
+    if (!assignedToUserId && (item.status === "CHECKED_OUT" || item.status === "RESERVED" || item.status === "OVERDUE")) newStatus = "AVAILABLE"
+
+    db.prepare("UPDATE EquipmentUnit SET assignedToUserId = ?, status = ? WHERE id = ?")
+      .run(assignedToUserId ?? null, newStatus, item.id)
+
+    const logMsg = assignedToUserId
+      ? `Assigned to worker (id: ${assignedToUserId})`
+      : "Assignment cleared — equipment returned to available pool"
+
+    db.prepare(`
+      INSERT INTO AuditLog (id, action, actorId, equipmentUnitId, message, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(generateId(), "STATUS_CHANGED", actorUserId, item.id, logMsg, now)
+  })()
+
+  const updated = db.prepare(`${UNIT_JOIN_SQL} WHERE eu.id = ?`).get(item.id) as UnitJoinRow
   res.json(toApiEquipment(updated))
 })
 

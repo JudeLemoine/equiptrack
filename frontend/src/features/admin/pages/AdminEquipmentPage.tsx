@@ -1,14 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { ColumnDef } from '@tanstack/react-table'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { MoreHorizontal, Plus, ArrowLeft } from 'lucide-react'
-import DataTable from '../../../components/DataTable'
+import { Plus, ArrowLeft, Search, Pencil, Trash2 } from 'lucide-react'
 import ErrorState from '../../../components/ErrorState'
 import Loader from '../../../components/Loader'
 import PageHeader from '../../../components/PageHeader'
-import StatusBadge from '../../../components/StatusBadge'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,13 +24,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../../components/ui/dialog'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '../../../components/ui/dropdown-menu'
+import { Input } from '../../../components/ui/input'
 import EquipmentForm from '../../equipment/components/EquipmentForm'
+import EquipmentGroupGrid from '../../equipment/components/EquipmentGroupGrid'
 import {
   createEquipment,
   deleteEquipment,
@@ -41,18 +34,18 @@ import {
   updateEquipment,
 } from '../../../services/equipmentService'
 import type { CreateEquipmentDTO, Equipment, EquipmentStatus } from '../../../types/equipment'
-import { formatDate } from '../../../lib/utils'
 
-const filterOptions: Array<{ label: string; value: EquipmentStatus | 'all' }> = [
+const STATUS_FILTERS: Array<{ label: string; value: EquipmentStatus | 'all' }> = [
   { label: 'All statuses', value: 'all' },
   { label: 'Available', value: 'available' },
-  { label: 'In use', value: 'in_use' },
+  { label: 'In Use', value: 'in_use' },
   { label: 'Maintenance', value: 'maintenance' },
 ]
 
 export default function AdminEquipmentPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<EquipmentStatus | 'all'>('all')
   const [isCreateOpen, setCreateOpen] = useState(false)
@@ -99,59 +92,7 @@ export default function AdminEquipmentPage() {
     onError: () => toast.error('Could not delete equipment.'),
   })
 
-  const columns = useMemo<ColumnDef<Equipment>[]>(
-    () => [
-      {
-        accessorKey: 'name',
-        header: 'Name',
-        cell: ({ row }) => <p className="font-medium">{row.original.name}</p>,
-      },
-      {
-        accessorKey: 'category',
-        header: 'Category',
-      },
-      {
-        accessorKey: 'status',
-        header: 'Status',
-        cell: ({ row }) => <StatusBadge status={row.original.status} />,
-      },
-      {
-        accessorKey: 'nextServiceDueDate',
-        header: 'Next service due',
-        cell: ({ row }) => formatDate(row.original.nextServiceDueDate),
-      },
-      {
-        id: 'actions',
-        header: 'Actions',
-        enableSorting: false,
-        cell: ({ row }) => (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="icon" variant="secondary">
-                <MoreHorizontal className="h-4 w-4" />
-                <span className="sr-only">Open actions</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem asChild>
-                <Link to={`/admin/equipment/${row.original.id}`}>View profile</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setEditItem(row.original)}>Edit</DropdownMenuItem>
-              <DropdownMenuItem className="text-red-600" onClick={() => setDeleteItem(row.original)}>
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ),
-      },
-    ],
-    [],
-  )
-
-  if (equipmentQuery.isLoading) {
-    return <Loader label="Loading equipment..." />
-  }
-
+  if (equipmentQuery.isLoading) return <Loader label="Loading equipment..." />
   if (equipmentQuery.isError) {
     return (
       <ErrorState
@@ -168,6 +109,7 @@ export default function AdminEquipmentPage() {
         <ArrowLeft className="mr-2 h-4 w-4" />
         Back
       </Button>
+
       <PageHeader
         actions={
           <Button onClick={() => setCreateOpen(true)}>
@@ -179,34 +121,68 @@ export default function AdminEquipmentPage() {
         title="Equipment"
       />
 
-      <div className="flex flex-wrap gap-6 rounded-xl border border-slate-200 bg-white p-4">
-        <div className="flex flex-col gap-2">
+      {/* Filters */}
+      <div className="flex flex-wrap items-end gap-4 rounded-xl border border-slate-200 bg-white p-4">
+        {/* Search */}
+        <div className="flex flex-col gap-1.5 min-w-[200px] flex-1">
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Search</span>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+            <Input
+              className="pl-8"
+              placeholder="Search equipment by name…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* Status pills */}
+        <div className="flex flex-col gap-1.5">
           <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</span>
           <div className="flex flex-wrap gap-1.5">
-            {filterOptions.map((option) => (
+            {STATUS_FILTERS.map((opt) => (
               <button
-                key={option.value}
-                onClick={() => setStatusFilter(option.value)}
-                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${statusFilter === option.value ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:border-slate-400'}`}
+                key={opt.value}
+                onClick={() => setStatusFilter(opt.value)}
+                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                  statusFilter === opt.value
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:border-slate-400'
+                }`}
               >
-                {option.label}
+                {opt.label}
               </button>
             ))}
           </div>
         </div>
       </div>
 
-      <DataTable
-        columns={columns}
-        data={equipmentQuery.data ?? []}
-        emptyDescription="Try broadening your filters or add equipment."
-        emptyTitle="No equipment found"
-        onSearchValueChange={setSearch}
-        searchPlaceholder="Search equipment by name"
-        searchValue={search}
-        pageSize={25}
+      {/* Grouped tile grid */}
+      <EquipmentGroupGrid
+        equipment={equipmentQuery.data ?? []}
+        getDetailPath={(item) => `/admin/equipment/${item.id}`}
+        renderItemActions={(item) => (
+          <>
+            <button
+              className="flex items-center justify-center h-7 w-7 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+              title="Edit"
+              onClick={(e) => { e.preventDefault(); setEditItem(item) }}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <button
+              className="flex items-center justify-center h-7 w-7 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+              title="Delete"
+              onClick={(e) => { e.preventDefault(); setDeleteItem(item) }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </>
+        )}
       />
 
+      {/* Create dialog */}
       <Dialog onOpenChange={setCreateOpen} open={isCreateOpen}>
         <DialogContent>
           <DialogHeader>
@@ -222,13 +198,14 @@ export default function AdminEquipmentPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit dialog */}
       <Dialog onOpenChange={(open) => !open && setEditItem(null)} open={Boolean(editItem)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit equipment</DialogTitle>
             <DialogDescription>Update equipment details and status.</DialogDescription>
           </DialogHeader>
-          {editItem ? (
+          {editItem && (
             <EquipmentForm
               initialValues={editItem}
               isSubmitting={updateMutation.isPending}
@@ -236,10 +213,11 @@ export default function AdminEquipmentPage() {
               onSubmit={(values) => updateMutation.mutate({ id: editItem.id, values })}
               submitLabel="Save changes"
             />
-          ) : null}
+          )}
         </DialogContent>
       </Dialog>
 
+      {/* Delete confirm */}
       <AlertDialog onOpenChange={(open) => !open && setDeleteItem(null)} open={Boolean(deleteItem)}>
         <AlertDialogContent>
           <AlertDialogHeader>

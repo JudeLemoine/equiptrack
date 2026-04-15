@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ColumnDef } from '@tanstack/react-table'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 import { ArrowLeft } from 'lucide-react'
 import DataTable from '../../../components/DataTable'
@@ -22,7 +22,7 @@ import { TextField } from '@mui/material'
 import { Label } from '../../../components/ui/label'
 import { Select } from '../../../components/ui/select'
 import { listMaintenanceQueue, markEquipmentServiced } from '../../../services/equipmentService'
-import type { Equipment, IssueSeverity } from '../../../types/equipment'
+import type { Equipment, EquipmentStatus, IssueSeverity } from '../../../types/equipment'
 import { formatDate } from '../../../lib/utils'
 import { getSession } from '../../../lib/auth'
 
@@ -61,9 +61,17 @@ const severityConfig: Record<IssueSeverity, { label: string; className: string }
   CRITICAL: { label: 'Critical', className: 'text-red-700 bg-red-50 border-red-200' },
 }
 
+const statusOptions: Array<{ label: string; value: EquipmentStatus | 'all' }> = [
+  { label: 'All statuses', value: 'all' },
+  { label: 'In Maintenance', value: 'maintenance' },
+  { label: 'Available', value: 'available' },
+  { label: 'In Use', value: 'in_use' },
+]
+
 export default function MaintenanceEquipmentPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const location = useLocation()
   const session = getSession()
   const userId = session?.user.id ?? ''
   const [selectedItem, setSelectedItem] = useState<Equipment | null>(null)
@@ -71,6 +79,12 @@ export default function MaintenanceEquipmentPage() {
   const [search, setSearch] = useState('')
   const [priorityFilter, setPriorityFilter] = useState<Priority | 'all'>('all')
   const [severityFilter, setSeverityFilter] = useState<IssueSeverity | 'all' | 'none'>('all')
+
+  // Pre-set status filter from dashboard card navigation
+  const locationState = location.state as { statusFilter?: EquipmentStatus | 'all' } | null
+  const [statusFilter, setStatusFilter] = useState<EquipmentStatus | 'all'>(
+    locationState?.statusFilter ?? 'all'
+  )
 
   const equipmentQuery = useQuery({
     queryKey: ['maintenance-queue'],
@@ -90,6 +104,10 @@ export default function MaintenanceEquipmentPage() {
       )
     }
 
+    if (statusFilter !== 'all') {
+      items = items.filter((item) => item.status === statusFilter)
+    }
+
     if (priorityFilter !== 'all') {
       items = items.filter((item) => derivePriority(item.nextServiceDueDate) === priorityFilter)
     }
@@ -101,7 +119,7 @@ export default function MaintenanceEquipmentPage() {
     }
 
     return items
-  }, [equipmentQuery.data, search, priorityFilter, severityFilter])
+  }, [equipmentQuery.data, search, statusFilter, priorityFilter, severityFilter])
 
   const completeServiceMutation = useMutation({
     mutationFn: (payload: { id: string; nextServiceDueDate?: string }) =>
@@ -242,8 +260,20 @@ export default function MaintenanceEquipmentPage() {
           <CardDescription>Search and filter the maintenance queue.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="max-w-xs space-y-2">
+          <div className="flex flex-wrap gap-4">
+            <div className="min-w-[160px] space-y-2">
+              <Label htmlFor="statusFilter">Status</Label>
+              <Select
+                id="statusFilter"
+                onChange={(e) => setStatusFilter(e.target.value as EquipmentStatus | 'all')}
+                value={statusFilter}
+              >
+                {statusOptions.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </Select>
+            </div>
+            <div className="min-w-[160px] space-y-2">
               <Label htmlFor="priorityFilter">Priority</Label>
               <Select
                 id="priorityFilter"

@@ -13,6 +13,8 @@ export type Equipment = {
   nextServiceDueDate?: string
   notes?: string
   severity?: IssueSeverity
+  assignedToUserId?: string
+  assignedToName?: string
 }
 
 export type CreateEquipmentDTO = {

@@ -2,8 +2,10 @@ import { useState, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useParams, useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Trash2, QrCode, Download } from 'lucide-react'
+import { Trash2, QrCode, Download, UserCircle2, UserX, Search } from 'lucide-react'
 import { QRCodeCanvas } from 'qrcode.react'
+import { listUsers } from '../../../services/userService'
+import { assignEquipment } from '../../../services/equipmentService'
 import ErrorState from '../../../components/ErrorState'
 import Loader from '../../../components/Loader'
 import PageHeader from '../../../components/PageHeader'
@@ -88,6 +90,29 @@ export default function EquipmentProfilePage() {
 
   const role = session?.user.role
   const userId = session?.user.id ?? ''
+
+  // Assign worker dialog
+  const [isAssignOpen, setAssignOpen] = useState(false)
+  const [assignSearch, setAssignSearch] = useState('')
+
+  const fieldUsersQuery = useQuery({
+    queryKey: ['users-field-for-assign'],
+    queryFn: () => listUsers(),
+    enabled: isAssignOpen,
+    select: (users) => users.filter((u) => u.role === 'field'),
+  })
+
+  const assignMutation = useMutation({
+    mutationFn: ({ targetUserId }: { targetUserId: string | null }) =>
+      assignEquipment(id as string, targetUserId, userId),
+    onSuccess: async () => {
+      setAssignOpen(false)
+      setAssignSearch('')
+      await refreshAll()
+      toast.success('Assignment updated.')
+    },
+    onError: () => toast.error('Could not update assignment.'),
+  })
 
   // QR code download ref
   const qrWrapperRef = useRef<HTMLDivElement>(null)
@@ -343,6 +368,48 @@ export default function EquipmentProfilePage() {
             <div>
               <Label className="text-xs text-slate-500">Last Service</Label>
               <p className="text-slate-700">{formatDate(equipment.lastServiceDate)}</p>
+            </div>
+
+            {/* Assigned Worker row — visible to all roles, editable by admin */}
+            <div className="sm:col-span-2">
+              <Label className="text-xs text-slate-500">Assigned Worker</Label>
+              <div className="mt-1 flex items-center gap-3">
+                {equipment.assignedToName ? (
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-center h-7 w-7 rounded-full bg-emerald-100 shrink-0">
+                      <UserCircle2 className="h-4 w-4 text-emerald-700" />
+                    </div>
+                    <span className="font-medium text-slate-900">{equipment.assignedToName}</span>
+                  </div>
+                ) : (
+                  <span className="text-sm text-slate-400 italic">No worker assigned</span>
+                )}
+                {role === 'admin' && (
+                  <div className="flex items-center gap-1.5 ml-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 px-2 text-xs gap-1"
+                      onClick={() => setAssignOpen(true)}
+                    >
+                      <UserCircle2 className="h-3.5 w-3.5" />
+                      {equipment.assignedToName ? 'Reassign' : 'Assign Worker'}
+                    </Button>
+                    {equipment.assignedToName && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-xs gap-1 text-red-500 hover:text-red-700 hover:bg-red-50"
+                        disabled={assignMutation.isPending}
+                        onClick={() => assignMutation.mutate({ targetUserId: null })}
+                      >
+                        <UserX className="h-3.5 w-3.5" />
+                        Unassign
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
             {role === 'field' && !canCheckout && equipment.status === 'available' && (
               <div className="sm:col-span-2">
@@ -788,6 +855,83 @@ export default function EquipmentProfilePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ASSIGN WORKER DIALOG */}
+      <Dialog open={isAssignOpen} onOpenChange={(open) => { setAssignOpen(open); if (!open) setAssignSearch('') }}>
+        <DialogContent className="max-w-md p-0 overflow-hidden gap-0">
+          <DialogHeader className="px-5 pt-5 pb-3 border-b border-slate-100">
+            <DialogTitle className="flex items-center gap-2">
+              <UserCircle2 className="h-4 w-4 text-slate-500" />
+              Assign Worker
+            </DialogTitle>
+            <DialogDescription>
+              Select a field worker to assign to <strong>{equipment.name}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Search */}
+          <div className="px-4 py-3 border-b border-slate-100">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+              <input
+                autoFocus
+                className="w-full pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                placeholder="Search field workers…"
+                value={assignSearch}
+                onChange={(e) => setAssignSearch(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Worker list */}
+          <div className="overflow-y-auto" style={{ maxHeight: '55vh' }}>
+            {fieldUsersQuery.isLoading && (
+              <p className="text-xs text-slate-400 text-center py-8">Loading workers…</p>
+            )}
+            {!fieldUsersQuery.isLoading && (fieldUsersQuery.data ?? []).filter((u) =>
+              u.name.toLowerCase().includes(assignSearch.toLowerCase()) ||
+              (u.position ?? '').toLowerCase().includes(assignSearch.toLowerCase())
+            ).length === 0 && (
+              <p className="text-xs text-slate-400 text-center py-8">No field workers found.</p>
+            )}
+            {(fieldUsersQuery.data ?? [])
+              .filter((u) =>
+                u.name.toLowerCase().includes(assignSearch.toLowerCase()) ||
+                (u.position ?? '').toLowerCase().includes(assignSearch.toLowerCase())
+              )
+              .map((u) => {
+                const isCurrentlyAssigned = equipment.assignedToUserId === u.id
+                return (
+                  <button
+                    key={u.id}
+                    disabled={assignMutation.isPending}
+                    onClick={() => assignMutation.mutate({ targetUserId: u.id })}
+                    className={`w-full flex items-center gap-3 px-5 py-3 text-left border-b border-slate-50 last:border-0 transition-colors ${
+                      isCurrentlyAssigned
+                        ? 'bg-emerald-50 hover:bg-emerald-100'
+                        : 'hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-center h-9 w-9 rounded-full bg-emerald-100 shrink-0">
+                      <UserCircle2 className="h-5 w-5 text-emerald-700" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-800 truncate">{u.name}</p>
+                      {u.position && (
+                        <p className="text-xs text-slate-500 truncate">{u.position}</p>
+                      )}
+                    </div>
+                    {isCurrentlyAssigned && (
+                      <span className="shrink-0 text-[10px] font-semibold text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">
+                        Current
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS EquipmentUnit (
   equipmentTypeId    TEXT NOT NULL REFERENCES EquipmentType(id),
   locationId         TEXT NOT NULL REFERENCES Location(id),
   status             TEXT NOT NULL DEFAULT 'AVAILABLE' CHECK(status IN ('AVAILABLE','RESERVED','CHECKED_OUT','OVERDUE','DUE_SOON_MAINTENANCE','IN_MAINTENANCE','OUT_OF_SERVICE')),
+  assignedToUserId   TEXT REFERENCES User(id),
   year               INTEGER,
   inServiceDate      TEXT,
   nextMaintenanceDue TEXT,

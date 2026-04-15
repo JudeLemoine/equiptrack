@@ -104,6 +104,17 @@ export function clearTechNotes(equipmentId: string): Promise<void> {
   return apiClient.delete<void>(`/api/equipment/${equipmentId}/tech-notes`)
 }
 
+export function assignEquipment(
+  id: string,
+  assignedToUserId: string | null,
+  actorUserId: string,
+): Promise<Equipment> {
+  return apiClient.patch<Equipment, { assignedToUserId: string | null; actorUserId: string }>(
+    `/api/equipment/${id}/assign`,
+    { assignedToUserId, actorUserId },
+  )
+}
+
 export function reportIssue(
   equipmentId: string,
   data: { severity: string; title: string; description: string; reportedById: string },

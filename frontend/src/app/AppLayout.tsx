@@ -22,6 +22,7 @@ import {
   Boxes,
   ListChecks,
   AlertCircle,
+  QrCode,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -487,18 +488,21 @@ const ROLE_NAV: Record<string, NavItem[]> = {
     { label: 'Equipment', to: '/admin/equipment', icon: Boxes },
     { label: 'Rentals', to: '/admin/rentals', icon: ClipboardList },
     { label: 'Users', to: '/admin/users', icon: Users },
+    { label: 'Scan QR', to: '/scan', icon: QrCode },
   ],
   field: [
     { label: 'Dashboard', to: '/field/dashboard', icon: LayoutDashboard },
     { label: 'Equipment', to: '/field/equipment', icon: Boxes },
     { label: 'My Rentals', to: '/field/rentals', icon: ClipboardList },
     { label: 'My Reports', to: '/field/reports', icon: AlertCircle },
+    { label: 'Scan QR', to: '/scan', icon: QrCode },
   ],
   maintenance: [
     { label: 'Dashboard', to: '/maintenance/dashboard', icon: LayoutDashboard },
     { label: 'Service Queue', to: '/maintenance/queue', icon: ListChecks },
     { label: 'All Equipment', to: '/maintenance/equipment', icon: Boxes },
     { label: 'Issue Reports', to: '/maintenance/issues', icon: AlertCircle },
+    { label: 'Scan QR', to: '/scan', icon: QrCode },
   ],
 }
 

@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useParams, useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Trash2 } from 'lucide-react'
+import { Trash2, QrCode, Download } from 'lucide-react'
+import { QRCodeCanvas } from 'qrcode.react'
 import ErrorState from '../../../components/ErrorState'
 import Loader from '../../../components/Loader'
 import PageHeader from '../../../components/PageHeader'
@@ -87,6 +88,21 @@ export default function EquipmentProfilePage() {
 
   const role = session?.user.role
   const userId = session?.user.id ?? ''
+
+  // QR code download ref
+  const qrWrapperRef = useRef<HTMLDivElement>(null)
+
+  const handleDownloadQR = () => {
+    const canvas = qrWrapperRef.current?.querySelector('canvas')
+    if (!canvas || !equipment) return
+    const url = canvas.toDataURL('image/png')
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${equipment.name.replace(/[^a-z0-9]/gi, '_')}_QR.png`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  }
 
   // Data Queries
   const { data: equipment, isLoading, isError, error } = useQuery({
@@ -402,6 +418,72 @@ export default function EquipmentProfilePage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* QR Code Card */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <QrCode className="h-4 w-4 text-slate-500" />
+            Equipment QR Code
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row items-start gap-6">
+            {/* QR image + download */}
+            <div className="flex flex-col items-center gap-3 shrink-0">
+              <div
+                ref={qrWrapperRef}
+                className="p-3 bg-white border border-slate-200 rounded-xl shadow-sm"
+              >
+                <QRCodeCanvas
+                  value={equipment.id}
+                  size={148}
+                  level="H"
+                  marginSize={1}
+                  bgColor="#ffffff"
+                  fgColor="#1A4889"
+                />
+              </div>
+              <p className="text-xs text-slate-500 text-center">
+                Asset Tag:{' '}
+                <span className="font-mono font-semibold text-slate-700">{equipment.qrCode}</span>
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs"
+                onClick={handleDownloadQR}
+              >
+                <Download className="h-3.5 w-3.5" />
+                Download PNG
+              </Button>
+            </div>
+
+            {/* Description */}
+            <div className="flex-1 min-w-0 space-y-3 pt-1">
+              <p className="text-sm font-medium text-slate-800">How to use this QR code</p>
+              <ul className="text-sm text-slate-600 space-y-2">
+                <li className="flex items-start gap-2">
+                  <span className="shrink-0 mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold text-slate-500">1</span>
+                  Download and print this QR code, then attach it to the physical equipment.
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="shrink-0 mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold text-slate-500">2</span>
+                  Use the <strong>Scan QR</strong> option in the app navigation to scan it with your camera.
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="shrink-0 mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold text-slate-500">3</span>
+                  EquipTrack will instantly navigate to this equipment's profile.
+                </li>
+              </ul>
+              <p className="text-xs text-slate-400 pt-1">
+                Encodes equipment ID:{' '}
+                <span className="font-mono">{equipment.id}</span>
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Field Worker Add Note (New Feature) */}
       {role === 'field' && (

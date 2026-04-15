@@ -1,13 +1,15 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
-import { TextField } from '@mui/material'
 import { Button } from '../../../components/ui/button'
 import { Input } from '../../../components/ui/input'
 import { Label } from '../../../components/ui/label'
 import { Select } from '../../../components/ui/select'
 import { Textarea } from '../../../components/ui/textarea'
 import type { CreateEquipmentDTO, Equipment, EquipmentStatus } from '../../../types/equipment'
+
+const dateCls =
+  'w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors'
 
 const schema = z.object({
   name: z.string().trim().min(2, 'Name must be at least 2 characters.'),
@@ -31,9 +33,9 @@ type EquipmentFormProps = {
 }
 
 const statusOptions: Array<{ label: string; value: EquipmentStatus }> = [
-  { label: 'Available', value: 'available' },
-  { label: 'In Use', value: 'in_use' },
-  { label: 'Maintenance', value: 'maintenance' },
+  { label: 'Available',    value: 'available'   },
+  { label: 'In Use',       value: 'in_use'      },
+  { label: 'Maintenance',  value: 'maintenance' },
 ]
 
 export default function EquipmentForm({
@@ -78,17 +80,17 @@ export default function EquipmentForm({
       <div className="space-y-2">
         <Label htmlFor="name">Name</Label>
         <Input id="name" {...form.register('name')} />
-        {form.formState.errors.name ? (
+        {form.formState.errors.name && (
           <p className="text-xs text-red-600">{form.formState.errors.name.message}</p>
-        ) : null}
+        )}
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="category">Category</Label>
         <Input id="category" {...form.register('category')} />
-        {form.formState.errors.category ? (
+        {form.formState.errors.category && (
           <p className="text-xs text-red-600">{form.formState.errors.category.message}</p>
-        ) : null}
+        )}
       </div>
 
       <div className="space-y-2">
@@ -103,41 +105,33 @@ export default function EquipmentForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="qrCode">QR Code</Label>
+        <Label htmlFor="qrCode">QR Code / Asset Tag</Label>
         <Input id="qrCode" {...form.register('qrCode')} />
-        {form.formState.errors.qrCode ? (
+        {form.formState.errors.qrCode && (
           <p className="text-xs text-red-600">{form.formState.errors.qrCode.message}</p>
-        ) : null}
+        )}
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="lastServiceDate">Last Service Date</Label>
-        <TextField
+        <input
           id="lastServiceDate"
           type="date"
-          fullWidth
-          size="small"
+          className={dateCls}
           {...form.register('lastServiceDate')}
-          slotProps={{ inputLabel: { shrink: true } }}
-          variant="outlined"
-          sx={{ '& .MuiOutlinedInput-root': { height: '40px', borderRadius: '8px', backgroundColor: 'white' } }}
         />
-        {form.formState.errors.lastServiceDate ? (
+        {form.formState.errors.lastServiceDate && (
           <p className="text-xs text-red-600">{form.formState.errors.lastServiceDate.message}</p>
-        ) : null}
+        )}
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="nextServiceDueDate">Next Service Due Date</Label>
-        <TextField
+        <input
           id="nextServiceDueDate"
           type="date"
-          fullWidth
-          size="small"
+          className={dateCls}
           {...form.register('nextServiceDueDate')}
-          slotProps={{ inputLabel: { shrink: true } }}
-          variant="outlined"
-          sx={{ '& .MuiOutlinedInput-root': { height: '40px', borderRadius: '8px', backgroundColor: 'white' } }}
         />
       </div>
 
@@ -149,19 +143,19 @@ export default function EquipmentForm({
       <div className="space-y-2">
         <Label htmlFor="notes">Notes</Label>
         <Textarea id="notes" placeholder="Optional notes" {...form.register('notes')} />
-        {form.formState.errors.notes ? (
+        {form.formState.errors.notes && (
           <p className="text-xs text-red-600">{form.formState.errors.notes.message}</p>
-        ) : null}
+        )}
       </div>
 
       <div className="flex items-center justify-end gap-2">
-        {onCancel ? (
+        {onCancel && (
           <Button onClick={onCancel} type="button" variant="secondary">
             Cancel
           </Button>
-        ) : null}
+        )}
         <Button disabled={isSubmitting} type="submit">
-          {isSubmitting ? 'Saving...' : submitLabel}
+          {isSubmitting ? 'Saving…' : submitLabel}
         </Button>
       </div>
     </form>

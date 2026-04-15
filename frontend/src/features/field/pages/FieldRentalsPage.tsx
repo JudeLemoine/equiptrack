@@ -2,14 +2,13 @@ import { useMemo, useState } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import type { ColumnDef } from '@tanstack/react-table'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Clock, CheckCircle2, RotateCcw, XCircle, ExternalLink } from 'lucide-react'
 import DataTable from '../../../components/DataTable'
 import ErrorState from '../../../components/ErrorState'
 import Loader from '../../../components/Loader'
 import PageHeader from '../../../components/PageHeader'
 import StatusBadge from '../../../components/StatusBadge'
 import { Button } from '../../../components/ui/button'
-import { Tabs, TabsList, TabsTrigger } from '../../../components/ui/tabs'
 import { getSession } from '../../../lib/auth'
 import { formatDate } from '../../../lib/utils'
 import { listRentals } from '../../../services/rentalService'
@@ -17,20 +16,26 @@ import type { Rental, RentalStatus } from '../../../types/rental'
 
 const RENTAL_STATUS_RANK: Record<string, number> = { active: 0, pending: 1, approved: 2, returned: 3, rejected: 4 }
 
-const tabs: Array<{ label: string; value: RentalStatus | 'all' }> = [
-  { label: 'All', value: 'all' },
-  { label: 'Pending', value: 'pending' },
-  { label: 'Active', value: 'active' },
-  { label: 'Returned', value: 'returned' },
+const tabs: Array<{ label: string; value: RentalStatus | 'all'; dot?: string }> = [
+  { label: 'All',      value: 'all'      },
+  { label: 'Pending',  value: 'pending',  dot: 'bg-orange-400' },
+  { label: 'Active',   value: 'active',   dot: 'bg-emerald-500' },
+  { label: 'Returned', value: 'returned', dot: 'bg-slate-400' },
 ]
+
+const STATUS_MESSAGE: Record<string, { text: string; color: string; icon: React.ElementType }> = {
+  pending:  { text: 'Awaiting admin approval',           color: 'text-amber-700',   icon: Clock        },
+  approved: { text: 'Approved — awaiting check-out',     color: 'text-blue-700',    icon: CheckCircle2 },
+  active:   { text: 'Return is processed by admin',      color: 'text-slate-600',   icon: RotateCcw    },
+  returned: { text: 'Rental completed',                  color: 'text-emerald-700', icon: CheckCircle2 },
+  rejected: { text: 'Request was rejected',              color: 'text-red-700',     icon: XCircle      },
+}
 
 export default function FieldRentalsPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const locationState = location.state as { statusFilter?: RentalStatus | 'all' } | null
-  const [status, setStatus] = useState<RentalStatus | 'all'>(
-    locationState?.statusFilter ?? 'all'
-  )
+  const [status, setStatus] = useState<RentalStatus | 'all'>(locationState?.statusFilter ?? 'all')
   const session = getSession()
   const userId = session?.user.id ?? ''
 
@@ -46,6 +51,7 @@ export default function FieldRentalsPage() {
       {
         accessorKey: 'equipmentName',
         header: 'Equipment',
+        cell: ({ row }) => <p className="font-semibold text-slate-800">{row.original.equipmentName}</p>,
       },
       {
         accessorKey: 'status',
@@ -55,43 +61,42 @@ export default function FieldRentalsPage() {
       {
         accessorKey: 'startDate',
         header: 'Start',
-        cell: ({ row }) => formatDate(row.original.startDate),
+        cell: ({ row }) => <span className="text-sm text-slate-600">{formatDate(row.original.startDate)}</span>,
       },
       {
         accessorKey: 'endDate',
         header: 'End',
-        cell: ({ row }) => formatDate(row.original.endDate),
+        cell: ({ row }) => <span className="text-sm text-slate-600">{formatDate(row.original.endDate)}</span>,
       },
       {
         id: 'message',
-        header: 'Message',
+        header: 'Note',
         enableSorting: false,
         cell: ({ row }) => {
-          const statusValue = row.original.status
-          if (statusValue === 'pending') {
-            return <p className="text-sm text-amber-700">Waiting for admin approval.</p>
-          }
-          if (statusValue === 'active') {
-            return <p className="text-sm text-slate-600">Return process is handled by admin.</p>
-          }
-          if (statusValue === 'rejected') {
-            return <p className="text-sm text-red-700">Request was rejected.</p>
-          }
-          return <p className="text-sm text-emerald-700">Rental completed.</p>
+          const msg = STATUS_MESSAGE[row.original.status]
+          if (!msg) return null
+          const Icon = msg.icon
+          return (
+            <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${msg.color}`}>
+              <Icon className="h-3.5 w-3.5 shrink-0" />
+              {msg.text}
+            </span>
+          )
         },
       },
       {
         id: 'actions',
-        header: 'View',
+        header: '',
         enableSorting: false,
         cell: ({ row }) => (
           <Button
             onClick={() => navigate(`/field/equipment/${row.original.equipmentId}`)}
             size="sm"
             variant="ghost"
-            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+            className="gap-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
           >
-            View Profile
+            <ExternalLink className="h-3.5 w-3.5" />
+            View
           </Button>
         ),
       },
@@ -99,51 +104,51 @@ export default function FieldRentalsPage() {
     [navigate],
   )
 
-  const sortedRentals = useMemo(() => {
-    return [...(rentalsQuery.data ?? [])].sort((a, b) =>
+  const sortedRentals = useMemo(
+    () => [...(rentalsQuery.data ?? [])].sort((a, b) =>
       (RENTAL_STATUS_RANK[a.status] ?? 99) - (RENTAL_STATUS_RANK[b.status] ?? 99)
-    )
-  }, [rentalsQuery.data])
+    ),
+    [rentalsQuery.data],
+  )
 
-  if (rentalsQuery.isLoading) {
-    return <Loader label="Loading your rentals..." />
-  }
-
+  if (rentalsQuery.isLoading) return <Loader label="Loading your rentals..." />
   if (rentalsQuery.isError) {
-    return (
-      <ErrorState
-        error={rentalsQuery.error}
-        onRetry={() => rentalsQuery.refetch()}
-        title="Could not load rentals"
-      />
-    )
+    return <ErrorState error={rentalsQuery.error} onRetry={() => rentalsQuery.refetch()} title="Could not load rentals" />
   }
 
   return (
     <div className="space-y-6">
-      <Button className="mb-4" onClick={() => navigate(-1)} size="sm" variant="outline">
-        <ArrowLeft className="mr-2 h-4 w-4" />
+      <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">
+        <ArrowLeft className="h-3.5 w-3.5" />
         Back
-      </Button>
-      <PageHeader
-        subtitle="Track request status and active assignments"
-        title="My Requests"
-      />
+      </button>
 
-      <Tabs onValueChange={(value) => setStatus(value as RentalStatus | 'all')} value={status}>
-        <TabsList>
-          {tabs.map((tab) => (
-            <TabsTrigger key={tab.value} value={tab.value}>
-              {tab.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
+      <PageHeader title="My Requests" subtitle="Track request status and active assignments" />
+
+      {/* Status tabs */}
+      <div className="flex flex-wrap gap-1.5">
+        {tabs.map((tab) => (
+          <button
+            key={tab.value}
+            onClick={() => setStatus(tab.value)}
+            className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+              status === tab.value
+                ? 'bg-slate-900 text-white shadow-sm'
+                : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-400'
+            }`}
+          >
+            {tab.dot && (
+              <span className={`h-1.5 w-1.5 rounded-full ${status === tab.value ? 'bg-white/70' : tab.dot}`} />
+            )}
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
       <DataTable
         columns={columns}
         data={sortedRentals}
-        emptyDescription="You do not have rentals in this state."
+        emptyDescription="You have no rentals in this state."
         emptyTitle="No rentals found"
       />
     </div>

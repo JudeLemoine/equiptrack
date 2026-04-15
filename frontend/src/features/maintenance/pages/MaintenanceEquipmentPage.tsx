@@ -3,24 +3,18 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import type { ColumnDef } from '@tanstack/react-table'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Calendar, CheckCircle2 } from 'lucide-react'
 import DataTable from '../../../components/DataTable'
 import ErrorState from '../../../components/ErrorState'
 import Loader from '../../../components/Loader'
 import PageHeader from '../../../components/PageHeader'
 import StatusBadge from '../../../components/StatusBadge'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription,
+  DialogHeader, DialogTitle,
 } from '../../../components/ui/dialog'
 import { Button } from '../../../components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card'
-import { TextField } from '@mui/material'
 import { Label } from '../../../components/ui/label'
-import { Select } from '../../../components/ui/select'
 import { listMaintenanceQueue, markEquipmentServiced } from '../../../services/equipmentService'
 import type { Equipment, EquipmentStatus, IssueSeverity } from '../../../types/equipment'
 import { formatDate } from '../../../lib/utils'
@@ -30,42 +24,40 @@ type Priority = 'overdue' | 'critical' | 'upcoming' | 'scheduled'
 
 function derivePriority(nextServiceDueDate?: string): Priority {
   if (!nextServiceDueDate) return 'scheduled'
-  const now = new Date()
-  const due = new Date(nextServiceDueDate)
-  const diffDays = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  const diffDays = Math.ceil((new Date(nextServiceDueDate).getTime() - Date.now()) / 86_400_000)
   if (diffDays < 0) return 'overdue'
   if (diffDays <= 3) return 'critical'
   if (diffDays <= 7) return 'upcoming'
   return 'scheduled'
 }
 
-const priorityConfig: Record<Priority, { label: string; className: string }> = {
-  overdue: { label: 'Overdue', className: 'text-red-700 bg-red-50 border-red-200' },
-  critical: { label: 'Critical', className: 'text-orange-700 bg-orange-50 border-orange-200' },
-  upcoming: { label: 'Upcoming', className: 'text-amber-700 bg-amber-50 border-amber-200' },
-  scheduled: { label: 'Scheduled', className: 'text-blue-700 bg-blue-50 border-blue-200' },
+const PRIORITY_META: Record<Priority, { label: string; pill: string; dot: string }> = {
+  overdue:   { label: 'Overdue',   pill: 'text-red-700 bg-red-50 border-red-200',         dot: 'bg-red-500'    },
+  critical:  { label: 'Critical',  pill: 'text-orange-700 bg-orange-50 border-orange-200', dot: 'bg-orange-400' },
+  upcoming:  { label: 'Upcoming',  pill: 'text-amber-700 bg-amber-50 border-amber-200',   dot: 'bg-amber-400'  },
+  scheduled: { label: 'Scheduled', pill: 'text-blue-700 bg-blue-50 border-blue-200',       dot: 'bg-blue-400'   },
+}
+
+const SEVERITY_META: Record<IssueSeverity, { label: string; pill: string; dot: string }> = {
+  LOW:      { label: 'Low',      pill: 'text-blue-700 bg-blue-50 border-blue-200',       dot: 'bg-blue-400'    },
+  MEDIUM:   { label: 'Medium',   pill: 'text-amber-700 bg-amber-50 border-amber-200',    dot: 'bg-amber-400'   },
+  HIGH:     { label: 'High',     pill: 'text-orange-700 bg-orange-50 border-orange-200', dot: 'bg-orange-400'  },
+  CRITICAL: { label: 'Critical', pill: 'text-red-700 bg-red-50 border-red-200',          dot: 'bg-red-500'     },
 }
 
 const priorityOptions: Array<{ label: string; value: Priority | 'all' }> = [
-  { label: 'All priorities', value: 'all' },
-  { label: 'Overdue', value: 'overdue' },
-  { label: 'Critical (≤3 days)', value: 'critical' },
-  { label: 'Upcoming (≤7 days)', value: 'upcoming' },
-  { label: 'Scheduled', value: 'scheduled' },
+  { label: 'All priorities',   value: 'all'       },
+  { label: 'Overdue',          value: 'overdue'   },
+  { label: 'Critical (≤3 d)',  value: 'critical'  },
+  { label: 'Upcoming (≤7 d)',  value: 'upcoming'  },
+  { label: 'Scheduled',        value: 'scheduled' },
 ]
 
-const severityConfig: Record<IssueSeverity, { label: string; className: string }> = {
-  LOW: { label: 'Low', className: 'text-blue-700 bg-blue-50 border-blue-200' },
-  MEDIUM: { label: 'Medium', className: 'text-amber-700 bg-amber-50 border-amber-200' },
-  HIGH: { label: 'High', className: 'text-orange-700 bg-orange-50 border-orange-200' },
-  CRITICAL: { label: 'Critical', className: 'text-red-700 bg-red-50 border-red-200' },
-}
-
 const statusOptions: Array<{ label: string; value: EquipmentStatus | 'all' }> = [
-  { label: 'All statuses', value: 'all' },
+  { label: 'All statuses',   value: 'all'         },
   { label: 'In Maintenance', value: 'maintenance' },
-  { label: 'Available', value: 'available' },
-  { label: 'In Use', value: 'in_use' },
+  { label: 'Available',      value: 'available'   },
+  { label: 'In Use',         value: 'in_use'      },
 ]
 
 export default function MaintenanceEquipmentPage() {
@@ -74,17 +66,15 @@ export default function MaintenanceEquipmentPage() {
   const location = useLocation()
   const session = getSession()
   const userId = session?.user.id ?? ''
+
   const [selectedItem, setSelectedItem] = useState<Equipment | null>(null)
   const [manualNextDueDate, setManualNextDueDate] = useState('')
   const [search, setSearch] = useState('')
   const [priorityFilter, setPriorityFilter] = useState<Priority | 'all'>('all')
   const [severityFilter, setSeverityFilter] = useState<IssueSeverity | 'all' | 'none'>('all')
 
-  // Pre-set status filter from dashboard card navigation
   const locationState = location.state as { statusFilter?: EquipmentStatus | 'all' } | null
-  const [statusFilter, setStatusFilter] = useState<EquipmentStatus | 'all'>(
-    locationState?.statusFilter ?? 'all'
-  )
+  const [statusFilter, setStatusFilter] = useState<EquipmentStatus | 'all'>(locationState?.statusFilter ?? 'all')
 
   const equipmentQuery = useQuery({
     queryKey: ['maintenance-queue'],
@@ -94,39 +84,24 @@ export default function MaintenanceEquipmentPage() {
 
   const filteredData = useMemo(() => {
     let items = equipmentQuery.data ?? []
-
     if (search) {
       const term = search.toLowerCase()
-      items = items.filter((item) =>
-        item.name.toLowerCase().includes(term) ||
-        item.category.toLowerCase().includes(term) ||
-        item.qrCode?.toLowerCase().includes(term)
+      items = items.filter((i) =>
+        i.name.toLowerCase().includes(term) ||
+        i.category.toLowerCase().includes(term) ||
+        i.qrCode?.toLowerCase().includes(term)
       )
     }
-
-    if (statusFilter !== 'all') {
-      items = items.filter((item) => item.status === statusFilter)
-    }
-
-    if (priorityFilter !== 'all') {
-      items = items.filter((item) => derivePriority(item.nextServiceDueDate) === priorityFilter)
-    }
-
-    if (severityFilter === 'none') {
-      items = items.filter((item) => !item.severity)
-    } else if (severityFilter !== 'all') {
-      items = items.filter((item) => item.severity === severityFilter)
-    }
-
+    if (statusFilter !== 'all')   items = items.filter((i) => i.status === statusFilter)
+    if (priorityFilter !== 'all') items = items.filter((i) => derivePriority(i.nextServiceDueDate) === priorityFilter)
+    if (severityFilter === 'none')       items = items.filter((i) => !i.severity)
+    else if (severityFilter !== 'all')   items = items.filter((i) => i.severity === severityFilter)
     return items
   }, [equipmentQuery.data, search, statusFilter, priorityFilter, severityFilter])
 
   const completeServiceMutation = useMutation({
     mutationFn: (payload: { id: string; nextServiceDueDate?: string }) =>
-      markEquipmentServiced(payload.id, {
-        performedByUserId: userId,
-        nextServiceDueDate: payload.nextServiceDueDate,
-      }),
+      markEquipmentServiced(payload.id, { performedByUserId: userId, nextServiceDueDate: payload.nextServiceDueDate }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['equipment'] })
       await queryClient.invalidateQueries({ queryKey: ['maintenance-queue'] })
@@ -145,21 +120,23 @@ export default function MaintenanceEquipmentPage() {
       {
         accessorKey: 'name',
         header: 'Equipment',
-        cell: ({ row }) => <p className="font-medium">{row.original.name}</p>,
+        cell: ({ row }) => <p className="font-semibold text-slate-800">{row.original.name}</p>,
       },
       {
         accessorKey: 'category',
         header: 'Category',
+        cell: ({ row }) => <span className="text-sm text-slate-600">{row.original.category}</span>,
       },
       {
         id: 'priority',
         header: 'Priority',
         cell: ({ row }) => {
           const p = derivePriority(row.original.nextServiceDueDate)
-          const cfg = priorityConfig[p]
+          const m = PRIORITY_META[p]
           return (
-            <span className={`inline-block w-20 text-center py-0.5 rounded text-xs font-semibold border ${cfg.className}`}>
-              {cfg.label}
+            <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${m.pill}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${m.dot}`} />
+              {m.label}
             </span>
           )
         },
@@ -168,23 +145,15 @@ export default function MaintenanceEquipmentPage() {
         id: 'severity',
         header: () => {
           const cycle: Array<IssueSeverity | 'all' | 'none'> = ['all', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL', 'none']
-          const currentIdx = cycle.indexOf(severityFilter)
-          const nextVal = cycle[(currentIdx + 1) % cycle.length]
-          const label = severityFilter === 'all'
-            ? 'Severity'
-            : severityFilter === 'none'
-              ? 'Severity: None'
-              : `Severity: ${severityConfig[severityFilter].label}`
+          const nextVal = cycle[(cycle.indexOf(severityFilter) + 1) % cycle.length]
+          const label = severityFilter === 'all' ? 'Severity'
+            : severityFilter === 'none' ? 'Severity: None'
+            : `Sev: ${SEVERITY_META[severityFilter as IssueSeverity]?.label}`
           return (
-            <button
-              type="button"
-              onClick={() => setSeverityFilter(nextVal)}
-              className={`flex items-center gap-1 text-left font-medium transition-colors ${severityFilter !== 'all' ? 'text-slate-900' : 'text-slate-600 hover:text-slate-900'}`}
-            >
+            <button type="button" onClick={() => setSeverityFilter(nextVal)}
+              className={`flex items-center gap-1 text-[11px] font-semibold uppercase tracking-widest transition-colors ${severityFilter !== 'all' ? 'text-slate-900' : 'text-slate-500 hover:text-slate-900'}`}>
               {label}
-              {severityFilter !== 'all' && (
-                <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-slate-900" />
-              )}
+              {severityFilter !== 'all' && <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-slate-900" />}
             </button>
           )
         },
@@ -192,10 +161,11 @@ export default function MaintenanceEquipmentPage() {
         cell: ({ row }) => {
           const sev = row.original.severity
           if (!sev) return <span className="text-xs text-slate-400">—</span>
-          const cfg = severityConfig[sev]
+          const m = SEVERITY_META[sev]
           return (
-            <span className={`inline-block w-20 text-center py-0.5 rounded text-xs font-semibold border ${cfg.className}`}>
-              {cfg.label}
+            <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${m.pill}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${m.dot}`} />
+              {m.label}
             </span>
           )
         },
@@ -208,7 +178,7 @@ export default function MaintenanceEquipmentPage() {
       {
         accessorKey: 'nextServiceDueDate',
         header: 'Due date',
-        cell: ({ row }) => formatDate(row.original.nextServiceDueDate),
+        cell: ({ row }) => <span className="text-sm text-slate-600">{formatDate(row.original.nextServiceDueDate)}</span>,
       },
       {
         id: 'actions',
@@ -216,10 +186,16 @@ export default function MaintenanceEquipmentPage() {
         enableSorting: false,
         cell: ({ row }) => (
           <div className="flex gap-2">
-            <Button asChild size="sm" variant="secondary">
+            <Button asChild size="sm" variant="outline">
               <Link to={`/maintenance/equipment/${row.original.id}`}>View</Link>
             </Button>
-            <Button onClick={() => setSelectedItem(row.original)} size="sm">
+            <Button
+              onClick={() => setSelectedItem(row.original)}
+              size="sm"
+              className="gap-1.5"
+              style={{ backgroundColor: 'rgb(var(--brand-navy-rgb))', color: '#fff' }}
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" />
               Mark serviced
             </Button>
           </div>
@@ -229,67 +205,55 @@ export default function MaintenanceEquipmentPage() {
     [severityFilter],
   )
 
-  if (equipmentQuery.isLoading) {
-    return <Loader label="Loading maintenance queue..." />
-  }
-
+  if (equipmentQuery.isLoading) return <Loader label="Loading maintenance queue..." />
   if (equipmentQuery.isError) {
-    return (
-      <ErrorState
-        error={equipmentQuery.error}
-        onRetry={() => equipmentQuery.refetch()}
-        title="Could not load maintenance queue"
-      />
-    )
+    return <ErrorState error={equipmentQuery.error} onRetry={() => equipmentQuery.refetch()} title="Could not load maintenance queue" />
   }
 
   return (
     <div className="space-y-6">
-      <Button className="mb-4" onClick={() => navigate(-1)} size="sm" variant="outline">
-        <ArrowLeft className="mr-2 h-4 w-4" />
+      <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">
+        <ArrowLeft className="h-3.5 w-3.5" />
         Back
-      </Button>
-      <PageHeader
-        subtitle="Items due in the next 14 days or already overdue"
-        title="Maintenance Queue"
-      />
+      </button>
 
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="text-base">Filters</CardTitle>
-          <CardDescription>Search and filter the maintenance queue.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-4">
-            <div className="min-w-[160px] space-y-2">
-              <Label htmlFor="statusFilter">Status</Label>
-              <Select
-                id="statusFilter"
-                onChange={(e) => setStatusFilter(e.target.value as EquipmentStatus | 'all')}
-                value={statusFilter}
-              >
-                {statusOptions.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </Select>
-            </div>
-            <div className="min-w-[160px] space-y-2">
-              <Label htmlFor="priorityFilter">Priority</Label>
-              <Select
-                id="priorityFilter"
-                onChange={(event) => setPriorityFilter(event.target.value as Priority | 'all')}
-                value={priorityFilter}
-              >
-                {priorityOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </Select>
+      <PageHeader title="Maintenance Queue" subtitle="Items due in the next 14 days or already overdue" />
+
+      {/* ── Filters ──────────────────────────────────────────── */}
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-100 bg-slate-50 px-4 py-2.5">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Filters</p>
+        </div>
+        <div className="flex flex-wrap gap-x-8 gap-y-4 p-4">
+          {/* Status */}
+          <div className="flex flex-col gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Status</span>
+            <div className="flex flex-wrap gap-1.5">
+              {statusOptions.map((o) => (
+                <button key={o.value} onClick={() => setStatusFilter(o.value)}
+                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${statusFilter === o.value ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-400'}`}>
+                  {o.label}
+                </button>
+              ))}
             </div>
           </div>
-        </CardContent>
-      </Card>
+          {/* Priority */}
+          <div className="flex flex-col gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Priority</span>
+            <div className="flex flex-wrap gap-1.5">
+              {priorityOptions.map((o) => (
+                <button key={o.value} onClick={() => setPriorityFilter(o.value)}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium transition-colors ${priorityFilter === o.value ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-400'}`}>
+                  {o.value !== 'all' && PRIORITY_META[o.value as Priority] && (
+                    <span className={`h-1.5 w-1.5 rounded-full ${priorityFilter === o.value ? 'bg-white/70' : PRIORITY_META[o.value as Priority].dot}`} />
+                  )}
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
 
       <DataTable
         columns={columns}
@@ -297,52 +261,69 @@ export default function MaintenanceEquipmentPage() {
         emptyDescription="No equipment matches the current filters."
         emptyTitle="Maintenance queue is empty"
         onSearchValueChange={setSearch}
-        searchPlaceholder="Search by name, category, or asset tag"
+        searchPlaceholder="Search by name, category, or asset tag…"
         searchValue={search}
         pageSize={25}
       />
 
+      {/* ── Mark Serviced dialog ─────────────────────────────── */}
       <Dialog onOpenChange={(open) => !open && setSelectedItem(null)} open={Boolean(selectedItem)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Mark Serviced</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+              Mark Serviced
+            </DialogTitle>
             <DialogDescription>
               This will add a routine service log and update last/next service dates.
             </DialogDescription>
           </DialogHeader>
-          {selectedItem ? (
-            <div className="space-y-3">
-              <p className="text-sm"><span className="font-medium">Equipment:</span> {selectedItem.name}</p>
-              <p className="text-sm"><span className="font-medium">Configured interval:</span> {selectedItem.maintenanceIntervalDays ?? '-'} days</p>
-              <div className="space-y-2">
-                <Label htmlFor="manualNextDueDate">Manual next due date (required if no interval)</Label>
-                <TextField
-                  id="manualNextDueDate"
-                  type="date"
-                  fullWidth
-                  size="small"
-                  value={manualNextDueDate}
-                  onChange={(event) => setManualNextDueDate(event.target.value)}
-                  slotProps={{ inputLabel: { shrink: true } }}
-                  variant="outlined"
-                  sx={{ '& .MuiOutlinedInput-root': { height: '40px', borderRadius: '8px', backgroundColor: 'white' } }}
-                />
+          {selectedItem && (
+            <div className="space-y-4">
+              {/* Info card */}
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 space-y-1.5">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Equipment</p>
+                  <p className="text-sm font-semibold text-slate-800">{selectedItem.name}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Configured interval</p>
+                  <p className="text-sm text-slate-600">
+                    {selectedItem.maintenanceIntervalDays ? `${selectedItem.maintenanceIntervalDays} days` : '—'}
+                  </p>
+                </div>
               </div>
-              <div className="flex justify-end">
+
+              {/* Manual date */}
+              <div className="space-y-1.5">
+                <Label htmlFor="manualNextDueDate" className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+                  Manual next due date <span className="normal-case tracking-normal text-slate-400">(required if no interval)</span>
+                </Label>
+                <div className="relative">
+                  <Calendar className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                  <input
+                    id="manualNextDueDate"
+                    type="date"
+                    value={manualNextDueDate}
+                    onChange={(e) => setManualNextDueDate(e.target.value)}
+                    className="w-full h-10 rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <Button variant="outline" onClick={() => setSelectedItem(null)}>Cancel</Button>
                 <Button
                   disabled={completeServiceMutation.isPending}
-                  onClick={() =>
-                    completeServiceMutation.mutate({
-                      id: selectedItem.id,
-                      nextServiceDueDate: manualNextDueDate || undefined,
-                    })
-                  }
+                  onClick={() => completeServiceMutation.mutate({ id: selectedItem.id, nextServiceDueDate: manualNextDueDate || undefined })}
+                  className="gap-1.5"
                 >
-                  {completeServiceMutation.isPending ? 'Saving...' : 'Confirm'}
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  {completeServiceMutation.isPending ? 'Saving…' : 'Confirm'}
                 </Button>
               </div>
             </div>
-          ) : null}
+          )}
         </DialogContent>
       </Dialog>
     </div>

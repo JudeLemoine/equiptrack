@@ -16,6 +16,8 @@ import {
   Eye,
   EyeOff,
   LogIn,
+  ArrowLeft,
+  KeyRound,
 } from 'lucide-react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -50,11 +52,11 @@ const roles: RoleConfig[] = [
     description:
       'Administrators have unrestricted access to every area of EquipTrack. They manage the equipment catalogue, approve or reject rental requests, oversee all active and historical rentals, and maintain user accounts across the organisation.',
     access: [
-      { icon: BarChart3, label: 'Admin dashboard & KPI summary' },
-      { icon: Settings, label: 'Equipment catalogue management' },
-      { icon: ClipboardList, label: 'Rental approvals & full history' },
-      { icon: Users, label: 'User account administration' },
-      { icon: ShieldCheck, label: 'Impersonate any user (view-only)' },
+      { icon: BarChart3,    label: 'Admin dashboard & KPI summary'      },
+      { icon: Settings,     label: 'Equipment catalogue management'      },
+      { icon: ClipboardList, label: 'Rental approvals & full history'    },
+      { icon: Users,        label: 'User account administration'         },
+      { icon: ShieldCheck,  label: 'Impersonate any user (view-only)'   },
     ],
     defaultEmail: 'admin1@equiptrack.local',
   },
@@ -69,11 +71,11 @@ const roles: RoleConfig[] = [
     description:
       'Field users are the people on the ground using the equipment day-to-day. They can browse all available equipment, submit rental requests with a job site and reason, and track the status of their own active and past rentals.',
     access: [
-      { icon: BarChart3, label: 'Personal dashboard & active rentals' },
-      { icon: Truck, label: 'Browse available equipment' },
-      { icon: ClipboardList, label: 'Submit & track rental requests' },
-      { icon: MapPin, label: 'Job site & usage details' },
-      { icon: AlertTriangle, label: 'Report equipment issues' },
+      { icon: BarChart3,     label: 'Personal dashboard & active rentals' },
+      { icon: Truck,         label: 'Browse available equipment'          },
+      { icon: ClipboardList, label: 'Submit & track rental requests'      },
+      { icon: MapPin,        label: 'Job site & usage details'            },
+      { icon: AlertTriangle, label: 'Report equipment issues'             },
     ],
     defaultEmail: 'field1@equiptrack.local',
   },
@@ -88,27 +90,22 @@ const roles: RoleConfig[] = [
     description:
       'Maintenance technicians manage the health of every piece of equipment in the fleet. They work through a prioritised service queue, log completed work, respond to issue reports filed by field users, and update equipment status after servicing.',
     access: [
-      { icon: BarChart3, label: 'Maintenance dashboard & queue' },
-      { icon: WrenchIcon, label: 'Service logs & maintenance records' },
-      { icon: AlertTriangle, label: 'Issue report management' },
-      { icon: ClipboardList, label: 'Equipment status updates' },
-      { icon: ShieldCheck, label: 'Mark equipment as serviced' },
+      { icon: BarChart3,     label: 'Maintenance dashboard & queue'  },
+      { icon: WrenchIcon,    label: 'Service logs & maintenance records' },
+      { icon: AlertTriangle, label: 'Issue report management'            },
+      { icon: ClipboardList, label: 'Equipment status updates'           },
+      { icon: ShieldCheck,   label: 'Mark equipment as serviced'         },
     ],
     defaultEmail: 'maintenance1@equiptrack.local',
   },
 ]
 
-export default function LoginPage() {
+// ─── shared hook ────────────────────────────────────────────────────────────
+function useLoginMutation() {
   const navigate = useNavigate()
-  const authenticated = isAuthenticated()
   const { notifySessionChanged } = useImpersonation()
 
-  const [selectedRole, setSelectedRole] = useState<RoleConfig | null>(null)
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
-
-  const loginMutation = useMutation({
+  return useMutation({
     mutationFn: ({ email, password }: { email: string; password: string }) =>
       loginWithCredentials(email, password),
     onSuccess: (session) => {
@@ -129,17 +126,14 @@ export default function LoginPage() {
       toast.error(message)
     },
   })
+}
 
-  if (authenticated) {
-    return <Navigate replace to="/" />
-  }
-
-  function handleSelectRole(role: RoleConfig) {
-    setSelectedRole(role)
-    setEmail(role.defaultEmail)
-    setPassword('demo123')
-    setShowPassword(false)
-  }
+// ─── Manual login screen ────────────────────────────────────────────────────
+function ManualLoginScreen({ onBack }: { onBack: () => void }) {
+  const [email, setEmail]           = useState('')
+  const [password, setPassword]     = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const loginMutation = useLoginMutation()
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -151,210 +145,225 @@ export default function LoginPage() {
   }
 
   return (
+    <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
+      <div
+        className="w-full max-w-sm rounded-2xl overflow-hidden"
+        style={{ background: '#fff', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}
+      >
+        {/* Header */}
+        <div
+          className="px-6 py-5 flex items-center gap-3"
+          style={{ background: 'rgb(var(--brand-navy-rgb))', borderBottom: '1px solid rgba(255,255,255,0.1)' }}
+        >
+          <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-white/15">
+            <KeyRound className="h-4 w-4 text-white" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-white">Sign in with credentials</p>
+            <p className="text-xs text-white/60">Enter your email and password</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="px-6 py-6 flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              className="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors"
+              required
+              autoComplete="email"
+              autoFocus
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">
+              Password
+            </label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full h-10 px-3 pr-10 rounded-lg border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors"
+                required
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loginMutation.isPending}
+            className="w-full flex items-center justify-center gap-2 h-10 rounded-xl text-sm font-semibold text-white transition-opacity disabled:opacity-50"
+            style={{ background: 'rgb(var(--brand-navy-rgb))' }}
+          >
+            {loginMutation.isPending ? (
+              'Signing in…'
+            ) : (
+              <>
+                <LogIn className="h-4 w-4" />
+                Sign in
+              </>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex items-center justify-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors mt-1"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back to demo roles
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ─── Main login page ─────────────────────────────────────────────────────────
+export default function LoginPage() {
+  const authenticated = isAuthenticated()
+  const [showManual, setShowManual] = useState(false)
+  const loginMutation = useLoginMutation()
+
+  if (authenticated) return <Navigate replace to="/" />
+
+  function handleSelectRole(role: RoleConfig) {
+    loginMutation.mutate({ email: role.defaultEmail, password: 'demo123' })
+  }
+
+  return (
     <main className="min-h-screen flex flex-col" style={{ background: '#f8fafc' }}>
       {/* Top bar */}
       <div
         className="w-full flex items-center px-8 py-4 shrink-0"
-        style={{
-          background: 'rgb(var(--brand-navy-rgb))',
-          borderBottom: '1px solid rgba(255,255,255,0.1)',
-        }}
+        style={{ background: 'rgb(var(--brand-navy-rgb))', borderBottom: '1px solid rgba(255,255,255,0.1)' }}
       >
         <img alt="EquipTrack logo" className="h-8 w-auto select-none" src={fullLogoStroke} />
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-10 gap-6">
-        <div className="text-center mb-2">
-          <h1 className="text-3xl font-bold text-slate-800 tracking-tight">Sign In</h1>
-          <p className="mt-1.5 text-slate-500 text-sm">
-            Select a role to pre-fill demo credentials, then sign in.
-          </p>
-        </div>
+      {showManual ? (
+        <ManualLoginScreen onBack={() => setShowManual(false)} />
+      ) : (
+        <div className="flex-1 flex flex-col items-center justify-center px-6 py-10 gap-6">
+          <div className="text-center mb-2">
+            <h1 className="text-3xl font-bold text-slate-800 tracking-tight">Welcome to EquipTrack</h1>
+            <p className="mt-1.5 text-slate-500 text-sm">
+              Select a role to sign in instantly as a demo user.
+            </p>
+          </div>
 
-        {/* Role cards */}
-        <div className="w-full max-w-6xl grid grid-cols-1 md:grid-cols-3 gap-5">
-          {roles.map((role) => {
-            const Icon = role.icon
-            const isSelected = selectedRole?.key === role.key
+          {/* Role cards */}
+          <div className="w-full max-w-6xl grid grid-cols-1 md:grid-cols-3 gap-5">
+            {roles.map((role) => {
+              const Icon = role.icon
+              const isPending = loginMutation.isPending && loginMutation.variables?.email === role.defaultEmail
 
-            return (
-              <div
-                key={role.key}
-                className="flex flex-col rounded-2xl overflow-hidden cursor-pointer transition-all"
-                onClick={() => handleSelectRole(role)}
-                style={{
-                  background: '#fff',
-                  border: isSelected ? `2px solid ${role.accent}` : '1px solid #e2e8f0',
-                  boxShadow: isSelected
-                    ? `0 0 0 3px ${role.accentLight}, 0 4px 16px rgba(0,0,0,0.1)`
-                    : '0 2px 12px rgba(0,0,0,0.06)',
-                  transform: isSelected ? 'translateY(-2px)' : undefined,
-                }}
-              >
-                <div
-                  className="px-6 pt-7 pb-5"
+              return (
+                <button
+                  key={role.key}
+                  type="button"
+                  disabled={loginMutation.isPending}
+                  onClick={() => handleSelectRole(role)}
+                  className="flex flex-col rounded-2xl overflow-hidden text-left transition-all disabled:opacity-60 disabled:cursor-wait focus:outline-none focus-visible:ring-2"
                   style={{
-                    borderBottom: `1px solid ${role.accentBorder}`,
-                    background: role.accentLight,
+                    background: '#fff',
+                    border: `1px solid #e2e8f0`,
+                    boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+                    ['--tw-ring-color' as string]: role.accent,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!loginMutation.isPending) {
+                      const el = e.currentTarget
+                      el.style.border = `2px solid ${role.accent}`
+                      el.style.boxShadow = `0 0 0 3px ${role.accentLight}, 0 4px 16px rgba(0,0,0,0.1)`
+                      el.style.transform = 'translateY(-2px)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    const el = e.currentTarget
+                    el.style.border = '1px solid #e2e8f0'
+                    el.style.boxShadow = '0 2px 12px rgba(0,0,0,0.06)'
+                    el.style.transform = ''
                   }}
                 >
+                  {/* Card header */}
                   <div
-                    className="inline-flex items-center justify-center w-11 h-11 rounded-xl mb-4"
-                    style={{ background: role.accent }}
+                    className="px-6 pt-7 pb-5"
+                    style={{ borderBottom: `1px solid ${role.accentBorder}`, background: role.accentLight }}
                   >
-                    <Icon className="h-5 w-5 text-white" />
-                  </div>
-                  <h2
-                    className="text-xl font-bold tracking-tight mb-1"
-                    style={{ color: role.accent }}
-                  >
-                    {role.label}
-                  </h2>
-                  <p className="text-slate-500 text-xs font-medium">{role.tagline}</p>
-                </div>
-
-                <div className="px-6 py-5 flex flex-col gap-4 flex-1">
-                  <p className="text-slate-600 text-sm leading-relaxed">{role.description}</p>
-
-                  <div className="flex flex-col gap-2">
-                    <p
-                      className="text-[10px] font-bold uppercase tracking-widest mb-0.5"
-                      style={{ color: role.accent }}
+                    <div
+                      className="inline-flex items-center justify-center w-11 h-11 rounded-xl mb-4"
+                      style={{ background: role.accent }}
                     >
-                      Access includes
-                    </p>
-                    {role.access.map(({ icon: AccessIcon, label }) => (
-                      <div key={label} className="flex items-center gap-2.5">
-                        <div
-                          className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md"
-                          style={{ background: role.accentLight }}
-                        >
-                          <AccessIcon className="h-3.5 w-3.5" style={{ color: role.accent }} />
+                      <Icon className="h-5 w-5 text-white" />
+                    </div>
+                    <h2 className="text-xl font-bold tracking-tight mb-1" style={{ color: role.accent }}>
+                      {role.label}
+                    </h2>
+                    <p className="text-slate-500 text-xs font-medium">{role.tagline}</p>
+                  </div>
+
+                  {/* Card body */}
+                  <div className="px-6 py-5 flex flex-col gap-4 flex-1">
+                    <p className="text-slate-600 text-sm leading-relaxed">{role.description}</p>
+                    <div className="flex flex-col gap-2">
+                      <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: role.accent }}>
+                        Access includes
+                      </p>
+                      {role.access.map(({ icon: AccessIcon, label }) => (
+                        <div key={label} className="flex items-center gap-2.5">
+                          <div
+                            className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md"
+                            style={{ background: role.accentLight }}
+                          >
+                            <AccessIcon className="h-3.5 w-3.5" style={{ color: role.accent }} />
+                          </div>
+                          <span className="text-sm text-slate-700">{label}</span>
                         </div>
-                        <span className="text-sm text-slate-700">{label}</span>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
 
-                <div className="px-6 pb-5">
-                  <div
-                    className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg"
-                    style={{ background: role.accentLight, color: role.accent }}
-                  >
-                    <span className="font-mono font-medium truncate">{role.defaultEmail}</span>
+                  {/* CTA button at bottom */}
+                  <div className="px-6 pb-6">
+                    <div
+                      className="w-full py-2.5 rounded-xl text-sm font-semibold text-white text-center"
+                      style={{ background: role.accent }}
+                    >
+                      {isPending ? 'Signing in…' : `Sign in as ${role.label}`}
+                    </div>
                   </div>
-                </div>
-
-                <div className="px-6 pb-6">
-                  <div
-                    className="w-full py-2 rounded-xl text-sm font-semibold text-white text-center transition-opacity"
-                    style={{
-                      background: isSelected ? role.accent : '#94a3b8',
-                      opacity: isSelected ? 1 : 0.7,
-                    }}
-                  >
-                    {isSelected ? '✓ Selected' : `Select ${role.label}`}
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Login form — shown once a role is selected */}
-        {selectedRole && (
-          <div
-            className="w-full max-w-md rounded-2xl overflow-hidden"
-            style={{
-              background: '#fff',
-              border: `1px solid ${selectedRole.accentBorder}`,
-              boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-            }}
-          >
-            <div
-              className="px-6 py-4 flex items-center gap-3"
-              style={{
-                background: selectedRole.accentLight,
-                borderBottom: `1px solid ${selectedRole.accentBorder}`,
-              }}
-            >
-              <div
-                className="flex items-center justify-center w-8 h-8 rounded-lg"
-                style={{ background: selectedRole.accent }}
-              >
-                <selectedRole.icon className="h-4 w-4 text-white" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold" style={{ color: selectedRole.accent }}>
-                  Sign in as {selectedRole.label}
-                </p>
-                <p className="text-xs text-slate-500">Password: demo123</p>
-              </div>
-            </div>
-
-            <form onSubmit={handleSubmit} className="px-6 py-5 flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:border-transparent"
-                  style={{ ['--tw-ring-color' as string]: selectedRole.accent }}
-                  required
-                  autoComplete="email"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                  Password
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full px-3 py-2 pr-10 rounded-lg border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:border-transparent"
-                    required
-                    autoComplete="current-password"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loginMutation.isPending}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity disabled:opacity-50"
-                style={{ background: selectedRole.accent }}
-              >
-                {loginMutation.isPending ? (
-                  'Signing in…'
-                ) : (
-                  <>
-                    <LogIn className="h-4 w-4" />
-                    Sign in
-                  </>
-                )}
-              </button>
-            </form>
+                </button>
+              )
+            })}
           </div>
-        )}
-      </div>
+
+          {/* Manual login link */}
+          <button
+            type="button"
+            onClick={() => setShowManual(true)}
+            className="inline-flex items-center gap-2 mt-2 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors group"
+          >
+            <KeyRound className="h-3.5 w-3.5 text-slate-400 group-hover:text-slate-600 transition-colors" />
+            Sign in with email & password
+          </button>
+        </div>
+      )}
     </main>
   )
 }

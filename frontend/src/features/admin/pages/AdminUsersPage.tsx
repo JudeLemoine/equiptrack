@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ColumnDef } from '@tanstack/react-table'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, X, Eye, EyeOff, Trash2 } from 'lucide-react'
+import { ArrowLeft, Plus, X, Eye, EyeOff, Trash2, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import DataTable from '../../../components/DataTable'
 import ErrorState from '../../../components/ErrorState'
@@ -14,43 +14,33 @@ import type { UserRole } from '../../../types/auth'
 import type { User } from '../../../types/user'
 
 const roleOptions: Array<{ label: string; value: UserRole | 'all' }> = [
-  { label: 'All roles', value: 'all' },
-  { label: 'Admin', value: 'admin' },
-  { label: 'Field User', value: 'field' },
-  { label: 'Maintenance', value: 'maintenance' },
+  { label: 'All roles',    value: 'all'         },
+  { label: 'Admin',        value: 'admin'        },
+  { label: 'Field User',   value: 'field'        },
+  { label: 'Maintenance',  value: 'maintenance'  },
 ]
 
-const roleLabelMap: Record<UserRole, string> = {
-  admin: 'Admin',
-  field: 'Field User',
-  maintenance: 'Maintenance',
+const roleMeta: Record<UserRole, { label: string; pill: string; dot: string; initials: string }> = {
+  admin:       { label: 'Admin',       pill: 'text-blue-700 bg-blue-50 border-blue-200',     dot: 'bg-blue-500',    initials: 'bg-blue-600'    },
+  field:       { label: 'Field User',  pill: 'text-emerald-700 bg-emerald-50 border-emerald-200', dot: 'bg-emerald-500', initials: 'bg-emerald-600' },
+  maintenance: { label: 'Maintenance', pill: 'text-amber-700 bg-amber-50 border-amber-200',  dot: 'bg-amber-500',   initials: 'bg-amber-600'   },
 }
 
-const roleColorMap: Record<UserRole, string> = {
-  admin: 'bg-blue-100 text-blue-800',
-  field: 'bg-emerald-100 text-emerald-800',
-  maintenance: 'bg-amber-100 text-amber-800',
+function initials(name: string) {
+  return name.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase()
 }
 
 type CreateUserForm = {
-  name: string
-  email: string
-  role: UserRole
-  password: string
-  department: string
-  position: string
-  phoneNumber: string
+  name: string; email: string; role: UserRole
+  password: string; department: string; position: string; phoneNumber: string
 }
 
 const EMPTY_FORM: CreateUserForm = {
-  name: '',
-  email: '',
-  role: 'field',
-  password: '',
-  department: '',
-  position: '',
-  phoneNumber: '',
+  name: '', email: '', role: 'field', password: '',
+  department: '', position: '', phoneNumber: '',
 }
+
+const fieldCls = 'w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors placeholder:text-slate-400'
 
 function CreateUserDialog({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient()
@@ -63,9 +53,6 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       toast.success(`${newUser.name} has been added.`)
       onClose()
-    },
-    onError: () => {
-      // error toast already shown by apiClient
     },
   })
 
@@ -80,12 +67,8 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
       return
     }
     mutation.mutate({
-      name: form.name.trim(),
-      email: form.email.trim(),
-      role: form.role,
-      password: form.password,
-      department: form.department.trim() || undefined,
-      position: form.position.trim() || undefined,
+      name: form.name.trim(), email: form.email.trim(), role: form.role, password: form.password,
+      department: form.department.trim() || undefined, position: form.position.trim() || undefined,
       phoneNumber: form.phoneNumber.trim() || undefined,
     })
   }
@@ -101,50 +84,26 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
         style={{ background: '#fff' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div
-          className="flex items-center justify-between px-6 py-4"
-          style={{ background: 'rgb(var(--brand-navy-rgb))' }}
-        >
+        {/* Dialog header */}
+        <div className="flex items-center justify-between px-6 py-4" style={{ background: 'rgb(var(--brand-navy-rgb))' }}>
           <div className="flex items-center gap-2 text-white">
-            <Plus className="h-4 w-4" />
+            <Users className="h-4 w-4" />
             <span className="font-semibold text-sm">Create New User</span>
           </div>
-          <button
-            onClick={onClose}
-            className="text-white/70 hover:text-white transition-colors"
-          >
+          <button onClick={onClose} className="text-white/70 hover:text-white transition-colors">
             <X className="h-4 w-4" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-4">
-            {/* Name */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                Full Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) => handleChange('name', e.target.value)}
-                placeholder="Jane Smith"
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                required
-              />
+              <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Full Name <span className="text-red-400">*</span></label>
+              <input type="text" value={form.name} onChange={(e) => handleChange('name', e.target.value)} placeholder="Jane Smith" className={fieldCls} required />
             </div>
-
-            {/* Role */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                Role <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={form.role}
-                onChange={(e) => handleChange('role', e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white"
-              >
+              <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Role <span className="text-red-400">*</span></label>
+              <select value={form.role} onChange={(e) => handleChange('role', e.target.value)} className={fieldCls}>
                 <option value="field">Field User</option>
                 <option value="maintenance">Maintenance</option>
                 <option value="admin">Admin</option>
@@ -152,100 +111,43 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
             </div>
           </div>
 
-          {/* Email */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-              Email <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="email"
-              value={form.email}
-              onChange={(e) => handleChange('email', e.target.value)}
-              placeholder="jane@equiptrack.local"
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-              required
-            />
+            <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Email <span className="text-red-400">*</span></label>
+            <input type="email" value={form.email} onChange={(e) => handleChange('email', e.target.value)} placeholder="jane@equiptrack.local" className={fieldCls} required />
           </div>
 
-          {/* Password */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-              Password <span className="text-red-500">*</span>
-            </label>
+            <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Password <span className="text-red-400">*</span></label>
             <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={form.password}
-                onChange={(e) => handleChange('password', e.target.value)}
-                placeholder="Min. 6 characters"
-                className="w-full px-3 py-2 pr-10 rounded-lg border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                required
-                minLength={6}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-              >
+              <input type={showPassword ? 'text' : 'password'} value={form.password} onChange={(e) => handleChange('password', e.target.value)} placeholder="Min. 6 characters" className={`${fieldCls} pr-10`} required minLength={6} />
+              <button type="button" onClick={() => setShowPassword((v) => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            {/* Department */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                Department
-              </label>
-              <input
-                type="text"
-                value={form.department}
-                onChange={(e) => handleChange('department', e.target.value)}
-                placeholder="Operations"
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-              />
+              <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Department</label>
+              <input type="text" value={form.department} onChange={(e) => handleChange('department', e.target.value)} placeholder="Operations" className={fieldCls} />
             </div>
-
-            {/* Position */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                Position
-              </label>
-              <input
-                type="text"
-                value={form.position}
-                onChange={(e) => handleChange('position', e.target.value)}
-                placeholder="Site Supervisor"
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-              />
+              <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Position</label>
+              <input type="text" value={form.position} onChange={(e) => handleChange('position', e.target.value)} placeholder="Site Supervisor" className={fieldCls} />
             </div>
           </div>
 
-          {/* Phone */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-              Phone Number
-            </label>
-            <input
-              type="tel"
-              value={form.phoneNumber}
-              onChange={(e) => handleChange('phoneNumber', e.target.value)}
-              placeholder="555-0100"
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-            />
+            <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Phone Number</label>
+            <input type="tel" value={form.phoneNumber} onChange={(e) => handleChange('phoneNumber', e.target.value)} placeholder="555-0100" className={fieldCls} />
           </div>
 
-          <div className="flex gap-3 pt-1">
-            <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              className="flex-1"
-              disabled={mutation.isPending}
-              style={{ background: 'rgb(var(--brand-navy-rgb))' }}
-            >
+          {/* Divider */}
+          <div className="border-t border-slate-100" />
+
+          <div className="flex gap-3">
+            <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
+            <Button type="submit" className="flex-1" disabled={mutation.isPending} style={{ background: 'rgb(var(--brand-navy-rgb))' }}>
               {mutation.isPending ? 'Creating…' : 'Create User'}
             </Button>
           </div>
@@ -258,7 +160,6 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
 export default function AdminUsersPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-
   const [search, setSearch] = useState('')
   const [role, setRole] = useState<UserRole | 'all'>('all')
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -281,50 +182,50 @@ export default function AdminUsersPage() {
     () => [
       {
         accessorKey: 'name',
-        header: 'Name',
-        cell: ({ row }) => (
-          <button
-            className="font-medium text-indigo-600 hover:text-indigo-800 hover:underline text-left"
-            onClick={() => navigate(`/profile/${row.original.id}`)}
-          >
-            {row.original.name}
-          </button>
-        ),
-      },
-      {
-        accessorKey: 'email',
-        header: 'Email',
-        cell: ({ row }) => (
-          <span className="text-slate-600 text-sm font-mono">{row.original.email}</span>
-        ),
+        header: 'User',
+        cell: ({ row }) => {
+          const meta = roleMeta[row.original.role]
+          return (
+            <button
+              className="flex items-center gap-3 text-left group"
+              onClick={() => navigate(`/profile/${row.original.id}`)}
+            >
+              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${meta.initials}`}>
+                {initials(row.original.name)}
+              </div>
+              <div>
+                <p className="font-semibold text-slate-800 group-hover:text-blue-600 transition-colors">{row.original.name}</p>
+                <p className="text-xs text-slate-400 font-mono">{row.original.email}</p>
+              </div>
+            </button>
+          )
+        },
       },
       {
         accessorKey: 'role',
         header: 'Role',
-        cell: ({ row }) => (
-          <span
-            className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${roleColorMap[row.original.role]}`}
-          >
-            {roleLabelMap[row.original.role]}
-          </span>
-        ),
+        cell: ({ row }) => {
+          const meta = roleMeta[row.original.role]
+          return (
+            <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${meta.pill}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} />
+              {meta.label}
+            </span>
+          )
+        },
       },
       {
         id: 'actions',
         header: 'Actions',
+        enableSorting: false,
         cell: ({ row }) => (
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate(`/profile/${row.original.id}`)}
-            >
+            <Button variant="outline" size="sm" onClick={() => navigate(`/profile/${row.original.id}`)}>
               View Profile
             </Button>
             <Button
-              variant="ghost"
-              size="sm"
-              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              variant="ghost" size="sm"
+              className="text-red-500 hover:text-red-700 hover:bg-red-50"
               onClick={() => {
                 if (confirm(`Remove ${row.original.name}? This cannot be undone.`)) {
                   deleteMutation.mutate(row.original.id)
@@ -341,57 +242,53 @@ export default function AdminUsersPage() {
     [navigate, deleteMutation],
   )
 
-  if (usersQuery.isLoading) {
-    return <Loader label="Loading users..." />
-  }
-
+  if (usersQuery.isLoading) return <Loader label="Loading users..." />
   if (usersQuery.isError) {
-    return (
-      <ErrorState
-        error={usersQuery.error}
-        onRetry={() => usersQuery.refetch()}
-        title="Could not load users"
-      />
-    )
+    return <ErrorState error={usersQuery.error} onRetry={() => usersQuery.refetch()} title="Could not load users" />
   }
 
   const filteredUsers = (usersQuery.data ?? []).filter((user) => {
-    const query = search.toLowerCase().trim()
-    if (!query) return true
-    return user.name.toLowerCase().includes(query) || user.email.toLowerCase().includes(query)
+    const q = search.toLowerCase().trim()
+    return !q || user.name.toLowerCase().includes(q) || user.email.toLowerCase().includes(q)
   })
 
   return (
     <div className="space-y-6">
-      <Button className="mb-4" onClick={() => navigate(-1)} size="sm" variant="outline">
-        <ArrowLeft className="mr-2 h-4 w-4" />
+      <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">
+        <ArrowLeft className="h-3.5 w-3.5" />
         Back
-      </Button>
-      <div className="flex items-center justify-between">
-        <PageHeader subtitle="Manage user accounts and access" title="Users" />
-        <Button
-          onClick={() => setShowCreateDialog(true)}
-          className="flex items-center gap-2"
-          style={{ background: 'rgb(var(--brand-navy-rgb))' }}
-        >
-          <Plus className="h-4 w-4" />
-          Add User
-        </Button>
-      </div>
+      </button>
 
-      <div className="flex flex-wrap gap-6 rounded-xl border border-slate-200 bg-white p-4">
-        <div className="flex flex-col gap-2">
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Role</span>
-          <div className="flex flex-wrap gap-1.5">
-            {roleOptions.map((option) => (
-              <button
-                key={option.value}
-                onClick={() => setRole(option.value)}
-                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${role === option.value ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:border-slate-400'}`}
-              >
-                {option.label}
-              </button>
-            ))}
+      <PageHeader
+        title="Users"
+        subtitle="Manage user accounts and role access"
+        actions={
+          <Button onClick={() => setShowCreateDialog(true)} className="gap-2" style={{ background: 'rgb(var(--brand-navy-rgb))' }}>
+            <Plus className="h-4 w-4" />
+            Add User
+          </Button>
+        }
+      />
+
+      {/* Filters */}
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-100 bg-slate-50 px-4 py-2.5">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Filters</p>
+        </div>
+        <div className="p-4">
+          <div className="flex flex-col gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Role</span>
+            <div className="flex flex-wrap gap-1.5">
+              {roleOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setRole(opt.value)}
+                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${role === opt.value ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:border-slate-400'}`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -402,13 +299,11 @@ export default function AdminUsersPage() {
         emptyDescription="No users match your current filters."
         emptyTitle="No users found"
         onSearchValueChange={setSearch}
-        searchPlaceholder="Search users by name or email"
+        searchPlaceholder="Search by name or email…"
         searchValue={search}
       />
 
-      {showCreateDialog && (
-        <CreateUserDialog onClose={() => setShowCreateDialog(false)} />
-      )}
+      {showCreateDialog && <CreateUserDialog onClose={() => setShowCreateDialog(false)} />}
     </div>
   )
 }

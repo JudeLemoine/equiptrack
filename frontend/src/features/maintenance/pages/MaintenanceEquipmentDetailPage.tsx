@@ -1,6 +1,5 @@
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
-import { Button } from '../../../components/ui/button'
 import EquipmentProfilePage from '../../equipment/pages/EquipmentProfilePage'
 
 export default function MaintenanceEquipmentDetailPage() {
@@ -8,10 +7,13 @@ export default function MaintenanceEquipmentDetailPage() {
 
   return (
     <div className="space-y-6">
-      <Button className="mb-4" onClick={() => navigate(-1)} size="sm" variant="outline">
-        <ArrowLeft className="mr-2 h-4 w-4" />
+      <button
+        onClick={() => navigate(-1)}
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" />
         Back
-      </Button>
+      </button>
       <EquipmentProfilePage />
     </div>
   )

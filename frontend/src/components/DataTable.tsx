@@ -32,21 +32,21 @@ function MobileAccordionRow<TData>({ row }: { row: Row<TData> }) {
   const otherCells = row.getVisibleCells().slice(1)
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
       <button
-        className="flex w-full items-center justify-between p-4 text-left font-medium text-slate-900"
+        className="flex w-full items-center justify-between px-4 py-3.5 text-left font-medium text-slate-900 hover:bg-slate-50 transition-colors"
         onClick={() => setExpanded(!expanded)}
         type="button"
       >
         <div>{flexRender(firstCell.column.columnDef.cell, firstCell.getContext())}</div>
         {expanded ? (
-          <ChevronUp className="h-5 w-5 text-slate-500 shrink-0 ml-2" />
+          <ChevronUp className="h-4 w-4 text-slate-400 shrink-0 ml-2" />
         ) : (
-          <ChevronDown className="h-5 w-5 text-slate-500 shrink-0 ml-2" />
+          <ChevronDown className="h-4 w-4 text-slate-400 shrink-0 ml-2" />
         )}
       </button>
-      {expanded ? (
-        <div className="space-y-3 border-t border-slate-100 p-4">
+      {expanded && (
+        <div className="space-y-3 border-t border-slate-100 bg-slate-50/50 p-4">
           {otherCells.map((cell) => {
             const header =
               typeof cell.column.columnDef.header === 'string'
@@ -54,17 +54,17 @@ function MobileAccordionRow<TData>({ row }: { row: Row<TData> }) {
                 : cell.column.id
             return (
               <div className="flex flex-col gap-1" key={cell.id}>
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
                   {header}
                 </span>
-                <div className="text-sm text-slate-900">
+                <div className="text-sm text-slate-800">
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
                 </div>
               </div>
             )
           })}
         </div>
-      ) : null}
+      )}
     </div>
   )
 }
@@ -100,12 +100,11 @@ export default function DataTable<TData>({
   const hasRows = table.getRowModel().rows.length > 0
 
   const paginationControls = paginationEnabled && table.getPageCount() > 1 && (
-    <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3">
-      <p className="text-sm text-slate-600">
-        Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
-        <span className="ml-2 text-slate-400">
-          ({data.length} total)
-        </span>
+    <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3">
+      <p className="text-sm text-slate-500">
+        Page <span className="font-semibold text-slate-800">{table.getState().pagination.pageIndex + 1}</span> of{' '}
+        <span className="font-semibold text-slate-800">{table.getPageCount()}</span>
+        <span className="ml-2 text-slate-400 text-xs">({data.length} total)</span>
       </p>
       <div className="flex items-center gap-2">
         <Button
@@ -113,73 +112,69 @@ export default function DataTable<TData>({
           size="sm"
           onClick={() => table.previousPage()}
           disabled={!table.getCanPreviousPage()}
+          className="gap-1"
         >
-          <ChevronLeft className="h-4 w-4 mr-1" />
-          Previous
+          <ChevronLeft className="h-3.5 w-3.5" />
+          Prev
         </Button>
         <Button
           variant="outline"
           size="sm"
           onClick={() => table.nextPage()}
           disabled={!table.getCanNextPage()}
+          className="gap-1"
         >
           Next
-          <ChevronRight className="h-4 w-4 ml-1" />
+          <ChevronRight className="h-3.5 w-3.5" />
         </Button>
       </div>
     </div>
   )
 
   return (
-    <div className="space-y-4">
-      {onSearchValueChange ? (
+    <div className="space-y-3">
+      {onSearchValueChange && (
         <div className="relative w-full max-w-sm">
-          <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
           <Input
             className="pl-9"
-            onChange={(event) => onSearchValueChange(event.target.value)}
-            placeholder={searchPlaceholder ?? 'Search'}
+            onChange={(e) => onSearchValueChange(e.target.value)}
+            placeholder={searchPlaceholder ?? 'Search…'}
             value={searchValue ?? ''}
           />
         </div>
-      ) : null}
+      )}
 
-      <div className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white md:block">
+      {/* Desktop table */}
+      <div className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm md:block">
         <div className="w-full overflow-x-auto">
           <Table className="min-w-[720px]">
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
+                <TableRow key={headerGroup.id} className="bg-slate-50 hover:bg-slate-50 border-b border-slate-200">
                   {headerGroup.headers.map((header) => {
                     const canSort = header.column.getCanSort()
                     return (
-                      <TableHead key={header.id} className="h-12 px-4 py-2">
+                      <TableHead key={header.id} className="h-11 px-4 py-2">
                         {header.isPlaceholder ? null : canSort ? (
-                          <Button
-                            className="flex h-auto w-full items-center justify-start gap-2 px-0 text-slate-600 hover:text-slate-900"
+                          <button
+                            className="flex items-center gap-1.5 text-left font-semibold uppercase tracking-widest text-[11px] text-slate-500 hover:text-slate-900 transition-colors"
                             onClick={header.column.getToggleSortingHandler()}
                             type="button"
-                            variant="ghost"
                           >
-                            <span className="truncate whitespace-nowrap font-semibold uppercase tracking-wider text-xs">
-                              {flexRender(header.column.columnDef.header, header.getContext())}
-                            </span>
-                            <div className="flex-shrink-0">
-                              {header.column.getIsSorted() === 'asc' ? (
-                                <ArrowUp className="h-3.5 w-3.5 text-blue-600" />
-                              ) : header.column.getIsSorted() === 'desc' ? (
-                                <ArrowDown className="h-3.5 w-3.5 text-blue-600" />
-                              ) : (
-                                <ArrowUpDown className="h-3.5 w-3.5 text-slate-400 group-hover:text-slate-600" />
-                              )}
-                            </div>
-                          </Button>
+                            {flexRender(header.column.columnDef.header, header.getContext())}
+                            {header.column.getIsSorted() === 'asc' ? (
+                              <ArrowUp className="h-3 w-3 text-blue-500" />
+                            ) : header.column.getIsSorted() === 'desc' ? (
+                              <ArrowDown className="h-3 w-3 text-blue-500" />
+                            ) : (
+                              <ArrowUpDown className="h-3 w-3 text-slate-300" />
+                            )}
+                          </button>
                         ) : (
-                          <div className="flex h-auto w-full items-center justify-start py-2">
-                            <span className="truncate whitespace-nowrap font-semibold uppercase tracking-wider text-xs text-slate-500">
-                              {flexRender(header.column.columnDef.header, header.getContext())}
-                            </span>
-                          </div>
+                          <span className="font-semibold uppercase tracking-widest text-[11px] text-slate-500">
+                            {flexRender(header.column.columnDef.header, header.getContext())}
+                          </span>
                         )}
                       </TableHead>
                     )
@@ -189,10 +184,13 @@ export default function DataTable<TData>({
             </TableHeader>
             <TableBody>
               {hasRows ? (
-                table.getRowModel().rows.map((row) => (
-                  <TableRow key={row.id}>
+                table.getRowModel().rows.map((row, i) => (
+                  <TableRow
+                    key={row.id}
+                    className={`border-b border-slate-100 hover:bg-slate-50/80 transition-colors ${i % 2 === 1 ? 'bg-slate-50/30' : ''}`}
+                  >
                     {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id}>
+                      <TableCell key={cell.id} className="px-4 py-3">
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </TableCell>
                     ))}
@@ -200,7 +198,7 @@ export default function DataTable<TData>({
                 ))
               ) : (
                 <TableRow>
-                  <TableCell className="py-10" colSpan={columns.length}>
+                  <TableCell className="py-12" colSpan={columns.length}>
                     <EmptyState description={emptyDescription} title={emptyTitle} />
                   </TableCell>
                 </TableRow>
@@ -210,13 +208,14 @@ export default function DataTable<TData>({
         </div>
       </div>
 
-      <div className="space-y-3 md:hidden">
+      {/* Mobile accordion */}
+      <div className="space-y-2 md:hidden">
         {hasRows ? (
           table.getRowModel().rows.map((row) => (
             <MobileAccordionRow key={row.id} row={row} />
           ))
         ) : (
-          <div className="rounded-xl border border-slate-200 bg-white py-10">
+          <div className="rounded-xl border border-slate-200 bg-white py-12">
             <EmptyState description={emptyDescription} title={emptyTitle} />
           </div>
         )}

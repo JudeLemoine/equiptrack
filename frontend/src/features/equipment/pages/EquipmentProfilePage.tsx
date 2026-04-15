@@ -35,7 +35,6 @@ import { Textarea } from '../../../components/ui/textarea'
 import { getSession } from '../../../lib/auth'
 import { formatDate, formatDateTime } from '../../../lib/utils'
 import { listActivityByEquipment } from '../../../services/activityService'
-import { TextField } from '@mui/material'
 import {
   checkoutEquipment,
   getEquipment,
@@ -350,30 +349,30 @@ export default function EquipmentProfilePage() {
           <CardHeader>
             <CardTitle>Specifications & Status</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-2">
+          <CardContent className="grid gap-5 sm:grid-cols-2">
             <div>
-              <Label className="text-xs text-slate-500">Current Status</Label>
-              <div className="mt-1"><StatusBadge status={equipment.status} /></div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1">Current Status</p>
+              <StatusBadge status={equipment.status} />
             </div>
             <div>
-              <Label className="text-xs text-slate-500">Category</Label>
-              <p className="font-medium text-slate-900">{equipment.category}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1">Category</p>
+              <p className="text-sm font-medium text-slate-900">{equipment.category}</p>
             </div>
             <div>
-              <Label className="text-xs text-slate-500">Next Service Due</Label>
-              <p className={`font-medium ${equipment.nextServiceDueDate && new Date(equipment.nextServiceDueDate) < new Date() ? 'text-red-600' : ''}`}>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1">Next Service Due</p>
+              <p className={`text-sm font-medium ${equipment.nextServiceDueDate && new Date(equipment.nextServiceDueDate) < new Date() ? 'text-red-600' : 'text-slate-900'}`}>
                 {formatDate(equipment.nextServiceDueDate)}
               </p>
             </div>
             <div>
-              <Label className="text-xs text-slate-500">Last Service</Label>
-              <p className="text-slate-700">{formatDate(equipment.lastServiceDate)}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1">Last Service</p>
+              <p className="text-sm text-slate-700">{formatDate(equipment.lastServiceDate)}</p>
             </div>
 
             {/* Assigned Worker row — visible to all roles, editable by admin */}
             <div className="sm:col-span-2">
-              <Label className="text-xs text-slate-500">Assigned Worker</Label>
-              <div className="mt-1 flex items-center gap-3">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1">Assigned Worker</p>
+              <div className="flex items-center gap-3">
                 {equipment.assignedToName ? (
                   <div className="flex items-center gap-2">
                     <div className="flex items-center justify-center h-7 w-7 rounded-full bg-emerald-100 shrink-0">
@@ -698,30 +697,40 @@ export default function EquipmentProfilePage() {
               This will add a routine service log and update last/next service dates.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3">
-            <p className="text-sm"><span className="font-medium">Equipment:</span> {equipment?.name}</p>
-            <p className="text-sm"><span className="font-medium">Configured interval:</span> {equipment?.maintenanceIntervalDays ?? '-'} days</p>
-            <div className="space-y-2">
-              <Label htmlFor="manualNextDueDate">Manual next due date (required if no interval)</Label>
-              <TextField
+          <div className="space-y-4">
+            {/* Info card */}
+            <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 space-y-1.5">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Equipment</p>
+                <p className="text-sm font-semibold text-slate-800">{equipment?.name}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Configured interval</p>
+                <p className="text-sm text-slate-600">
+                  {equipment?.maintenanceIntervalDays ? `${equipment.maintenanceIntervalDays} days` : '—'}
+                </p>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="manualNextDueDate" className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+                Manual next due date <span className="normal-case tracking-normal text-slate-400">(required if no interval)</span>
+              </Label>
+              <input
                 id="manualNextDueDate"
                 type="date"
-                fullWidth
-                size="small"
                 value={manualNextDueDate}
                 onChange={(e) => setManualNextDueDate(e.target.value)}
-                slotProps={{ inputLabel: { shrink: true } }}
-                variant="outlined"
-                sx={{ '& .MuiOutlinedInput-root': { height: '40px', borderRadius: '8px', backgroundColor: 'white' } }}
+                className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors"
               />
             </div>
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setMarkServicedOpen(false)}>Cancel</Button>
               <Button
                 style={{ backgroundColor: navy }}
                 disabled={markServicedMutation.isPending}
                 onClick={() => markServicedMutation.mutate()}
               >
-                {markServicedMutation.isPending ? 'Saving...' : 'Confirm'}
+                {markServicedMutation.isPending ? 'Saving…' : 'Confirm'}
               </Button>
             </div>
           </div>
@@ -755,16 +764,12 @@ export default function EquipmentProfilePage() {
               </div>
               <div className="space-y-1 sm:col-span-2">
                 <Label htmlFor="editNextDue">Next Service Due Date</Label>
-                <TextField
+                <input
                   id="editNextDue"
                   type="date"
-                  fullWidth
-                  size="small"
                   value={editNextDue}
                   onChange={(e) => setEditNextDue(e.target.value)}
-                  slotProps={{ inputLabel: { shrink: true } }}
-                  variant="outlined"
-                  sx={{ '& .MuiOutlinedInput-root': { height: '40px', borderRadius: '8px', backgroundColor: 'white' } }}
+                  className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors"
                 />
               </div>
             </div>

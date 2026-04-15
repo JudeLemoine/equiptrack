@@ -519,10 +519,10 @@ function SecondaryNav({ role, theme }: { role: string; theme: typeof ROLE_THEME[
 
   return (
     <nav
-      className="w-full border-b"
+      className="w-full border-b overflow-hidden"
       style={{ background: theme.bg, borderColor: theme.border }}
     >
-      <div className="scrollbar-none mx-auto w-full max-w-7xl px-4 flex items-center gap-1 overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+      <div className="scrollbar-none mx-auto w-full max-w-7xl px-4 flex items-center gap-1 overflow-x-auto overflow-y-hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', touchAction: 'pan-x' }}>
         {items.map(({ label, to, icon: Icon }) => (
           <NavLink
             key={to}

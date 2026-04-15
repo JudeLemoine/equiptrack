@@ -12,7 +12,6 @@ import {
 import { useImpersonation } from '../../../app/ImpersonationContext'
 import { getEquipment, listEquipment } from '../../../services/equipmentService'
 import { Button } from '../../../components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card'
 import PageHeader from '../../../components/PageHeader'
 
 type ScanStatus = 'starting' | 'scanning' | 'found' | 'error' | 'not_found' | 'no_camera'
@@ -226,9 +225,8 @@ export default function QRScannerPage() {
         </div>
 
         {/* Camera viewport */}
-        <Card className="overflow-hidden">
-          <CardContent className="p-0">
-            <div className="relative bg-slate-900 rounded-lg overflow-hidden" style={{ minHeight: 340 }}>
+        <div className="overflow-hidden rounded-xl border border-slate-200 shadow-sm">
+          <div className="relative bg-slate-900 overflow-hidden" style={{ minHeight: 340 }}>
 
               {/* Live video feed */}
               <video
@@ -280,9 +278,8 @@ export default function QRScannerPage() {
                   <p className="text-sm text-green-100 font-medium">Equipment found!</p>
                 </div>
               )}
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* Retry button */}
         {showRetry && (
@@ -295,33 +292,33 @@ export default function QRScannerPage() {
         )}
 
         {/* Instructions */}
-        <Card>
-          <CardHeader className="pb-2 pt-4">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <QrCode className="h-4 w-4 text-slate-500" />
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-100 bg-slate-50 px-4 py-2.5">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
+              <QrCode className="h-3.5 w-3.5" />
               How to scan
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pb-4">
-            <ol className="text-sm text-slate-600 space-y-2">
+            </p>
+          </div>
+          <div className="p-4">
+            <ol className="text-sm text-slate-600 space-y-3">
               {[
                 'Allow camera access when your browser asks.',
                 'Hold the camera steady over any equipment QR code.',
                 "EquipTrack will navigate to that equipment's profile automatically.",
               ].map((step, i) => (
-                <li key={i} className="flex items-start gap-2.5">
-                  <span className="shrink-0 mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold text-slate-500">
+                <li key={i} className="flex items-start gap-3">
+                  <span className="shrink-0 mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold text-slate-600">
                     {i + 1}
                   </span>
-                  <span>{step}</span>
+                  <span className="leading-relaxed">{step}</span>
                 </li>
               ))}
             </ol>
-            <p className="mt-3 text-xs text-slate-400">
+            <p className="mt-4 text-xs text-slate-400 border-t border-slate-100 pt-3">
               Tip: QR codes can be downloaded from each equipment's profile page and printed for physical tagging.
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   )

@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ColumnDef } from '@tanstack/react-table'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { toast } from 'sonner'
 import { ArrowLeft, Clock, CheckCircle2, RotateCcw, XCircle, ExternalLink } from 'lucide-react'
 import DataTable from '../../../components/DataTable'
 import ErrorState from '../../../components/ErrorState'
@@ -11,7 +12,7 @@ import StatusBadge from '../../../components/StatusBadge'
 import { Button } from '../../../components/ui/button'
 import { getSession } from '../../../lib/auth'
 import { formatDate } from '../../../lib/utils'
-import { listRentals } from '../../../services/rentalService'
+import { listRentals, updateRentalStatus } from '../../../services/rentalService'
 import type { Rental, RentalStatus } from '../../../types/rental'
 
 const RENTAL_STATUS_RANK: Record<string, number> = { active: 0, pending: 1, returned: 2, rejected: 3 }
@@ -25,7 +26,7 @@ const tabs: Array<{ label: string; value: RentalStatus | 'all'; dot?: string }> 
 
 const STATUS_MESSAGE: Record<string, { text: string; color: string; icon: React.ElementType }> = {
   pending:  { text: 'Awaiting admin approval',           color: 'text-amber-700',   icon: Clock        },
-  active:   { text: 'Checked out — return via admin',    color: 'text-emerald-700', icon: RotateCcw    },
+  active:   { text: 'Checked out — tap Return when done', color: 'text-emerald-700', icon: RotateCcw    },
   returned: { text: 'Rental completed',                  color: 'text-slate-600',   icon: CheckCircle2 },
   rejected: { text: 'Request was rejected',              color: 'text-red-700',     icon: XCircle      },
 }
@@ -43,6 +44,18 @@ export default function FieldRentalsPage() {
     queryKey: ['rentals', 'field', userId, status],
     queryFn: () => listRentals({ requestedBy: userId, status }),
     placeholderData: keepPreviousData,
+  })
+
+  const queryClient = useQueryClient()
+  const returnMutation = useMutation({
+    mutationFn: (rentalId: string) =>
+      updateRentalStatus(rentalId, { status: 'returned' }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['rentals'] })
+      await queryClient.invalidateQueries({ queryKey: ['equipment'] })
+      toast.success('Equipment returned. Thanks!')
+    },
+    onError: () => toast.error('Could not mark this rental returned.'),
   })
 
   const columns = useMemo<ColumnDef<Rental>[]>(
@@ -87,20 +100,44 @@ export default function FieldRentalsPage() {
         id: 'actions',
         header: '',
         enableSorting: false,
-        cell: ({ row }) => (
-          <Button
-            onClick={() => navigate(`/field/equipment/${row.original.equipmentId}`)}
-            size="sm"
-            variant="ghost"
-            className="gap-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-            View
-          </Button>
-        ),
+        cell: ({ row }) => {
+          const rental = row.original
+          // Only offer Return for an active rental that the signed-in field
+          // user actually owns. The backend enforces the same rule; this is
+          // just to keep the UI honest for mocked/impersonated sessions.
+          const canReturn =
+            rental.status === 'active' && rental.requestedBy === userId
+          return (
+            <div className="flex items-center justify-end gap-2">
+              {canReturn && (
+                <Button
+                  onClick={() => returnMutation.mutate(rental.id)}
+                  size="sm"
+                  disabled={returnMutation.isPending}
+                  className="gap-1.5 text-xs"
+                  style={{ backgroundColor: '#16a34a', color: '#fff' }}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  {returnMutation.isPending && returnMutation.variables === rental.id
+                    ? 'Returning…'
+                    : 'Return'}
+                </Button>
+              )}
+              <Button
+                onClick={() => navigate(`/field/equipment/${rental.equipmentId}`)}
+                size="sm"
+                variant="ghost"
+                className="gap-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                View
+              </Button>
+            </div>
+          )
+        },
       },
     ],
-    [navigate],
+    [navigate, returnMutation, userId],
   )
 
   const sortedRentals = useMemo(

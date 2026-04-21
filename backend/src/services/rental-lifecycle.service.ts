@@ -219,10 +219,12 @@ function ensureRoleForAction(actor: UserRow, action: AllowedAction, rental?: { r
   }
 
   if (action === "RETURNED") {
-    if (actor.role !== UserRole.ADMIN && actor.role !== UserRole.MAINTENANCE) {
-      throw new RentalLifecycleError("FORBIDDEN", "Only admin or maintenance can mark rentals returned", 403)
-    }
-    return
+    if (actor.role === UserRole.ADMIN || actor.role === UserRole.MAINTENANCE) return
+    // A field worker is allowed to return a rental only if they are the
+    // original requester of that specific rental. This mirrors the CANCELLED
+    // rule below and does not broaden permissions for any other action.
+    if (actor.role === UserRole.FIELD_WORKER && rental?.requesterId === actor.id) return
+    throw new RentalLifecycleError("FORBIDDEN", "Only admin, maintenance, or the requester can mark this rental returned", 403)
   }
 
   if (action === "CANCELLED") {

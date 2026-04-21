@@ -33,7 +33,7 @@ type RentalGroup = {
   groupStatus: GroupStatus
 }
 
-type ItemDecision = { approve: boolean; unitId: string }
+type ItemDecision = { approve: boolean | null; unitId: string }
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -107,12 +107,12 @@ function initials(name: string) {
 function ItemApprovalRow({
   rental,
   decision,
-  onToggleApprove,
+  onSetApprove,
   onSelectUnit,
 }: {
   rental: Rental
   decision: ItemDecision
-  onToggleApprove: () => void
+  onSetApprove: (approve: boolean) => void
   onSelectUnit: (unitId: string) => void
 }) {
   const unitsQuery = useQuery({
@@ -122,7 +122,7 @@ function ItemApprovalRow({
       startDate: rental.startDate,
       endDate: rental.endDate,
     }),
-    enabled: decision.approve,
+    enabled: decision.approve === true,
     staleTime: 30_000,
   })
 
@@ -131,49 +131,83 @@ function ItemApprovalRow({
     [unitsQuery.data],
   )
 
+  const isApprove = decision.approve === true
+  const isReject = decision.approve === false
+
   return (
     <div className={`rounded-xl border transition-colors ${
-      decision.approve
+      isApprove
         ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50/40 dark:bg-emerald-900/10'
-        : 'border-red-200 dark:border-red-900/40 bg-red-50/40 dark:bg-red-900/10'
+        : isReject
+          ? 'border-red-200 dark:border-red-900/40 bg-red-50/40 dark:bg-red-900/10'
+          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'
     }`}>
       {/* Item header row */}
-      <div className="flex items-center gap-3 px-4 py-3">
-        {/* Approve/reject toggle */}
-        <button
-          onClick={onToggleApprove}
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2 transition-colors ${
-            decision.approve
-              ? 'bg-emerald-500 border-emerald-500 text-white'
-              : 'bg-red-100 border-red-300 dark:bg-red-900/30 dark:border-red-700 text-red-500 dark:text-red-400'
-          }`}
-          title={decision.approve ? 'Click to reject this item' : 'Click to approve this item'}
-        >
-          {decision.approve ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
-        </button>
-
+      <div className="flex flex-wrap items-center gap-3 px-4 py-3">
         {/* Equipment name */}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">
             {rental.equipmentName}
           </p>
           <p className={`text-[10px] font-semibold mt-0.5 ${
-            decision.approve ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'
+            isApprove
+              ? 'text-emerald-600 dark:text-emerald-400'
+              : isReject
+                ? 'text-red-500 dark:text-red-400'
+                : 'text-slate-400 dark:text-slate-500'
           }`}>
-            {decision.approve ? '✓ Will be checked out' : '✗ Will be rejected'}
+            {isApprove
+              ? '\u2713 Will be checked out'
+              : isReject
+                ? '\u2717 Will be rejected'
+                : 'Decision required'}
           </p>
         </div>
 
         {/* Unit badge once selected */}
-        {decision.approve && decision.unitId && (
+        {isApprove && decision.unitId && (
           <span className="shrink-0 font-mono text-xs bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-md">
-            {availableUnits.find((u) => u.id === decision.unitId)?.assetTag ?? '…'}
+            {availableUnits.find((u) => u.id === decision.unitId)?.assetTag ?? '\u2026'}
           </span>
         )}
+
+        {/* Explicit Approve / Reject segmented control */}
+        <div
+          role="group"
+          aria-label={`Decision for ${rental.equipmentName}`}
+          className="inline-flex shrink-0 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-600"
+        >
+          <button
+            type="button"
+            onClick={() => onSetApprove(true)}
+            aria-pressed={isApprove}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-colors ${
+              isApprove
+                ? 'bg-emerald-500 text-white'
+                : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300'
+            }`}
+          >
+            <Check className="h-3.5 w-3.5" />
+            Approve
+          </button>
+          <button
+            type="button"
+            onClick={() => onSetApprove(false)}
+            aria-pressed={isReject}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-colors border-l border-slate-200 dark:border-slate-600 ${
+              isReject
+                ? 'bg-red-500 text-white'
+                : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-300'
+            }`}
+          >
+            <X className="h-3.5 w-3.5" />
+            Reject
+          </button>
+        </div>
       </div>
 
       {/* Unit picker — only when approved */}
-      {decision.approve && (
+      {isApprove && (
         <div className="border-t border-emerald-200 dark:border-emerald-800/60 mx-0">
           {unitsQuery.isLoading ? (
             <div className="flex items-center gap-2 px-4 py-2.5 text-xs text-slate-400">
@@ -232,12 +266,14 @@ function GroupDetail({
   const [decisions, setDecisions] = useState<Record<string, ItemDecision>>({})
   const [expandedItems, setExpandedItems] = useState(true)
 
-  // Reset decisions whenever the selected group changes
+  // Reset decisions whenever the selected group changes.
+  // We default every pending item to "undecided" (approve: null) so the admin
+  // must make an explicit Approve or Reject call before they can submit.
   useEffect(() => {
     const init: Record<string, ItemDecision> = {}
     for (const item of group.items) {
       if (item.status === 'pending') {
-        init[item.id] = { approve: true, unitId: '' }
+        init[item.id] = { approve: null, unitId: '' }
       }
     }
     setDecisions(init)
@@ -249,18 +285,23 @@ function GroupDetail({
   const pendingItems = group.items.filter((r) => r.status === 'pending')
   const nonPendingItems = group.items.filter((r) => r.status !== 'pending')
 
-  // Validate: every "approve" decision needs a unit selected
-  const approveCount = Object.values(decisions).filter((d) => d.approve).length
-  const rejectCount = Object.values(decisions).filter((d) => !d.approve).length
-  const unassigned = Object.values(decisions).filter((d) => d.approve && !d.unitId).length
-  const canProcess = pendingItems.length > 0 && unassigned === 0
+  // Every pending item must have an explicit decision, and every "approve"
+  // decision needs a unit assigned before we can submit.
+  const approveCount = Object.values(decisions).filter((d) => d.approve === true).length
+  const rejectCount = Object.values(decisions).filter((d) => d.approve === false).length
+  const undecidedCount = pendingItems.filter(
+    (item) => (decisions[item.id]?.approve ?? null) === null,
+  ).length
+  const unassigned = Object.values(decisions).filter((d) => d.approve === true && !d.unitId).length
+  const canProcess =
+    pendingItems.length > 0 && undecidedCount === 0 && unassigned === 0
 
   const batchMutation = useMutation({
     mutationFn: async () => {
       for (const item of pendingItems) {
         const decision = decisions[item.id]
-        if (!decision) continue
-        if (decision.approve) {
+        if (!decision || decision.approve === null) continue
+        if (decision.approve === true) {
           // Backend enforces a strict rental-status machine:
           //   PENDING -> APPROVED|REJECTED|CANCELLED
           //   APPROVED -> CHECKED_OUT|...
@@ -392,22 +433,24 @@ function GroupDetail({
               {pendingItems.length > 0 && (
                 <div className="space-y-2">
                   {pendingItems.map((item) => {
-                    const dec = decisions[item.id] ?? { approve: true, unitId: '' }
+                    const dec = decisions[item.id] ?? { approve: null, unitId: '' }
                     return (
                       <ItemApprovalRow
                         key={item.id}
                         rental={item}
                         decision={dec}
-                        onToggleApprove={() =>
+                        onSetApprove={(approve) =>
                           setDecisions((prev) => ({
                             ...prev,
-                            [item.id]: { ...dec, approve: !dec.approve, unitId: '' },
+                            [item.id]: approve
+                              ? { approve: true, unitId: prev[item.id]?.unitId ?? '' }
+                              : { approve: false, unitId: '' },
                           }))
                         }
                         onSelectUnit={(unitId) =>
                           setDecisions((prev) => ({
                             ...prev,
-                            [item.id]: { ...dec, unitId },
+                            [item.id]: { ...(prev[item.id] ?? { approve: true, unitId: '' }), unitId },
                           }))
                         }
                       />
@@ -429,9 +472,14 @@ function GroupDetail({
                             {rejectCount} to reject
                           </span>
                         )}
+                        {undecidedCount > 0 && (
+                          <span className="block text-amber-600 dark:text-amber-400 mt-0.5">
+                            {undecidedCount} still need{undecidedCount === 1 ? 's' : ''} an Approve or Reject decision
+                          </span>
+                        )}
                         {unassigned > 0 && (
                           <span className="block text-amber-600 dark:text-amber-400 mt-0.5">
-                            ⚠ {unassigned} equipment still need{unassigned === 1 ? 's' : ''} a unit assigned
+                            {unassigned} approved item{unassigned === 1 ? '' : 's'} still need{unassigned === 1 ? 's' : ''} a unit assigned
                           </span>
                         )}
                       </div>
@@ -445,10 +493,12 @@ function GroupDetail({
                         {batchMutation.isPending
                           ? 'Processing…'
                           : approveCount > 0 && rejectCount > 0
-                            ? `Process ${pendingItems.length} Equipment`
+                            ? `Submit decisions (${approveCount} approve, ${rejectCount} reject)`
                             : approveCount > 0
-                              ? `Approve ${approveCount} Equipment`
-                              : `Reject ${rejectCount} Equipment`}
+                              ? `Approve ${approveCount} ${approveCount === 1 ? 'request' : 'requests'}`
+                              : rejectCount > 0
+                                ? `Reject ${rejectCount} ${rejectCount === 1 ? 'request' : 'requests'}`
+                                : 'Submit decisions'}
                       </Button>
                     </div>
                   </div>
@@ -685,78 +735,92 @@ export default function AdminRentalsPage() {
                   : `${equipmentSummary.slice(0, 2).join(', ')} +${equipmentSummary.length - 2} more`
 
                 return (
-                  <button
-                    key={group.key}
-                    onClick={() => setSelectedKey(group.key)}
-                    className={`w-full flex items-start gap-3 px-4 py-3.5 text-left transition-colors group ${
-                      isSelected
-                        ? 'bg-blue-50 dark:bg-blue-900/20 border-l-2 border-l-blue-500'
-                        : 'hover:bg-slate-50 dark:hover:bg-slate-700/40 border-l-2 border-l-transparent'
-                    }`}
-                  >
-                    {/* Avatar */}
-                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold mt-0.5 ${
-                      isSelected
-                        ? 'bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300'
-                        : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
-                    }`}>
-                      {initials(group.requesterName)}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      {/* Person name (title) */}
-                      <p className={`text-sm font-bold truncate leading-tight ${
-                        isSelected ? 'text-blue-700 dark:text-blue-300' : 'text-slate-800 dark:text-slate-200'
+                  <div key={group.key}>
+                    <button
+                      onClick={() => setSelectedKey(group.key)}
+                      className={`w-full flex items-start gap-3 px-4 py-3.5 text-left transition-colors group ${
+                        isSelected
+                          ? 'bg-blue-50 dark:bg-blue-900/20 border-l-2 border-l-blue-500'
+                          : 'hover:bg-slate-50 dark:hover:bg-slate-700/40 border-l-2 border-l-transparent'
+                      }`}
+                    >
+                      {/* Avatar */}
+                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold mt-0.5 ${
+                        isSelected
+                          ? 'bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300'
+                          : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
                       }`}>
-                        {group.requesterName}
-                      </p>
-                      {/* Equipment list (subtitle) */}
-                      <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                        {summaryText}
-                      </p>
-                      {/* Date */}
-                      <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
-                        {formatDate(group.startDate)}
-                        {group.endDate ? ` → ${formatDate(group.endDate)}` : ''}
-                        {group.site ? ` · ${group.site}` : ''}
-                      </p>
-                    </div>
+                        {initials(group.requesterName)}
+                      </div>
 
-                    <div className="flex flex-col items-end gap-1.5 shrink-0 ml-1">
-                      {/* Status pill */}
-                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${gcfg.bg} ${gcfg.text}`}>
-                        <span className={`h-1.5 w-1.5 rounded-full ${gcfg.dot}`} />
-                        {gcfg.label}
-                      </span>
-                      {/* Request count badge */}
-                      <span className="inline-flex items-center gap-0.5 text-[10px] text-slate-400 dark:text-slate-500">
-                        <Users className="h-2.5 w-2.5" />
-                        {group.items.length}{' '}
-                        {group.groupStatus === 'active'
-                          ? 'in use'
-                          : group.groupStatus === 'returned'
-                            ? 'returned'
-                            : group.groupStatus === 'rejected'
-                              ? 'rejected'
-                              : group.items.length === 1 ? 'request' : 'requests'}
-                      </span>
-                    </div>
-                  </button>
+                      <div className="min-w-0 flex-1">
+                        {/* Person name (title) */}
+                        <p className={`text-sm font-bold truncate leading-tight ${
+                          isSelected ? 'text-blue-700 dark:text-blue-300' : 'text-slate-800 dark:text-slate-200'
+                        }`}>
+                          {group.requesterName}
+                        </p>
+                        {/* Equipment list (subtitle) */}
+                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                          {summaryText}
+                        </p>
+                        {/* Date */}
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
+                          {formatDate(group.startDate)}
+                          {group.endDate ? ` → ${formatDate(group.endDate)}` : ''}
+                          {group.site ? ` · ${group.site}` : ''}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col items-end gap-1.5 shrink-0 ml-1">
+                        {/* Status pill */}
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${gcfg.bg} ${gcfg.text}`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${gcfg.dot}`} />
+                          {gcfg.label}
+                        </span>
+                        {/* Request count badge */}
+                        <span className="inline-flex items-center gap-0.5 text-[10px] text-slate-400 dark:text-slate-500">
+                          <Users className="h-2.5 w-2.5" />
+                          {group.items.length}{' '}
+                          {group.groupStatus === 'active'
+                            ? 'in use'
+                            : group.groupStatus === 'returned'
+                              ? 'returned'
+                              : group.groupStatus === 'rejected'
+                                ? 'rejected'
+                                : group.items.length === 1 ? 'request' : 'requests'}
+                        </span>
+                      </div>
+                    </button>
+
+                    {/* Mobile inline accordion — opens directly under the selected row.
+                        Desktop still uses the right-hand side panel (below). */}
+                    {isSelected && (
+                      <div className="lg:hidden border-t border-b border-blue-200 dark:border-blue-900/40 bg-slate-50 dark:bg-slate-900/40">
+                        <GroupDetail
+                          key={group.key}
+                          group={group}
+                          onActionDone={() => setSelectedKey(null)}
+                        />
+                      </div>
+                    )}
+                  </div>
                 )
               })
             )}
           </div>
         </div>
 
-        {/* ── Right: group detail + actions ── */}
-        <div className="lg:col-span-3 flex flex-col lg:max-h-[720px]">
+        {/* ── Right: group detail + actions (desktop only; mobile uses the
+               inline accordion attached to the selected row above) ── */}
+        <div className="hidden lg:flex lg:col-span-3 flex-col lg:max-h-[720px]">
           <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 shrink-0">
             <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
               Request Detail & Actions
             </p>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
               {selectedGroup
-                ? `${selectedGroup.items.length} ${selectedGroup.items.length === 1 ? 'request' : 'requests'} — toggle ✓/✗ to choose which to approve, then assign a unit to each`
+                ? `${selectedGroup.items.length} ${selectedGroup.items.length === 1 ? 'request' : 'requests'} — pick Approve or Reject for each, then assign a unit to every approval`
                 : 'Select a request from the list'}
             </p>
           </div>

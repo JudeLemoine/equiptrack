@@ -209,6 +209,7 @@ export default function AdminEquipmentPage() {
             <DialogDescription>Create a new equipment record.</DialogDescription>
           </DialogHeader>
           <EquipmentForm
+            existingEquipment={equipmentQuery.data ?? []}
             isSubmitting={createMutation.isPending}
             onCancel={() => setCreateOpen(false)}
             onSubmit={(values) => createMutation.mutate(values)}
@@ -227,6 +228,7 @@ export default function AdminEquipmentPage() {
           {editItem && (
             <EquipmentForm
               initialValues={editItem}
+              existingEquipment={equipmentQuery.data ?? []}
               isSubmitting={updateMutation.isPending}
               onCancel={() => setEditItem(null)}
               onSubmit={(values) => updateMutation.mutate({ id: editItem.id, values })}

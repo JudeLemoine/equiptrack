@@ -57,13 +57,22 @@ export default function QRScannerPage() {
     setStatus('found')
     setStatusMessage('QR Code detected — looking up equipment…')
 
-    let equipment = null
-    try { equipment = await getEquipment(decodedText) } catch { /* not found by ID */ }
+    // QR payloads in this system are asset tags (e.g. "EXC-001"), not IDs.
+    // Try an asset-tag search first; only fall back to a silent getEquipment(id)
+    // so we don't show a 404 toast when the search is the valid path.
+    let equipment: Awaited<ReturnType<typeof getEquipment>> | null = null
+    try {
+      const results = await listEquipment({ search: decodedText })
+      const exact = results.find(
+        (r) => (r.qrCode ?? '').toLowerCase() === decodedText.toLowerCase(),
+      )
+      equipment = exact ?? results[0] ?? null
+    } catch { /* search failed — try ID fallback silently */ }
+
     if (!equipment) {
       try {
-        const results = await listEquipment({ search: decodedText })
-        if (results.length > 0) equipment = results[0]
-      } catch { /* search failed */ }
+        equipment = await getEquipment(decodedText, { silent: true })
+      } catch { /* not found by ID either */ }
     }
 
     if (!equipment) {

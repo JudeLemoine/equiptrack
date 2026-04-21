@@ -29,7 +29,13 @@ function extractErrorMessage(details: unknown, status: number): string {
   return `Something went wrong (${status}). Please try again.`
 }
 
-async function handleResponse<T>(response: Response): Promise<T> {
+export type ApiRequestOptions = {
+  // When true, no toast.error is shown on non-ok responses.
+  // Use for speculative lookups where the caller handles fallbacks (e.g. QR scan).
+  silent?: boolean
+}
+
+async function handleResponse<T>(response: Response, options?: ApiRequestOptions): Promise<T> {
   if (!response.ok) {
     let details: unknown
 
@@ -40,7 +46,9 @@ async function handleResponse<T>(response: Response): Promise<T> {
     }
 
     const userMessage = extractErrorMessage(details, response.status)
-    toast.error(userMessage, { id: `api-error-${response.status}-${userMessage}` })
+    if (!options?.silent) {
+      toast.error(userMessage, { id: `api-error-${response.status}-${userMessage}` })
+    }
 
     throw new ApiRequestError({
       message: userMessage,
@@ -56,7 +64,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return (await response.json()) as T
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, options?: ApiRequestOptions): Promise<T> {
   const headers = new Headers(init?.headers)
 
   if (init?.body && !headers.has('Content-Type')) {
@@ -80,7 +88,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       headers,
     })
 
-    return handleResponse<T>(response)
+    return handleResponse<T>(response, options)
   } catch (error) {
     if (error instanceof ApiRequestError) {
       throw error
@@ -95,25 +103,25 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const apiClient = {
-  get: <T>(path: string) => request<T>(path),
-  post: <T, B>(path: string, body: B) =>
+  get: <T>(path: string, options?: ApiRequestOptions) => request<T>(path, undefined, options),
+  post: <T, B>(path: string, body: B, options?: ApiRequestOptions) =>
     request<T>(path, {
       method: 'POST',
       body: JSON.stringify(body),
-    }),
-  put: <T, B>(path: string, body: B) =>
+    }, options),
+  put: <T, B>(path: string, body: B, options?: ApiRequestOptions) =>
     request<T>(path, {
       method: 'PUT',
       body: JSON.stringify(body),
-    }),
-  patch: <T, B>(path: string, body: B) =>
+    }, options),
+  patch: <T, B>(path: string, body: B, options?: ApiRequestOptions) =>
     request<T>(path, {
       method: 'PATCH',
       body: JSON.stringify(body),
-    }),
-  delete: <T>(path: string, body?: unknown) =>
+    }, options),
+  delete: <T>(path: string, body?: unknown, options?: ApiRequestOptions) =>
     request<T>(path, {
       method: 'DELETE',
       ...(body ? { body: JSON.stringify(body) } : {}),
-    }),
+    }, options),
 }

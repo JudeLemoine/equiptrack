@@ -818,28 +818,50 @@ export default function EquipmentProfilePage() {
                 </p>
               </div>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="manualNextDueDate" className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
-                Manual next due date <span className="normal-case tracking-normal text-slate-400">(required if no interval)</span>
-              </Label>
-              <input
-                id="manualNextDueDate"
-                type="date"
-                value={manualNextDueDate}
-                onChange={(e) => setManualNextDueDate(e.target.value)}
-                className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100"
-              />
-            </div>
-            <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setMarkServicedOpen(false)}>Cancel</Button>
-              <Button
-                style={{ backgroundColor: navy }}
-                disabled={markServicedMutation.isPending}
-                onClick={() => markServicedMutation.mutate()}
-              >
-                {markServicedMutation.isPending ? 'Saving…' : 'Confirm'}
-              </Button>
-            </div>
+            {(() => {
+              const hasInterval = Boolean(equipment?.maintenanceIntervalDays)
+              const manualRequired = !hasInterval
+              const today = new Date(); today.setHours(0, 0, 0, 0)
+              const manualDate = manualNextDueDate ? new Date(manualNextDueDate) : null
+              const manualInPast = Boolean(manualDate && manualDate < today)
+              const missingRequired = manualRequired && !manualNextDueDate
+              const invalid = missingRequired || manualInPast
+              return (
+                <>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="manualNextDueDate" className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+                      Manual next due date {manualRequired && <span className="normal-case tracking-normal text-rose-500">(required — no interval configured)</span>}
+                    </Label>
+                    <input
+                      id="manualNextDueDate"
+                      type="date"
+                      value={manualNextDueDate}
+                      min={new Date().toISOString().slice(0, 10)}
+                      onChange={(e) => setManualNextDueDate(e.target.value)}
+                      className={`w-full h-10 rounded-lg border bg-white px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors dark:bg-slate-700 dark:text-slate-100 ${
+                        invalid ? 'border-rose-400 dark:border-rose-500' : 'border-slate-200 dark:border-slate-600'
+                      }`}
+                    />
+                    {missingRequired && (
+                      <p className="text-xs text-rose-500">A next-service date is required because this equipment has no maintenance interval.</p>
+                    )}
+                    {manualInPast && (
+                      <p className="text-xs text-rose-500">Next service date cannot be in the past.</p>
+                    )}
+                  </div>
+                  <div className="flex justify-end gap-3">
+                    <Button variant="outline" onClick={() => setMarkServicedOpen(false)}>Cancel</Button>
+                    <Button
+                      style={{ backgroundColor: navy }}
+                      disabled={markServicedMutation.isPending || invalid}
+                      onClick={() => markServicedMutation.mutate()}
+                    >
+                      {markServicedMutation.isPending ? 'Saving…' : 'Confirm'}
+                    </Button>
+                  </div>
+                </>
+              )
+            })()}
           </div>
         </DialogContent>
       </Dialog>

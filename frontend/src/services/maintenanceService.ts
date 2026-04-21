@@ -6,6 +6,8 @@ export type IssueSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
 export type IssueReport = {
   id: string
   equipmentId: string
+  equipmentName?: string
+  equipmentAssetTag?: string
   reportedByUserId: string
   title: string
   description: string

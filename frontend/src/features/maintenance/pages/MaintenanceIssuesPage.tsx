@@ -105,11 +105,39 @@ export default function MaintenanceIssuesPage() {
   const columns = useMemo<ColumnDef<IssueReport>[]>(
     () => [
       {
+        id: 'equipment',
+        header: 'Equipment',
+        cell: ({ row }) => {
+          const name = row.original.equipmentName
+          const tag = row.original.equipmentAssetTag
+          if (!name && !tag) {
+            return <span className="text-sm text-slate-400">Unknown equipment</span>
+          }
+          return (
+            <div className="min-w-0">
+              <p className="font-medium text-slate-800 dark:text-slate-200 truncate">
+                {name ?? 'Equipment'}
+              </p>
+              {tag && (
+                <span className="inline-flex items-center rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[11px] text-slate-600 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300">
+                  {tag}
+                </span>
+              )}
+            </div>
+          )
+        },
+      },
+      {
         accessorKey: 'title',
         header: 'Issue',
         cell: ({ row }) => (
           <div>
             <p className="font-semibold text-slate-800 dark:text-slate-200">{row.original.title}</p>
+            {row.original.description && (
+              <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5">
+                {row.original.description}
+              </p>
+            )}
           </div>
         ),
       },

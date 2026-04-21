@@ -261,7 +261,13 @@ function GroupDetail({
         const decision = decisions[item.id]
         if (!decision) continue
         if (decision.approve) {
-          await updateRentalStatus(item.id, { status: 'active', assignedEquipmentId: decision.unitId })
+          // Backend enforces a strict rental-status machine:
+          //   PENDING -> APPROVED|REJECTED|CANCELLED
+          //   APPROVED -> CHECKED_OUT|...
+          // So we cannot jump PENDING -> CHECKED_OUT ("active") in one call.
+          // Step 1 assigns the unit and moves to APPROVED; step 2 flips it to active (CHECKED_OUT).
+          await updateRentalStatus(item.id, { status: 'approved', assignedEquipmentId: decision.unitId })
+          await updateRentalStatus(item.id, { status: 'active' })
         } else {
           await updateRentalStatus(item.id, { status: 'rejected' })
         }

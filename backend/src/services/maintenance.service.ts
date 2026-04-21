@@ -127,18 +127,32 @@ export async function listIssueReports(input: { equipmentId?: string; status?: I
   const conditions: string[] = ["1=1"]
   const params: unknown[] = []
 
-  if (input.equipmentId) { conditions.push("equipmentUnitId = ?"); params.push(input.equipmentId) }
-  if (input.status) { conditions.push("status = ?"); params.push(input.status) }
-  if (input.severity) { conditions.push("severity = ?"); params.push(input.severity) }
-  if (input.reportedBy) { conditions.push("reportedById = ?"); params.push(input.reportedBy) }
+  if (input.equipmentId) { conditions.push("ir.equipmentUnitId = ?"); params.push(input.equipmentId) }
+  if (input.status) { conditions.push("ir.status = ?"); params.push(input.status) }
+  if (input.severity) { conditions.push("ir.severity = ?"); params.push(input.severity) }
+  if (input.reportedBy) { conditions.push("ir.reportedById = ?"); params.push(input.reportedBy) }
+
+  type JoinedIssueRow = IssueRow & {
+    equipmentAssetTag: string | null
+    equipmentTypeName: string | null
+  }
 
   const issues = db.prepare(
-    `SELECT * FROM IssueReport WHERE ${conditions.join(" AND ")} ORDER BY reportedAt DESC`
-  ).all(...params) as IssueRow[]
+    `SELECT ir.*,
+            eu.assetTag AS equipmentAssetTag,
+            et.name     AS equipmentTypeName
+     FROM IssueReport ir
+     LEFT JOIN EquipmentUnit eu ON eu.id = ir.equipmentUnitId
+     LEFT JOIN EquipmentType et ON et.id = eu.equipmentTypeId
+     WHERE ${conditions.join(" AND ")}
+     ORDER BY ir.reportedAt DESC`
+  ).all(...params) as JoinedIssueRow[]
 
   return issues.map((issue) => ({
     id: issue.id,
     equipmentId: issue.equipmentUnitId,
+    equipmentName: issue.equipmentTypeName ?? undefined,
+    equipmentAssetTag: issue.equipmentAssetTag ?? undefined,
     reportedByUserId: issue.reportedById,
     title: issue.title,
     description: issue.description,

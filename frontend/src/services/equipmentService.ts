@@ -40,8 +40,8 @@ export function listEquipment(params?: ListEquipmentParams): Promise<Equipment[]
   return apiClient.get<Equipment[]>(`/api/equipment${queryString ? `?${queryString}` : ''}`)
 }
 
-export function getEquipment(id: string): Promise<Equipment> {
-  return apiClient.get<Equipment>(`/api/equipment/${id}`)
+export function getEquipment(id: string, options?: { silent?: boolean }): Promise<Equipment> {
+  return apiClient.get<Equipment>(`/api/equipment/${id}`, options)
 }
 
 export function createEquipment(dto: CreateEquipmentDTO): Promise<Equipment> {

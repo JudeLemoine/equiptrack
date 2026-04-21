@@ -25,6 +25,7 @@ import fullLogoStroke from '../../assets/logos/full_logo_stroke.png'
 import { isAuthenticated, setSession } from '../../lib/auth'
 import { loginWithCredentials } from '../../services/authService'
 import { useImpersonation } from '../../app/ImpersonationContext'
+import { useDarkMode } from '../../hooks/useDarkMode'
 import type { UserRole } from '../../types/auth'
 
 type RoleConfig = {
@@ -147,8 +148,8 @@ function ManualLoginScreen({ onBack }: { onBack: () => void }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
       <div
-        className="w-full max-w-sm rounded-2xl overflow-hidden"
-        style={{ background: '#fff', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}
+        className="w-full max-w-sm rounded-2xl overflow-hidden bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
+        style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}
       >
         {/* Header */}
         <div
@@ -166,7 +167,7 @@ function ManualLoginScreen({ onBack }: { onBack: () => void }) {
 
         <form onSubmit={handleSubmit} className="px-6 py-6 flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">
+            <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
               Email
             </label>
             <input
@@ -174,7 +175,7 @@ function ManualLoginScreen({ onBack }: { onBack: () => void }) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              className="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors"
+              className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors"
               required
               autoComplete="email"
               autoFocus
@@ -182,7 +183,7 @@ function ManualLoginScreen({ onBack }: { onBack: () => void }) {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">
+            <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
               Password
             </label>
             <div className="relative">
@@ -190,7 +191,7 @@ function ManualLoginScreen({ onBack }: { onBack: () => void }) {
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full h-10 px-3 pr-10 rounded-lg border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors"
+                className="w-full h-10 px-3 pr-10 rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors"
                 required
                 autoComplete="current-password"
               />
@@ -223,7 +224,7 @@ function ManualLoginScreen({ onBack }: { onBack: () => void }) {
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex items-center justify-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors mt-1"
+            className="inline-flex items-center justify-center gap-1.5 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors mt-1"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             Back to demo roles
@@ -239,6 +240,7 @@ export default function LoginPage() {
   const authenticated = isAuthenticated()
   const [showManual, setShowManual] = useState(false)
   const loginMutation = useLoginMutation()
+  const { dark } = useDarkMode()
 
   if (authenticated) return <Navigate replace to="/" />
 
@@ -247,7 +249,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col" style={{ background: '#f8fafc' }}>
+    <main className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
       {/* Top bar */}
       <div
         className="w-full flex items-center px-8 py-4 shrink-0"
@@ -261,8 +263,8 @@ export default function LoginPage() {
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center px-6 py-10 gap-6">
           <div className="text-center mb-2">
-            <h1 className="text-3xl font-bold text-slate-800 tracking-tight">Welcome to EquipTrack</h1>
-            <p className="mt-1.5 text-slate-500 text-sm">
+            <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-200 tracking-tight">Welcome to EquipTrack</h1>
+            <p className="mt-1.5 text-slate-500 dark:text-slate-400 text-sm">
               Select a role to sign in instantly as a demo user.
             </p>
           </div>
@@ -279,10 +281,9 @@ export default function LoginPage() {
                   type="button"
                   disabled={loginMutation.isPending}
                   onClick={() => handleSelectRole(role)}
-                  className="flex flex-col rounded-2xl overflow-hidden text-left transition-all disabled:opacity-60 disabled:cursor-wait focus:outline-none focus-visible:ring-2"
+                  className="flex flex-col rounded-2xl overflow-hidden text-left transition-all disabled:opacity-60 disabled:cursor-wait focus:outline-none focus-visible:ring-2 bg-white dark:bg-slate-800"
                   style={{
-                    background: '#fff',
-                    border: `1px solid #e2e8f0`,
+                    border: dark ? '1px solid #334155' : '1px solid #e2e8f0',
                     boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
                     ['--tw-ring-color' as string]: role.accent,
                   }}
@@ -296,7 +297,7 @@ export default function LoginPage() {
                   }}
                   onMouseLeave={(e) => {
                     const el = e.currentTarget
-                    el.style.border = '1px solid #e2e8f0'
+                    el.style.border = dark ? '1px solid #334155' : '1px solid #e2e8f0'
                     el.style.boxShadow = '0 2px 12px rgba(0,0,0,0.06)'
                     el.style.transform = ''
                   }}
@@ -304,7 +305,7 @@ export default function LoginPage() {
                   {/* Card header */}
                   <div
                     className="px-6 pt-7 pb-5"
-                    style={{ borderBottom: `1px solid ${role.accentBorder}`, background: role.accentLight }}
+                    style={{ borderBottom: `1px solid ${role.accentBorder}`, background: dark ? `${role.accent}22` : role.accentLight }}
                   >
                     <div
                       className="inline-flex items-center justify-center w-11 h-11 rounded-xl mb-4"
@@ -315,12 +316,12 @@ export default function LoginPage() {
                     <h2 className="text-xl font-bold tracking-tight mb-1" style={{ color: role.accent }}>
                       {role.label}
                     </h2>
-                    <p className="text-slate-500 text-xs font-medium">{role.tagline}</p>
+                    <p className="text-slate-500 dark:text-slate-400 text-xs font-medium">{role.tagline}</p>
                   </div>
 
                   {/* Card body */}
                   <div className="px-6 py-5 flex flex-col gap-4 flex-1">
-                    <p className="text-slate-600 text-sm leading-relaxed">{role.description}</p>
+                    <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">{role.description}</p>
                     <div className="flex flex-col gap-2">
                       <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: role.accent }}>
                         Access includes
@@ -329,11 +330,11 @@ export default function LoginPage() {
                         <div key={label} className="flex items-center gap-2.5">
                           <div
                             className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md"
-                            style={{ background: role.accentLight }}
+                            style={{ background: dark ? `${role.accent}30` : role.accentLight }}
                           >
                             <AccessIcon className="h-3.5 w-3.5" style={{ color: role.accent }} />
                           </div>
-                          <span className="text-sm text-slate-700">{label}</span>
+                          <span className="text-sm text-slate-700 dark:text-slate-300">{label}</span>
                         </div>
                       ))}
                     </div>
@@ -357,7 +358,7 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={() => setShowManual(true)}
-            className="inline-flex items-center gap-2 mt-2 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors group"
+            className="inline-flex items-center gap-2 mt-2 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors group"
           >
             <KeyRound className="h-3.5 w-3.5 text-slate-400 group-hover:text-slate-600 transition-colors" />
             Sign in with email & password

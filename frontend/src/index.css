@@ -1,5 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
   --brand-navy-rgb: 3 62 140;
@@ -10,6 +11,18 @@
   font-family: Manrope, 'IBM Plex Sans', 'Avenir Next', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+.dark body {
+  background:
+    radial-gradient(circle at 0% 0%, rgba(30, 41, 59, 0.8), transparent 35%),
+    radial-gradient(circle at 100% 100%, rgba(15, 23, 42, 0.9), transparent 30%),
+    #0f172a;
+  color: #f1f5f9;
 }
 
 * {

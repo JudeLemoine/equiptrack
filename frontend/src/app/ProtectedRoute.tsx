@@ -16,7 +16,8 @@ export default function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
   }
 
   if (allowedRoles?.length) {
-    if (!effectiveRole || !allowedRoles.includes(effectiveRole as UserRole)) {
+    // Admin always bypasses role restrictions
+    if (!effectiveRole || (effectiveRole !== 'admin' && !allowedRoles.includes(effectiveRole as UserRole))) {
       return <Navigate replace to="/" />
     }
   }

@@ -1,29 +1,29 @@
 import { useMemo, useState } from 'react'
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import type { ColumnDef } from '@tanstack/react-table'
-import { useNavigate } from 'react-router-dom'
-import { toast } from 'sonner'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { ExternalLink } from 'lucide-react'
 import DataTable from '../../../components/DataTable'
 import ErrorState from '../../../components/ErrorState'
 import Loader from '../../../components/Loader'
 import PageHeader from '../../../components/PageHeader'
 import { Button } from '../../../components/ui/button'
-import { getSession } from '../../../lib/auth'
 import { formatDateTime } from '../../../lib/utils'
 import {
-  listIssueReports, resolveIssue, moveToMaintenance,
-  type IssueReport, type IssueStatus, type IssueSeverity,
+  listIssueReports,
+  type IssueReport,
+  type IssueStatus,
+  type IssueSeverity,
 } from '../../../services/maintenanceService'
 
 const SEVERITY_RANK: Record<string, number>     = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 }
 const ISSUE_STATUS_RANK: Record<string, number> = { OPEN: 0, IN_PROGRESS: 1, REVIEWED: 2, RESOLVED: 3, CLOSED: 4 }
 
 const SEVERITY_META: Record<string, { label: string; pill: string; dot: string }> = {
-  LOW:      { label: 'Low',      pill: 'text-blue-700 bg-blue-50 border-blue-200 dark:text-blue-300 dark:bg-blue-900/40 dark:border-blue-800',         dot: 'bg-blue-400 dark:bg-blue-300'      },
-  MEDIUM:   { label: 'Medium',   pill: 'text-amber-700 bg-amber-50 border-amber-200 dark:text-amber-300 dark:bg-amber-900/40 dark:border-amber-800',     dot: 'bg-amber-400 dark:bg-amber-300'    },
+  LOW:      { label: 'Low',      pill: 'text-blue-700 bg-blue-50 border-blue-200 dark:text-blue-300 dark:bg-blue-900/40 dark:border-blue-800',           dot: 'bg-blue-400 dark:bg-blue-300'      },
+  MEDIUM:   { label: 'Medium',   pill: 'text-amber-700 bg-amber-50 border-amber-200 dark:text-amber-300 dark:bg-amber-900/40 dark:border-amber-800',       dot: 'bg-amber-400 dark:bg-amber-300'    },
   HIGH:     { label: 'High',     pill: 'text-orange-700 bg-orange-50 border-orange-200 dark:text-orange-300 dark:bg-orange-900/40 dark:border-orange-800', dot: 'bg-orange-400 dark:bg-orange-300'  },
-  CRITICAL: { label: 'Critical', pill: 'text-red-700 bg-red-50 border-red-200 dark:text-red-300 dark:bg-red-900/40 dark:border-red-800',                 dot: 'bg-red-500 dark:bg-red-400'        },
+  CRITICAL: { label: 'Critical', pill: 'text-red-700 bg-red-50 border-red-200 dark:text-red-300 dark:bg-red-900/40 dark:border-red-800',                   dot: 'bg-red-500 dark:bg-red-400'        },
 }
 
 const STATUS_META: Record<string, { label: string; pill: string; dot: string }> = {
@@ -34,15 +34,21 @@ const STATUS_META: Record<string, { label: string; pill: string; dot: string }> 
   CLOSED:      { label: 'Closed',      pill: 'text-slate-600 bg-slate-50 border-slate-200 dark:text-slate-400 dark:bg-slate-700/50 dark:border-slate-600',             dot: 'bg-slate-400'                      },
 }
 
-const statusOptions:   Array<{ label: string; value: IssueStatus   | 'all' }> = [
-  { label: 'All statuses', value: 'all' }, { label: 'Open', value: 'OPEN' },
-  { label: 'Reviewed', value: 'REVIEWED' }, { label: 'In Progress', value: 'IN_PROGRESS' },
-  { label: 'Resolved', value: 'RESOLVED' }, { label: 'Closed', value: 'CLOSED' },
+const statusOptions: Array<{ label: string; value: IssueStatus | 'all' }> = [
+  { label: 'All statuses', value: 'all' },
+  { label: 'Open',         value: 'OPEN' },
+  { label: 'Reviewed',     value: 'REVIEWED' },
+  { label: 'In Progress',  value: 'IN_PROGRESS' },
+  { label: 'Resolved',     value: 'RESOLVED' },
+  { label: 'Closed',       value: 'CLOSED' },
 ]
+
 const severityOptions: Array<{ label: string; value: IssueSeverity | 'all' }> = [
-  { label: 'All severities', value: 'all' }, { label: 'Low', value: 'LOW' },
-  { label: 'Medium', value: 'MEDIUM' }, { label: 'High', value: 'HIGH' },
-  { label: 'Critical', value: 'CRITICAL' },
+  { label: 'All severities', value: 'all' },
+  { label: 'Low',            value: 'LOW' },
+  { label: 'Medium',         value: 'MEDIUM' },
+  { label: 'High',           value: 'HIGH' },
+  { label: 'Critical',       value: 'CRITICAL' },
 ]
 
 function SeverityBadge({ severity }: { severity: string }) {
@@ -67,14 +73,13 @@ function StatusBadgeIssue({ status }: { status: string }) {
   )
 }
 
-export default function MaintenanceIssuesPage() {
+export default function AdminIssuesPage() {
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
-  const session = getSession()
-  const userId = session?.user.id ?? ''
+  const location = useLocation()
+  const locationState = location.state as { severityFilter?: IssueSeverity | 'all'; statusFilter?: IssueStatus | 'all' } | null
 
-  const [status,   setStatus]   = useState<IssueStatus   | 'all'>('all')
-  const [severity, setSeverity] = useState<IssueSeverity | 'all'>('all')
+  const [status,   setStatus]   = useState<IssueStatus   | 'all'>(locationState?.statusFilter   ?? 'all')
+  const [severity, setSeverity] = useState<IssueSeverity | 'all'>(locationState?.severityFilter ?? 'all')
 
   const issuesQuery = useQuery({
     queryKey: ['issues', { status, severity }],
@@ -85,23 +90,6 @@ export default function MaintenanceIssuesPage() {
     placeholderData: keepPreviousData,
   })
 
-  const resolveMutation = useMutation({
-    mutationFn: (id: string) => resolveIssue(id, userId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['issues'] })
-      toast.success('Issue resolved.')
-    },
-  })
-
-  const maintenanceMutation = useMutation({
-    mutationFn: (id: string) => moveToMaintenance(id, userId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['issues'] })
-      queryClient.invalidateQueries({ queryKey: ['maintenance-queue'] })
-      toast.success('Equipment moved to maintenance queue.')
-    },
-  })
-
   const columns = useMemo<ColumnDef<IssueReport>[]>(
     () => [
       {
@@ -110,6 +98,9 @@ export default function MaintenanceIssuesPage() {
         cell: ({ row }) => (
           <div>
             <p className="font-semibold text-slate-800 dark:text-slate-200">{row.original.title}</p>
+            {row.original.description && (
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 line-clamp-1">{row.original.description}</p>
+            )}
           </div>
         ),
       },
@@ -127,44 +118,29 @@ export default function MaintenanceIssuesPage() {
         accessorKey: 'reportedAt',
         header: 'Reported',
         cell: ({ row }) => (
-          <span className="text-sm text-slate-500 whitespace-nowrap">{formatDateTime(row.original.reportedAt)}</span>
+          <span className="text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">
+            {formatDateTime(row.original.reportedAt)}
+          </span>
         ),
       },
       {
         id: 'actions',
-        header: 'Actions',
+        header: 'Equipment',
         enableSorting: false,
-        cell: ({ row }) => {
-          const isOpen = ['OPEN', 'REVIEWED', 'IN_PROGRESS'].includes(row.original.status)
-          return (
-            <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" variant="outline" className="gap-1.5"
-                onClick={() => navigate(`/maintenance/equipment/${row.original.equipmentId}`)}>
-                <ExternalLink className="h-3.5 w-3.5" />
-                View
-              </Button>
-              {isOpen && (
-                <>
-                  <Button size="sm" disabled={maintenanceMutation.isPending}
-                    onClick={() => maintenanceMutation.mutate(row.original.id)}
-                    style={{ backgroundColor: 'rgb(var(--brand-navy-rgb))', color: '#fff' }}
-                    className="hover:opacity-90">
-                    Move to Queue
-                  </Button>
-                  <Button size="sm" variant="ghost"
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    onClick={() => resolveMutation.mutate(row.original.id)}
-                    disabled={resolveMutation.isPending}>
-                    Dismiss
-                  </Button>
-                </>
-              )}
-            </div>
-          )
-        },
+        cell: ({ row }) => (
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            onClick={() => navigate(`/admin/equipment/${row.original.equipmentId}`)}
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            View Equipment
+          </Button>
+        ),
       },
     ],
-    [navigate, maintenanceMutation, resolveMutation],
+    [navigate],
   )
 
   const sortedIssues = useMemo(() =>
@@ -185,7 +161,7 @@ export default function MaintenanceIssuesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Issue Reports" subtitle="All equipment issues reported by field workers" />
+      <PageHeader title="Issue Reports" subtitle="Equipment issues reported by field workers across the fleet" />
 
       {/* Filters */}
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 shadow-sm">
@@ -197,10 +173,17 @@ export default function MaintenanceIssuesPage() {
             <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Status</span>
             <div className="flex flex-wrap gap-1.5">
               {statusOptions.map((o) => (
-                <button key={o.value} onClick={() => setStatus(o.value)}
-                  className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition-colors ${status === o.value ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-400 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-600'}`}>
+                <button
+                  key={o.value}
+                  onClick={() => setStatus(o.value)}
+                  className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition-colors ${
+                    status === o.value
+                      ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                      : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-400 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-600'
+                  }`}
+                >
                   {o.value !== 'all' && STATUS_META[o.value] && (
-                    <span className={`h-1.5 w-1.5 rounded-full ${status === o.value ? 'bg-white/70' : STATUS_META[o.value].dot}`} />
+                    <span className={`h-1.5 w-1.5 rounded-full ${status === o.value ? 'bg-white/70 dark:bg-slate-900/70' : STATUS_META[o.value].dot}`} />
                   )}
                   {o.label}
                 </button>
@@ -211,10 +194,17 @@ export default function MaintenanceIssuesPage() {
             <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Severity</span>
             <div className="flex flex-wrap gap-1.5">
               {severityOptions.map((o) => (
-                <button key={o.value} onClick={() => setSeverity(o.value)}
-                  className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition-colors ${severity === o.value ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-400 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-600'}`}>
+                <button
+                  key={o.value}
+                  onClick={() => setSeverity(o.value)}
+                  className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition-colors ${
+                    severity === o.value
+                      ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                      : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-400 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-600'
+                  }`}
+                >
                   {o.value !== 'all' && SEVERITY_META[o.value] && (
-                    <span className={`h-1.5 w-1.5 rounded-full ${severity === o.value ? 'bg-white/70' : SEVERITY_META[o.value].dot}`} />
+                    <span className={`h-1.5 w-1.5 rounded-full ${severity === o.value ? 'bg-white/70 dark:bg-slate-900/70' : SEVERITY_META[o.value].dot}`} />
                   )}
                   {o.label}
                 </button>

@@ -102,7 +102,7 @@ export default function UserProfilePage() {
     <div className="space-y-6 max-w-2xl mx-auto">
       <button
         onClick={() => navigate(-1)}
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
         Back
@@ -140,15 +140,15 @@ export default function UserProfilePage() {
       />
 
       {/* ── Identity hero card ──────────────────────────────── */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex items-center gap-4 p-6 border-b border-slate-100">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 shadow-sm">
+        <div className="flex items-center gap-4 p-6 border-b border-slate-100 dark:border-slate-700">
           {/* Avatar bubble */}
           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-slate-800 text-white text-lg font-bold shadow-sm">
             {initials || <User className="h-6 w-6" />}
           </div>
           <div className="min-w-0">
-            <p className="text-lg font-bold text-slate-900 truncate">{user.name}</p>
-            <p className="text-sm text-slate-500 truncate">{user.email}</p>
+            <p className="text-lg font-bold text-slate-900 dark:text-slate-100 truncate">{user.name}</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 truncate">{user.email}</p>
             <span className={`mt-1 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${ROLE_PILL[user.role] ?? 'bg-slate-100 text-slate-600'}`}>
               {user.role}
             </span>
@@ -159,17 +159,17 @@ export default function UserProfilePage() {
         <div className="p-6 space-y-6">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-3">Account Details</p>
-            <p className="text-xs text-slate-500 mb-4">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
               {isOwnProfile ? 'Contact your administrator to change read-only details.' : 'Information about this user account.'}
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-xl bg-slate-50 border border-slate-100 p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-700 p-4">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-0.5">Name</p>
-                <p className="text-sm font-medium text-slate-900">{user.name}</p>
+                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{user.name}</p>
               </div>
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-0.5">Email</p>
-                <p className="text-sm font-medium text-slate-900">{user.email}</p>
+                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{user.email}</p>
                 {isOwnProfile && (
                   <button
                     type="button"
@@ -183,17 +183,17 @@ export default function UserProfilePage() {
               </div>
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-0.5">Role</p>
-                <p className="text-sm font-medium text-slate-900 capitalize">{user.role}</p>
+                <p className="text-sm font-medium text-slate-900 dark:text-slate-100 capitalize">{user.role}</p>
               </div>
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-0.5">Department</p>
-                <p className="text-sm font-medium text-slate-900">{user.department || '—'}</p>
+                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{user.department || '—'}</p>
               </div>
             </div>
           </div>
 
           {/* Editable section */}
-          <div className="space-y-4 border-t border-slate-100 pt-6">
+          <div className="space-y-4 border-t border-slate-100 dark:border-slate-700 pt-6">
             <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
               {isOwnProfile ? 'Editable Details' : 'Contact Information'}
             </p>
@@ -236,7 +236,7 @@ export default function UserProfilePage() {
                       className={`px-3 py-1.5 rounded-full text-sm font-medium capitalize transition-colors ${
                         avatarUrl === icon
                           ? 'bg-slate-900 text-white'
-                          : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-400'
+                          : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-400 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-600'
                       }`}
                     >
                       {icon}
@@ -248,7 +248,7 @@ export default function UserProfilePage() {
                     className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                       avatarUrl === ''
                         ? 'bg-slate-900 text-white'
-                        : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-400'
+                        : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-400 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-600'
                     }`}
                   >
                     None

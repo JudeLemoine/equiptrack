@@ -23,7 +23,10 @@ import {
   ListChecks,
   AlertCircle,
   QrCode,
+  Moon,
+  Send,
 } from 'lucide-react'
+import { useDarkMode } from '../hooks/useDarkMode'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { clearSession, getSession, setSession } from '../lib/auth'
@@ -52,6 +55,8 @@ type NotificationItem = {
   iconColor: string
   title: string
   body: string
+  link: string
+  linkState?: Record<string, unknown>
 }
 
 const ROLE_THEME = {
@@ -157,41 +162,41 @@ function useNotifications(role?: string, userId?: string): NotificationItem[] {
   if (isAdmin) {
     const pending = adminSummary.data?.pendingRentalRequests ?? 0
     if (pending > 0) {
-      items.push({ id: 'pending-rentals', icon: Clock, iconColor: '#d97706', title: 'Pending Rental Requests', body: `${pending} request${pending !== 1 ? 's' : ''} awaiting your approval.` })
+      items.push({ id: 'pending-rentals', icon: Clock, iconColor: '#d97706', title: 'Pending Rental Requests', body: `${pending} request${pending !== 1 ? 's' : ''} awaiting your approval.`, link: '/admin/rentals', linkState: { statusFilter: 'pending' } })
     }
     const critical = criticalIssues.data?.length ?? 0
     if (critical > 0) {
-      items.push({ id: 'critical-issues', icon: AlertTriangle, iconColor: '#dc2626', title: 'Critical Equipment Issues', body: `${critical} critical issue${critical !== 1 ? 's' : ''} reported and unresolved.` })
+      items.push({ id: 'critical-issues', icon: AlertTriangle, iconColor: '#dc2626', title: 'Critical Equipment Issues', body: `${critical} critical issue${critical !== 1 ? 's' : ''} reported and unresolved.`, link: '/admin/issues', linkState: { severityFilter: 'CRITICAL' } })
     }
     const active = adminSummary.data?.activeRentals ?? 0
     if (active > 0) {
-      items.push({ id: 'active-rentals', icon: CheckCircle2, iconColor: '#15803d', title: 'Active Rentals', body: `${active} rental${active !== 1 ? 's' : ''} currently checked out.` })
+      items.push({ id: 'active-rentals', icon: CheckCircle2, iconColor: '#15803d', title: 'Active Rentals', body: `${active} rental${active !== 1 ? 's' : ''} currently checked out.`, link: '/admin/rentals', linkState: { statusFilter: 'active' } })
     }
   }
 
   if (isField) {
     const myPending = fieldSummary.data?.myPendingRequests ?? 0
     if (myPending > 0) {
-      items.push({ id: 'my-pending', icon: Clock, iconColor: '#d97706', title: 'Requests Awaiting Approval', body: `${myPending} of your rental request${myPending !== 1 ? 's are' : ' is'} pending admin review.` })
+      items.push({ id: 'my-pending', icon: Clock, iconColor: '#d97706', title: 'Requests Awaiting Approval', body: `${myPending} of your rental request${myPending !== 1 ? 's are' : ' is'} pending admin review.`, link: '/field/rentals', linkState: { statusFilter: 'pending' } })
     }
     const overdueRentals = (myRentals.data ?? []).filter((r) => r.status === 'overdue')
     if (overdueRentals.length > 0) {
-      items.push({ id: 'overdue-rentals', icon: AlertTriangle, iconColor: '#dc2626', title: 'Overdue Rentals', body: `${overdueRentals.length} rental${overdueRentals.length !== 1 ? 's are' : ' is'} past the expected return date.` })
+      items.push({ id: 'overdue-rentals', icon: AlertTriangle, iconColor: '#dc2626', title: 'Overdue Rentals', body: `${overdueRentals.length} rental${overdueRentals.length !== 1 ? 's are' : ' is'} past the expected return date.`, link: '/field/rentals', linkState: { statusFilter: 'overdue' } })
     }
     const myActive = fieldSummary.data?.myActiveRentals ?? 0
     if (myActive > 0) {
-      items.push({ id: 'my-active', icon: CheckCircle2, iconColor: '#15803d', title: 'Active Rentals', body: `You have ${myActive} item${myActive !== 1 ? 's' : ''} currently checked out.` })
+      items.push({ id: 'my-active', icon: CheckCircle2, iconColor: '#15803d', title: 'Active Rentals', body: `You have ${myActive} item${myActive !== 1 ? 's' : ''} currently checked out.`, link: '/field/rentals', linkState: { statusFilter: 'active' } })
     }
   }
 
   if (isMaintenance) {
     const critical = criticalIssues.data?.length ?? 0
     if (critical > 0) {
-      items.push({ id: 'critical-issues-maint', icon: AlertTriangle, iconColor: '#dc2626', title: 'Critical Issues', body: `${critical} critical issue${critical !== 1 ? 's' : ''} need immediate attention.` })
+      items.push({ id: 'critical-issues-maint', icon: AlertTriangle, iconColor: '#dc2626', title: 'Critical Issues', body: `${critical} critical issue${critical !== 1 ? 's' : ''} need immediate attention.`, link: '/maintenance/issues', linkState: { severityFilter: 'CRITICAL' } })
     }
     const open = openIssues.data?.length ?? 0
     if (open > 0) {
-      items.push({ id: 'open-issues', icon: Clock, iconColor: '#d97706', title: 'Open Issue Reports', body: `${open} issue${open !== 1 ? 's' : ''} in the queue awaiting resolution.` })
+      items.push({ id: 'open-issues', icon: Clock, iconColor: '#d97706', title: 'Open Issue Reports', body: `${open} issue${open !== 1 ? 's' : ''} in the queue awaiting resolution.`, link: '/maintenance/issues', linkState: { statusFilter: 'OPEN' } })
     }
   }
 
@@ -202,14 +207,16 @@ function NotificationPanel({
   theme,
   notifications,
   onClose,
+  onNavigate,
 }: {
   theme: typeof ROLE_THEME[keyof typeof ROLE_THEME]
   notifications: NotificationItem[]
   onClose: () => void
+  onNavigate: (link: string, state?: Record<string, unknown>) => void
 }) {
   return (
     <div
-      className="absolute right-0 top-full mt-2 w-80 rounded-xl shadow-xl overflow-hidden z-50"
+      className="absolute right-0 top-full mt-2 w-80 rounded-xl shadow-xl overflow-hidden z-50 dark:border dark:border-slate-700"
       style={{ background: '#fff', border: '1px solid #e2e8f0' }}
     >
       <div
@@ -226,25 +233,30 @@ function NotificationPanel({
       </div>
 
       {notifications.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-400">
+        <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-400 dark:bg-slate-800">
           <CheckCircle2 className="h-8 w-8 opacity-40" />
           <p className="text-sm font-medium">All clear</p>
           <p className="text-xs">No notifications right now.</p>
         </div>
       ) : (
-        <div className="divide-y divide-slate-50 max-h-96 overflow-y-auto">
+        <div className="divide-y divide-slate-100 dark:divide-slate-700 max-h-96 overflow-y-auto dark:bg-slate-800">
           {notifications.map((n) => {
             const Icon = n.icon
             return (
-              <div key={n.id} className="flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
+              <button
+                key={n.id}
+                onClick={() => { onNavigate(n.link, n.linkState); onClose() }}
+                className="w-full flex items-start gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/60 transition-colors text-left group"
+              >
                 <div className="shrink-0 mt-0.5 flex items-center justify-center w-7 h-7 rounded-lg" style={{ background: `${n.iconColor}18` }}>
                   <Icon className="h-3.5 w-3.5" style={{ color: n.iconColor }} />
                 </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-slate-800">{n.title}</p>
-                  <p className="text-xs text-slate-500 leading-relaxed mt-0.5">{n.body}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{n.title}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">{n.body}</p>
                 </div>
-              </div>
+                <ChevronDown className="h-3.5 w-3.5 shrink-0 mt-1 -rotate-90 text-slate-300 dark:text-slate-600 group-hover:text-blue-400 transition-colors" />
+              </button>
             )
           })}
         </div>
@@ -353,6 +365,7 @@ function RoleTopBar({ onLogout, onImpersonate }: { onLogout: () => void; onImper
   const [notifOpen, setNotifOpen] = useState(false)
   const [calendarOpen, setCalendarOpen] = useState(false)
   const clock = useLiveClock()
+  const { dark, toggle: toggleDark } = useDarkMode()
   const notifications = useNotifications(role, userId)
   const unreadCount = notifications.length
 
@@ -423,7 +436,7 @@ function RoleTopBar({ onLogout, onImpersonate }: { onLogout: () => void; onImper
               </span>
             )}
           </button>
-          {notifOpen && <NotificationPanel theme={theme} notifications={notifications} onClose={() => setNotifOpen(false)} />}
+          {notifOpen && <NotificationPanel theme={theme} notifications={notifications} onClose={() => setNotifOpen(false)} onNavigate={(link, state) => navigate(link, { state })} />}
         </div>
 
         <DropdownMenu onOpenChange={(open) => { if (open) { toast.dismiss(); setNotifOpen(false) } }}>
@@ -440,13 +453,13 @@ function RoleTopBar({ onLogout, onImpersonate }: { onLogout: () => void; onImper
           </DropdownMenuTrigger>
 
           <DropdownMenuContent align="end" className="w-60">
-            <div className="px-3 py-3 flex items-center gap-3 border-b border-slate-100">
+            <div className="px-3 py-3 flex items-center gap-3 border-b border-slate-100 dark:border-slate-700">
               <Avatar className="h-10 w-10 shrink-0">
                 <AvatarFallback className="text-sm font-bold text-white" style={{ background: theme.bg }}>{userInitials}</AvatarFallback>
               </Avatar>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-800 truncate">{name}</p>
-                <p className="text-xs text-slate-500 truncate">{email}</p>
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{name}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{email}</p>
                 <span className="inline-block mt-0.5 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded text-white" style={{ background: theme.bg }}>{theme.badge}</span>
               </div>
             </div>
@@ -464,6 +477,18 @@ function RoleTopBar({ onLogout, onImpersonate }: { onLogout: () => void; onImper
                 Impersonate User
               </DropdownMenuItem>
             )}
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuItem onSelect={(e) => e.preventDefault()} onClick={toggleDark} className="cursor-pointer flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2">
+                <Moon className="h-4 w-4" />
+                Dark Mode
+              </span>
+              <span className={`inline-flex h-5 w-9 shrink-0 items-center rounded-full border-2 transition-colors ${dark ? 'border-blue-500 bg-blue-500' : 'border-slate-300 bg-slate-200'}`}>
+                <span className={`h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform ${dark ? 'translate-x-[17px]' : 'translate-x-0.5'}`} />
+              </span>
+            </DropdownMenuItem>
 
             <DropdownMenuSeparator />
 
@@ -487,15 +512,17 @@ const ROLE_NAV: Record<string, NavItem[]> = {
     { label: 'Dashboard', to: '/admin/dashboard', icon: LayoutDashboard },
     { label: 'Equipment', to: '/admin/equipment', icon: Boxes },
     { label: 'Rentals', to: '/admin/rentals', icon: ClipboardList },
+    { label: 'Issue Reports', to: '/admin/issues', icon: AlertCircle },
     { label: 'Users', to: '/admin/users', icon: Users },
     { label: 'Scan QR', to: '/scan', icon: QrCode },
   ],
   field: [
-    { label: 'Dashboard', to: '/field/dashboard', icon: LayoutDashboard },
-    { label: 'Equipment', to: '/field/equipment', icon: Boxes },
-    { label: 'My Rentals', to: '/field/rentals', icon: ClipboardList },
-    { label: 'My Reports', to: '/field/reports', icon: AlertCircle },
-    { label: 'Scan QR', to: '/scan', icon: QrCode },
+    { label: 'Dashboard',   to: '/field/dashboard', icon: LayoutDashboard },
+    { label: 'Equipment',   to: '/field/equipment',  icon: Boxes },
+    { label: 'Request',     to: '/field/request',    icon: Send },
+    { label: 'My Rentals',  to: '/field/rentals',    icon: ClipboardList },
+    { label: 'My Reports',  to: '/field/reports',    icon: AlertCircle },
+    { label: 'Scan QR',     to: '/scan',             icon: QrCode },
   ],
   maintenance: [
     { label: 'Dashboard', to: '/maintenance/dashboard', icon: LayoutDashboard },
@@ -572,7 +599,7 @@ export default function AppLayout() {
 
   return (
     <div
-      className="min-h-screen bg-slate-100 text-slate-900"
+      className="min-h-screen bg-slate-100 dark:bg-slate-900 dark:text-slate-100 text-slate-900"
       data-impersonating={impersonation.active ? impersonation.user?.id : undefined}
       data-impersonated-role={impersonation.active ? impersonation.user?.role : undefined}
     >

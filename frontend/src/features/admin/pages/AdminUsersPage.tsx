@@ -21,9 +21,9 @@ const roleOptions: Array<{ label: string; value: UserRole | 'all' }> = [
 ]
 
 const roleMeta: Record<UserRole, { label: string; pill: string; dot: string; initials: string }> = {
-  admin:       { label: 'Admin',       pill: 'text-blue-700 bg-blue-50 border-blue-200',     dot: 'bg-blue-500',    initials: 'bg-blue-600'    },
-  field:       { label: 'Field User',  pill: 'text-emerald-700 bg-emerald-50 border-emerald-200', dot: 'bg-emerald-500', initials: 'bg-emerald-600' },
-  maintenance: { label: 'Maintenance', pill: 'text-amber-700 bg-amber-50 border-amber-200',  dot: 'bg-amber-500',   initials: 'bg-amber-600'   },
+  admin:       { label: 'Admin',       pill: 'text-blue-700 bg-blue-50 border-blue-200 dark:text-blue-300 dark:bg-blue-900/40 dark:border-blue-800',         dot: 'bg-blue-500 dark:bg-blue-400',    initials: 'bg-blue-600'    },
+  field:       { label: 'Field User',  pill: 'text-emerald-700 bg-emerald-50 border-emerald-200 dark:text-emerald-300 dark:bg-emerald-900/40 dark:border-emerald-800', dot: 'bg-emerald-500 dark:bg-emerald-400', initials: 'bg-emerald-600' },
+  maintenance: { label: 'Maintenance', pill: 'text-amber-700 bg-amber-50 border-amber-200 dark:text-amber-300 dark:bg-amber-900/40 dark:border-amber-800',   dot: 'bg-amber-500 dark:bg-amber-400',   initials: 'bg-amber-600'   },
 }
 
 function initials(name: string) {
@@ -40,7 +40,7 @@ const EMPTY_FORM: CreateUserForm = {
   department: '', position: '', phoneNumber: '',
 }
 
-const fieldCls = 'w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors placeholder:text-slate-400'
+const fieldCls = 'w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors placeholder:text-slate-400 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100 dark:placeholder:text-slate-500'
 
 function CreateUserDialog({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient()
@@ -80,8 +80,7 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl"
-        style={{ background: '#fff' }}
+        className="w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl bg-white dark:bg-slate-800"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Dialog header */}
@@ -143,7 +142,7 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
           </div>
 
           {/* Divider */}
-          <div className="border-t border-slate-100" />
+          <div className="border-t border-slate-100 dark:border-slate-700" />
 
           <div className="flex gap-3">
             <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
@@ -194,7 +193,7 @@ export default function AdminUsersPage() {
                 {initials(row.original.name)}
               </div>
               <div>
-                <p className="font-semibold text-slate-800 group-hover:text-blue-600 transition-colors">{row.original.name}</p>
+                <p className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-blue-600 transition-colors">{row.original.name}</p>
                 <p className="text-xs text-slate-400 font-mono">{row.original.email}</p>
               </div>
             </button>
@@ -254,7 +253,7 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
-      <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">
+      <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 transition-colors">
         <ArrowLeft className="h-3.5 w-3.5" />
         Back
       </button>
@@ -271,19 +270,19 @@ export default function AdminUsersPage() {
       />
 
       {/* Filters */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 bg-slate-50 px-4 py-2.5">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 shadow-sm">
+        <div className="border-b border-slate-100 bg-slate-50 dark:bg-slate-700/50 dark:border-slate-700 px-4 py-2.5">
           <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Filters</p>
         </div>
         <div className="p-4">
           <div className="flex flex-col gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Role</span>
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Role</span>
             <div className="flex flex-wrap gap-1.5">
               {roleOptions.map((opt) => (
                 <button
                   key={opt.value}
                   onClick={() => setRole(opt.value)}
-                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${role === opt.value ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:border-slate-400'}`}
+                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${role === opt.value ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:border-slate-400 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-600'}`}
                 >
                   {opt.label}
                 </button>

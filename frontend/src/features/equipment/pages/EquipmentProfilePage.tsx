@@ -6,6 +6,8 @@ import { Trash2, QrCode, Download, UserCircle2, UserX, Search } from 'lucide-rea
 import { QRCodeCanvas } from 'qrcode.react'
 import { listUsers } from '../../../services/userService'
 import { assignEquipment } from '../../../services/equipmentService'
+import RentalRequestForm from '../../rentals/components/RentalRequestForm'
+import { createRentalRequest } from '../../../services/rentalService'
 import ErrorState from '../../../components/ErrorState'
 import Loader from '../../../components/Loader'
 import PageHeader from '../../../components/PageHeader'
@@ -36,7 +38,6 @@ import { getSession } from '../../../lib/auth'
 import { formatDate, formatDateTime } from '../../../lib/utils'
 import { listActivityByEquipment } from '../../../services/activityService'
 import {
-  checkoutEquipment,
   getEquipment,
   updateEquipment,
   markEquipmentServiced,
@@ -64,6 +65,7 @@ export default function EquipmentProfilePage() {
   
   // Dialog States
   const [isReportIssueOpen, setReportIssueOpen] = useState(false)
+  const [isRentalRequestOpen, setRentalRequestOpen] = useState(false)
   const [isMarkServicedOpen, setMarkServicedOpen] = useState(false)
   const [isEditAssetOpen, setEditAssetOpen] = useState(false)
   const [manualNextDueDate, setManualNextDueDate] = useState('')
@@ -75,6 +77,7 @@ export default function EquipmentProfilePage() {
 
   // Form States
   const [issueSeverity, setIssueSeverity] = useState('low')
+  const [issueTitle, setIssueTitle] = useState('')
   const [issueDescription, setIssueDescription] = useState('')
   const [fieldNote, setFieldNote] = useState('')
   const [techNote, setTechNote] = useState('')
@@ -169,18 +172,20 @@ export default function EquipmentProfilePage() {
     mutationFn: async () => {
       return reportIssue(id as string, {
         severity: issueSeverity,
-        title: `Issue Report: ${equipment?.name}`,
-        description: issueDescription,
-        reportedById: userId
+        title: issueTitle.trim() || `Issue Report: ${equipment?.name}`,
+        description: issueDescription.trim(),
+        reportedById: userId,
       })
     },
     onSuccess: async () => {
       setReportIssueOpen(false)
       setIssueSeverity('low')
+      setIssueTitle('')
       setIssueDescription('')
       await refreshAll()
       toast.success('Issue reported successfully.')
-    }
+    },
+    onError: () => toast.error('Could not submit issue report.'),
   })
 
   const addNoteMutation = useMutation({
@@ -226,27 +231,23 @@ export default function EquipmentProfilePage() {
     onError: () => toast.error('Could not mark serviced. Add a manual due date if needed.'),
   })
 
-  const checkoutMutation = useMutation({
-    mutationFn: () => {
-      if (!startDate || !endDate) {
-        toast.error('Please select rental dates on the Search page before checking out.')
-        throw new Error('Start date and end date are required for checkout.')
-      }
-      return checkoutEquipment(id as string, {
+  const rentalRequestMutation = useMutation({
+    mutationFn: (values: { startDate: string; endDate?: string; notes?: string }) =>
+      createRentalRequest({
+        equipmentId: id as string,
         requestedBy: userId,
-        startDate,
-        endDate,
-      })
-    },
+        startDate: values.startDate,
+        endDate: values.endDate,
+        notes: values.notes,
+      }),
     onSuccess: () => {
+      setRentalRequestOpen(false)
       refreshAll()
-      toast.success('Checkout request submitted for approval.')
+      toast.success('Rental request submitted — awaiting admin approval.')
     },
     onError: (err: any) => {
-      if (err.message !== 'Start date and end date are required for checkout.') {
-        toast.error(err.message || 'Failed to submit checkout request.')
-      }
-    }
+      toast.error(err.message || 'Failed to submit rental request.')
+    },
   })
 
   const editAssetMutation = useMutation({
@@ -299,7 +300,7 @@ export default function EquipmentProfilePage() {
     onSuccess: async () => { await refreshAll(); toast.success('Note removed.') },
   })
 
-  const canCheckout = equipment?.status === 'available' && startDate && endDate
+  const canCheckout = equipment?.status === 'available'
 
   if (isLoading) return <Loader label="Loading Asset Profile..." />
   if (isError || !equipment) return <ErrorState error={error as Error} title="Asset Not Found" />
@@ -311,16 +312,17 @@ export default function EquipmentProfilePage() {
           <div className="flex flex-wrap gap-2">
             {role === 'field' && (
               <>
-                <Button 
+                <Button
                   style={{ backgroundColor: navy, color: 'white' }}
-                  onClick={() => checkoutMutation.mutate()}
-                  disabled={!canCheckout || checkoutMutation.isPending}
+                  className="hover:opacity-90 disabled:opacity-40"
+                  onClick={() => setRentalRequestOpen(true)}
+                  disabled={!canCheckout}
                 >
-                  {checkoutMutation.isPending ? 'Processing...' : 'Check Out'}
+                  Request Equipment
                 </Button>
-                <Button 
-                  variant="outline" 
-                  style={{ borderColor: gold, color: navy }}
+                <Button
+                  variant="outline"
+                  className="border-amber-400 text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:border-amber-500 dark:text-amber-400 dark:hover:bg-amber-900/20 dark:hover:text-amber-300"
                   onClick={() => setReportIssueOpen(true)}
                 >
                   Report Issue
@@ -329,13 +331,42 @@ export default function EquipmentProfilePage() {
             )}
 
             {role === 'maintenance' && (
-              <Button style={{ backgroundColor: navy }} onClick={() => setMarkServicedOpen(true)}>
-                Mark Serviced
-              </Button>
+              <>
+                <Button
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  onClick={() => setMarkServicedOpen(true)}
+                >
+                  Mark Serviced
+                </Button>
+                <Button
+                  variant="outline"
+                  className="border-amber-400 text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:border-amber-500 dark:text-amber-400 dark:hover:bg-amber-900/20 dark:hover:text-amber-300"
+                  onClick={() => setReportIssueOpen(true)}
+                >
+                  Report Issue
+                </Button>
+              </>
             )}
-            
+
             {role === 'admin' && (
-              <Button variant="secondary" onClick={openEditDialog}>Edit Asset</Button>
+              <>
+                <Button
+                  style={{ backgroundColor: navy, color: 'white' }}
+                  className="hover:opacity-90 disabled:opacity-40"
+                  onClick={() => setRentalRequestOpen(true)}
+                  disabled={!canCheckout}
+                >
+                  Request Equipment
+                </Button>
+                <Button
+                  variant="outline"
+                  className="border-amber-400 text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:border-amber-500 dark:text-amber-400 dark:hover:bg-amber-900/20 dark:hover:text-amber-300"
+                  onClick={() => setReportIssueOpen(true)}
+                >
+                  Report Issue
+                </Button>
+                <Button variant="secondary" onClick={openEditDialog}>Edit Asset</Button>
+              </>
             )}
           </div>
         }
@@ -356,17 +387,17 @@ export default function EquipmentProfilePage() {
             </div>
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1">Category</p>
-              <p className="text-sm font-medium text-slate-900">{equipment.category}</p>
+              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{equipment.category}</p>
             </div>
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1">Next Service Due</p>
-              <p className={`text-sm font-medium ${equipment.nextServiceDueDate && new Date(equipment.nextServiceDueDate) < new Date() ? 'text-red-600' : 'text-slate-900'}`}>
+              <p className={`text-sm font-medium ${equipment.nextServiceDueDate && new Date(equipment.nextServiceDueDate) < new Date() ? 'text-red-600' : 'text-slate-900 dark:text-slate-100'}`}>
                 {formatDate(equipment.nextServiceDueDate)}
               </p>
             </div>
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1">Last Service</p>
-              <p className="text-sm text-slate-700">{formatDate(equipment.lastServiceDate)}</p>
+              <p className="text-sm text-slate-700 dark:text-slate-300">{formatDate(equipment.lastServiceDate)}</p>
             </div>
 
             {/* Assigned Worker row — visible to all roles, editable by admin */}
@@ -378,7 +409,7 @@ export default function EquipmentProfilePage() {
                     <div className="flex items-center justify-center h-7 w-7 rounded-full bg-emerald-100 shrink-0">
                       <UserCircle2 className="h-4 w-4 text-emerald-700" />
                     </div>
-                    <span className="font-medium text-slate-900">{equipment.assignedToName}</span>
+                    <span className="font-medium text-slate-900 dark:text-slate-100">{equipment.assignedToName}</span>
                   </div>
                 ) : (
                   <span className="text-sm text-slate-400 italic">No worker assigned</span>
@@ -436,14 +467,14 @@ export default function EquipmentProfilePage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {equipment.notes && (
-              <p className="text-sm text-slate-600 italic">{equipment.notes}</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400 italic">{equipment.notes}</p>
             )}
             {techNotes && techNotes.length > 0 ? (
               <div className="space-y-3">
                 {techNotes.map((note: MaintenanceNote) => (
-                  <div key={note.id} className="border-l-2 border-indigo-200 pl-3 py-1 flex items-start justify-between gap-2">
+                  <div key={note.id} className="border-l-2 border-indigo-200 dark:border-indigo-600 pl-3 py-1 flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-sm text-slate-700">{note.body}</p>
+                      <p className="text-sm text-slate-700 dark:text-slate-300">{note.body}</p>
                       <p className="text-xs text-slate-400 mt-0.5">{formatDateTime(note.createdAt)}</p>
                     </div>
                     {(role === 'maintenance' || role === 'admin') && (
@@ -461,10 +492,10 @@ export default function EquipmentProfilePage() {
                 ))}
               </div>
             ) : !equipment.notes ? (
-              <p className="text-sm text-slate-500 italic">No technician notes on file.</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400 italic">No technician notes on file.</p>
             ) : null}
             {role === 'maintenance' && (
-              <div className="pt-2 border-t border-slate-100 space-y-2">
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-700 space-y-2">
                 <Textarea
                   placeholder="Add a technician note..."
                   value={techNote}
@@ -499,7 +530,7 @@ export default function EquipmentProfilePage() {
             <div className="flex flex-col items-center gap-3 shrink-0">
               <div
                 ref={qrWrapperRef}
-                className="p-3 bg-white border border-slate-200 rounded-xl shadow-sm"
+                className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm"
               >
                 <QRCodeCanvas
                   value={equipment.id}
@@ -510,9 +541,9 @@ export default function EquipmentProfilePage() {
                   fgColor="#1A4889"
                 />
               </div>
-              <p className="text-xs text-slate-500 text-center">
+              <p className="text-xs text-slate-500 dark:text-slate-400 text-center">
                 Asset Tag:{' '}
-                <span className="font-mono font-semibold text-slate-700">{equipment.qrCode}</span>
+                <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">{equipment.qrCode}</span>
               </p>
               <Button
                 variant="outline"
@@ -527,22 +558,22 @@ export default function EquipmentProfilePage() {
 
             {/* Description */}
             <div className="flex-1 min-w-0 space-y-3 pt-1">
-              <p className="text-sm font-medium text-slate-800">How to use this QR code</p>
-              <ul className="text-sm text-slate-600 space-y-2">
+              <p className="text-sm font-medium text-slate-800 dark:text-slate-200">How to use this QR code</p>
+              <ul className="text-sm text-slate-600 dark:text-slate-400 space-y-2">
                 <li className="flex items-start gap-2">
-                  <span className="shrink-0 mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold text-slate-500">1</span>
+                  <span className="shrink-0 mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-700 text-[11px] font-bold text-slate-500 dark:text-slate-400">1</span>
                   Download and print this QR code, then attach it to the physical equipment.
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="shrink-0 mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold text-slate-500">2</span>
+                  <span className="shrink-0 mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-700 text-[11px] font-bold text-slate-500 dark:text-slate-400">2</span>
                   Use the <strong>Scan QR</strong> option in the app navigation to scan it with your camera.
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="shrink-0 mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold text-slate-500">3</span>
+                  <span className="shrink-0 mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-700 text-[11px] font-bold text-slate-500 dark:text-slate-400">3</span>
                   EquipTrack will instantly navigate to this equipment's profile.
                 </li>
               </ul>
-              <p className="text-xs text-slate-400 pt-1">
+              <p className="text-xs text-slate-400 dark:text-slate-500 pt-1">
                 Encodes equipment ID:{' '}
                 <span className="font-mono">{equipment.id}</span>
               </p>
@@ -602,13 +633,13 @@ export default function EquipmentProfilePage() {
                 ) ?? []
                 return historyItems.length > 0 ? (
                   historyItems.map((log: ActivityEvent) => (
-                    <div key={log.id} className="border-l-2 border-slate-200 pl-4 py-1">
-                      <p className="text-sm font-medium">{log.summary}</p>
-                      <p className="text-xs text-slate-500">{formatDateTime(log.timestamp)}</p>
+                    <div key={log.id} className="border-l-2 border-slate-200 dark:border-slate-600 pl-4 py-1">
+                      <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{log.summary}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{formatDateTime(log.timestamp)}</p>
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-slate-500 py-2">No recent history on file</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 py-2">No recent history on file</p>
                 )
               })()}
             </div>
@@ -633,57 +664,133 @@ export default function EquipmentProfilePage() {
             <div className="space-y-4">
               {serviceLogs && serviceLogs.length > 0 ? (
                 serviceLogs.map((entry: ServiceLogEntry) => (
-                  <div key={entry.id} className="rounded-lg bg-slate-50 p-3">
-                    <p className="text-sm">{entry.note}</p>
-                    <p className="text-xs text-slate-500 mt-1">{formatDate(entry.date)}</p>
+                  <div key={entry.id} className="rounded-lg bg-slate-50 dark:bg-slate-700/50 p-3">
+                    <p className="text-sm dark:text-slate-200">{entry.note}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{formatDate(entry.date)}</p>
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-slate-500 py-2">No service logs on file</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 py-2">No service logs on file</p>
               )}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* REPORT ISSUE DIALOG */}
-      <Dialog open={isReportIssueOpen} onOpenChange={setReportIssueOpen}>
-        <DialogContent>
+      {/* ── RENTAL REQUEST DIALOG ──────────────────────────────── */}
+      <Dialog open={isRentalRequestOpen} onOpenChange={setRentalRequestOpen}>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Report Equipment Issue</DialogTitle>
-            <DialogDescription>
-              Critical issues will automatically mark this unit as Out of Service.
+            <DialogTitle className="text-base">Request Equipment</DialogTitle>
+            <DialogDescription className="text-xs">
+              Fill in the details below. Your request will be sent to an admin for approval.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Severity</Label>
-              <select 
-                className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                value={issueSeverity} 
-                onChange={(e) => setIssueSeverity(e.target.value)}
-              >
-                <option value="low">Low (Operational)</option>
-                <option value="medium">Medium (Monitor)</option>
-                <option value="critical">Critical (Immediate Repair)</option>
-              </select>
+          <RentalRequestForm
+            equipmentName={equipment?.name ?? ''}
+            equipmentQr={equipment?.qrCode ?? ''}
+            requesterName={session?.user.name ?? ''}
+            requesterEmail={session?.user.email ?? ''}
+            defaultStartDate={startDate ?? ''}
+            defaultEndDate={endDate ?? ''}
+            isSubmitting={rentalRequestMutation.isPending}
+            onSubmit={(values) => rentalRequestMutation.mutate(values)}
+            onCancel={() => setRentalRequestOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* ── REPORT ISSUE DIALOG ────────────────────────────────── */}
+      <Dialog open={isReportIssueOpen} onOpenChange={(open) => { setReportIssueOpen(open); if (!open) { setIssueSeverity('low'); setIssueTitle(''); setIssueDescription('') } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-base">Report Equipment Issue</DialogTitle>
+            <DialogDescription className="text-xs">
+              Describe the problem so the maintenance team can triage it quickly.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5 py-2">
+            {/* Equipment info card */}
+            <div className="rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-4 py-3 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-0.5">Equipment</p>
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{equipment?.name}</p>
+                <p className="text-xs font-mono text-slate-400">{equipment?.qrCode}</p>
+              </div>
+              <StatusBadge status={equipment?.status ?? 'available'} />
             </div>
-            <div className="space-y-2">
-              <Label>Description</Label>
-              <Textarea 
-                placeholder="Describe the leak, noise, or damage..." 
-                value={issueDescription}
-                onChange={(e) => setIssueDescription(e.target.value)}
+
+            {/* Severity — visual pill toggles */}
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Severity</p>
+              <div className="grid grid-cols-4 gap-2">
+                {([
+                  { value: 'low',      label: 'Low',      cls: 'border-blue-200 text-blue-700 bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:bg-blue-900/40',           active: 'border-blue-500 bg-blue-500 text-white dark:bg-blue-600 dark:border-blue-600' },
+                  { value: 'medium',   label: 'Medium',   cls: 'border-amber-200 text-amber-700 bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:bg-amber-900/40',       active: 'border-amber-500 bg-amber-500 text-white dark:bg-amber-600 dark:border-amber-600' },
+                  { value: 'high',     label: 'High',     cls: 'border-orange-200 text-orange-700 bg-orange-50 dark:border-orange-800 dark:text-orange-300 dark:bg-orange-900/40', active: 'border-orange-500 bg-orange-500 text-white dark:bg-orange-600 dark:border-orange-600' },
+                  { value: 'critical', label: 'Critical', cls: 'border-red-200 text-red-700 bg-red-50 dark:border-red-800 dark:text-red-300 dark:bg-red-900/40',                   active: 'border-red-500 bg-red-500 text-white dark:bg-red-700 dark:border-red-700' },
+                ] as const).map((s) => (
+                  <button
+                    key={s.value}
+                    type="button"
+                    onClick={() => setIssueSeverity(s.value)}
+                    className={`rounded-lg border px-2 py-2 text-xs font-semibold transition-all text-center ${issueSeverity === s.value ? s.active : s.cls} hover:opacity-90`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+              {issueSeverity === 'critical' && (
+                <p className="mt-1.5 text-xs text-red-600 dark:text-red-400 font-medium">⚠ Critical issues will flag this unit for immediate attention.</p>
+              )}
+            </div>
+
+            {/* Issue title */}
+            <div>
+              <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5">
+                Issue Title <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="text"
+                value={issueTitle}
+                onChange={(e) => setIssueTitle(e.target.value)}
+                placeholder={`e.g. Hydraulic leak on left arm`}
+                className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors placeholder:text-slate-400"
+                maxLength={120}
               />
             </div>
-            <Button 
-              className="w-full" 
-              style={{ backgroundColor: navy }}
-              onClick={() => reportIssueMutation.mutate()}
-              disabled={reportIssueMutation.isPending || !issueDescription.trim()}
-            >
-              {reportIssueMutation.isPending ? 'Sending...' : 'Submit Report'}
-            </Button>
+
+            {/* Description */}
+            <div>
+              <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5">
+                Description <span className="text-red-400">*</span>
+              </label>
+              <textarea
+                placeholder="Describe what you observed — noises, leaks, damage, behaviour, when it started…"
+                value={issueDescription}
+                onChange={(e) => setIssueDescription(e.target.value)}
+                rows={4}
+                maxLength={600}
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors resize-none placeholder:text-slate-400"
+              />
+              <p className="mt-1 text-right text-[10px] text-slate-400">{issueDescription.length}/600</p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 pt-1">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => setReportIssueOpen(false)} disabled={reportIssueMutation.isPending}>
+                Cancel
+              </Button>
+              <Button
+                className="flex-1"
+                style={{ backgroundColor: navy }}
+                onClick={() => reportIssueMutation.mutate()}
+                disabled={reportIssueMutation.isPending || !issueTitle.trim() || !issueDescription.trim()}
+              >
+                {reportIssueMutation.isPending ? 'Submitting…' : 'Submit Report'}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -699,14 +806,14 @@ export default function EquipmentProfilePage() {
           </DialogHeader>
           <div className="space-y-4">
             {/* Info card */}
-            <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 space-y-1.5">
+            <div className="rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 px-4 py-3 space-y-1.5">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Equipment</p>
-                <p className="text-sm font-semibold text-slate-800">{equipment?.name}</p>
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{equipment?.name}</p>
               </div>
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Configured interval</p>
-                <p className="text-sm text-slate-600">
+                <p className="text-sm text-slate-600 dark:text-slate-400">
                   {equipment?.maintenanceIntervalDays ? `${equipment.maintenanceIntervalDays} days` : '—'}
                 </p>
               </div>
@@ -720,7 +827,7 @@ export default function EquipmentProfilePage() {
                 type="date"
                 value={manualNextDueDate}
                 onChange={(e) => setManualNextDueDate(e.target.value)}
-                className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors"
+                className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100"
               />
             </div>
             <div className="flex justify-end gap-3">
@@ -769,7 +876,7 @@ export default function EquipmentProfilePage() {
                   type="date"
                   value={editNextDue}
                   onChange={(e) => setEditNextDue(e.target.value)}
-                  className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors"
+                  className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100"
                 />
               </div>
             </div>
@@ -864,7 +971,7 @@ export default function EquipmentProfilePage() {
       {/* ASSIGN WORKER DIALOG */}
       <Dialog open={isAssignOpen} onOpenChange={(open) => { setAssignOpen(open); if (!open) setAssignSearch('') }}>
         <DialogContent className="max-w-md p-0 overflow-hidden gap-0">
-          <DialogHeader className="px-5 pt-5 pb-3 border-b border-slate-100">
+          <DialogHeader className="px-5 pt-5 pb-3 border-b border-slate-100 dark:border-slate-700">
             <DialogTitle className="flex items-center gap-2">
               <UserCircle2 className="h-4 w-4 text-slate-500" />
               Assign Worker
@@ -875,12 +982,12 @@ export default function EquipmentProfilePage() {
           </DialogHeader>
 
           {/* Search */}
-          <div className="px-4 py-3 border-b border-slate-100">
+          <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
               <input
                 autoFocus
-                className="w-full pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                className="w-full pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100"
                 placeholder="Search field workers…"
                 value={assignSearch}
                 onChange={(e) => setAssignSearch(e.target.value)}
@@ -911,19 +1018,19 @@ export default function EquipmentProfilePage() {
                     key={u.id}
                     disabled={assignMutation.isPending}
                     onClick={() => assignMutation.mutate({ targetUserId: u.id })}
-                    className={`w-full flex items-center gap-3 px-5 py-3 text-left border-b border-slate-50 last:border-0 transition-colors ${
+                    className={`w-full flex items-center gap-3 px-5 py-3 text-left border-b border-slate-50 dark:border-slate-700 last:border-0 transition-colors ${
                       isCurrentlyAssigned
-                        ? 'bg-emerald-50 hover:bg-emerald-100'
-                        : 'hover:bg-slate-50'
+                        ? 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/30'
+                        : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'
                     }`}
                   >
                     <div className="flex items-center justify-center h-9 w-9 rounded-full bg-emerald-100 shrink-0">
                       <UserCircle2 className="h-5 w-5 text-emerald-700" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-800 truncate">{u.name}</p>
+                      <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{u.name}</p>
                       {u.position && (
-                        <p className="text-xs text-slate-500 truncate">{u.position}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{u.position}</p>
                       )}
                     </div>
                     {isCurrentlyAssigned && (

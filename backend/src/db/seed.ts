@@ -127,36 +127,240 @@ const manufacturers = [
 ]
 
 const departments = ["Operations", "Field Services", "Maintenance", "Turnaround", "Projects", "Logistics"]
+
 const jobSites = [
   "North Pit Expansion", "Steam Plant Upgrade", "Tailings Cell 4", "Pipeline Spread 7",
   "Refinery Turnaround Unit 12", "Cooling Water Upgrade", "Crusher Relocation",
   "Substation Expansion", "Well Pad 14B", "Tank Farm Rehabilitation",
+  "Overburden Removal Phase 3", "Secondary Recovery Program", "Camp Road Grading",
+  "Compressor Station 6 Tie-In", "Settling Pond Dike Repair",
 ]
 
-const noteBodies = [
-  "Operator reported intermittent hydraulic pressure drop.",
-  "Routine inspection completed with no major concerns.",
-  "Unit should be prioritized for next service window.",
-  "Observed minor wear on track assembly.",
-  "Awaiting parts before maintenance can proceed.",
-  "Equipment returned in acceptable condition.",
-  "Temporary restriction applied pending maintenance review.",
-  "Technician recommends follow-up inspection in 14 days.",
+// ─── Rich note bodies (equipment unit, rental, maintenance, issue) ───────────
+
+const equipmentNoteBodies = [
+  "Operator reported a slight hydraulic pressure drop during boom extension — pressure recovers on idle. Flagged for next service window; no operational restriction in place at this time.",
+  "Routine 250-hour inspection completed. Filters replaced, greasing points serviced, fluid levels topped up. No deficiencies noted. Unit cleared for continued deployment.",
+  "Minor surface rust observed on the left side access ladder. Structural integrity not compromised. Recommend sandblasting and touch-up paint at next scheduled downtime.",
+  "Track tension on the right side measured at the lower end of tolerance. Adjusted to spec during shift. Operator advised to monitor and report if slack returns before end of week.",
+  "Cab HVAC blowing warm intermittently. Refrigerant charge appears low. Booked for HVAC service — operator comfort is affected in peak summer temperatures.",
+  "Unit returned from North Pit after 18-day deployment. Full walkaround completed. All lights functional, no fluid leaks, undercarriage in acceptable condition. Cleared for redeployment.",
+  "Windshield has a 15 cm crack originating from lower driver-side corner. Does not impair sightlines but is flagged per safety policy — replacement scheduled for end of week.",
+  "Boom cylinder seal showing minor seepage at the rod end. Not a critical leak but will be monitored daily. Maintenance notified. Approximate repair window: next 72 hours.",
+  "Engine hours at 4,820 — approaching 5,000-hour major overhaul threshold. Maintenance team alerted. Parts pre-order initiated for major service kit.",
+  "Left rear tire on haul truck showing uneven wear pattern. Likely alignment or suspension issue. Pulled from service for inspection. Replacement tire fitted from yard stock.",
+  "Electrical harness near cab base shows chafing against the frame. Potential intermittent fault risk. Secured with conduit clamp as a temporary measure. Full harness replacement ordered.",
+  "Bucket teeth replaced — previous set was worn past 40% of original profile. New teeth fitted and torqued per manufacturer spec. Bucket lip also inspected for cracks — none found.",
+  "Operator reported unusual noise from the final drive during reversing. Sound is intermittent and not reproducible at low speed. Maintenance to perform final drive oil sample analysis.",
+  "Pre-shift check revealed low coolant level. Added 2 litres of approved coolant mix. No obvious external leak observed. Booked for pressure test to identify potential internal seepage.",
+  "Unit has exceeded recommended deployment hours for this quarter. Scheduled downtime block allocated next Monday. Operator safety briefing updated with interim inspection intervals.",
+  "Ground-engaging tools replaced per scheduled wear cycle. New bucket adapters installed. All pins and retainers checked — two retaining clips replaced. Good condition overall.",
+  "Battery bank showing 11.8V at rest — below the 12.4V minimum spec. Jump-start required this morning. Batteries flagged for replacement before next deployment.",
+  "Slew ring bearing grease purged and regreased following torque-check procedure. Bearing play measured within spec. No cracking or pitting observed on visual inspection.",
+  "Fuel filter replaced ahead of schedule due to water contamination indicator light. Fuel tank drained and inspected — approximately 0.5L of water-contaminated fuel removed.",
+  "Operator noted the auto-greasing system indicator light is on. Manual greasing applied as a precaution. Lubrication tech to inspect the pump assembly and reservoir level.",
+  "Platform and handrails inspected following near-miss report from adjacent work area. All safety hardware confirmed secure. Anti-slip tread material in good condition.",
+  "Radiator fins partially blocked with debris from tailings area operation. Fins blown out with compressed air — core flow now fully clear. Coolant temp has returned to normal range.",
+  "Oil sample taken during scheduled PM. Lab results pending. Based on visual inspection, oil is dark but not metallic. Will defer oil change decision until sample results received.",
+  "Air filter primary element replaced. Secondary element inspected — clean, retained. Restriction indicator reset. Engine intake system fully sealed and reinstated.",
+  "Under-carriage inspection at 500 hours — sprocket wear measured at 18%, idler wear at 12%, track pads at 25% wear. All within acceptable limits. Next undercarriage check at 1,000 hours.",
+]
+
+const rentalNoteBodies = [
+  "Admin confirmed equipment availability with yard staff before approving. Unit verified fuelled and ready for pickup at 06:30 dispatch window.",
+  "Field supervisor requested early return — job scope reduced. Equipment checked back in 3 days ahead of schedule. No damage, all fluids at level.",
+  "Rental extended by 4 days following site manager request — additional earthworks required on the eastern berm. Updated end date approved and logged.",
+  "Equipment held at site overnight due to muddy access road preventing haul truck retrieval. Security measures in place. Retrieval rescheduled for morning.",
+  "Operator noted fuel level was below 50% at pickup — fuelled on-site before mobilisation. Fuel cost to be cross-charged to project cost code PL-7B.",
+  "Return inspection completed by yard foreman. Minor mud accumulation on undercarriage — washed down in yard. No damage or defects. Rental closed in good standing.",
+  "Approved unit was unavailable at dispatch time due to a last-minute unscheduled repair. Alternate unit of same type provided — documented under this rental record.",
+  "Requester confirmed operator certification on file for this equipment type prior to checkout. Cert number logged in HSE system.",
+  "Late return flagged — equipment not returned by approved end date. Field supervisor contacted. Confirmed equipment still required for 2 additional days. Status updated to overdue pending formal extension.",
+  "Pre-rental inspection conducted jointly by maintenance tech and requester. No pre-existing damage noted. All accessories and attachments confirmed present and functional.",
+  "Site received unusually heavy rainfall during rental period. Equipment was relocated to higher ground. Hourly operation logs submitted by operator — no issues during wet conditions.",
+  "Rental approved but equipment held pending resolution of outstanding safety recall notice. Recall verified as not applicable to this serial number. Equipment released following confirmation.",
+]
+
+const maintenanceNoteBodies = [
+  "Found significant debris accumulation in the cooling air intake. Cleaned thoroughly. Recommend adding an intake screen guard — will source from supplier.",
+  "Boom cylinder removed for bench inspection. Seals replaced with OEM kit. Cylinder honed and reassembled. Pressure tested to 3,500 PSI — no leaks. Reinstalled and function tested.",
+  "Electrical diagnostic completed using CAT ET tool. Found fault code E360 — turbo inlet pressure sensor. Sensor replaced. Fault cleared and unit tested under load.",
+  "Transmission oil sample from last service came back with elevated iron particles. Full transmission drain, inspection, and refill completed. No visible gear damage found.",
+  "Scheduled 1,000-hour service completed: engine oil, all filters, coolant flush, battery load test, brake adjustment, track tension, and full fluid analysis kit submitted to lab.",
+  "Welding repair completed on the right-hand dozer blade — stress crack running approximately 220mm. Crack vee'd out, welded in two passes, ground smooth, and MPI tested. No further cracking found.",
+  "Hydraulic pump replaced following field report of loss of power. Old pump removed — internal vane wear observed. New pump installed, system flushed, and pressure tested. Performance restored.",
+  "Air conditioning refrigerant recovered, system vacuumed, and recharged to manufacturer specification. Compressor clutch also replaced — slipping observed on inspection.",
+  "Swing motor disassembled — found worn thrust washers. Parts on order from OEM. Temporary restriction placed on swing speed. Expected back in service within 5 business days.",
+  "Final drive oil replaced on both sides at 3,000-hour interval. Left side showed slight metallic tinge — consistent with normal bedding wear. No abnormal findings. Cleared for deployment.",
+  "Undercarriage replacement: both track chains replaced, sprockets replaced, idlers resurfaced, and new track shoes fitted. All torqued to spec. Full undercarriage warranty period reset.",
+  "Engine overhaul completed. Pistons, rings, liners, main bearings, and con-rod bearings replaced. Valve seats re-cut. Engine run-in per factory procedure — 2-hour low-load break-in completed.",
+  "Brake system inspected following operator concern. Brake pads measured at 4mm — above the 3mm replacement threshold. Calipers cleaned and lubricated. Brake fluid flushed.",
+  "Investigated intermittent hydraulic fault. Root cause identified as a loose return filter housing — was bypassing under pressure. Tightened and sealed. Fault not reproducible after fix.",
+  "Technician replaced main battery bank (3 × 12V 200Ah). Old batteries load-tested — all below 60% capacity. New batteries installed, terminals cleaned, and charge confirmed.",
+]
+
+const issueDescriptionBodies = [
+  "Operator noticed a continuous drip from the hydraulic return line near the boom pivot during operation. Leak is approximately 1 drop every 3 seconds at full working pressure. Equipment pulled from service and marked with red tag. Location: boom pivot area, starboard side. First observed at approximately 10:45 this morning.",
+  "Machine began vibrating excessively at the cab and operator station when operating above 1,800 RPM. Vibration is inconsistent — occurs mainly under load and reduces at idle. Suspect imbalance in the drive shaft or torque converter. Operator shut down immediately per procedure. This is the second report this month for this unit.",
+  "Dashboard is showing a persistent E-450 electrical fault code. Unit loses cab display intermittently and the fault resets itself after 30–60 seconds. Issue began after the unit returned from the Pipeline Spread 7 site last Tuesday. No physical damage visible to the cab harness on initial inspection.",
+  "Brake response is delayed by approximately 0.5–1 second on the left axle service brake. Noticed during a downhill approach to the crusher dump pocket. Operator felt the pedal travel was longer than usual. Unit parked and not returned to service. This is a safety-critical issue — please prioritise.",
+  "Track wear on the left side is beyond the acceptable 30% threshold. Track shoe lug height measured at 18mm — spec minimum is 25mm. Pads are not providing adequate grip in soft ground. Unit sliding on grades during material push. Recommend immediate track replacement.",
+  "Boom responds with a 1–2 second lag when joystick input is applied. Issue is consistent and not intermittent. Noticed during precision load placement at the steam plant. Operator could not accurately place loads. Suspect hydraulic pilot pressure issue or pilot valve sticking.",
+  "Engine coolant temperature gauge spiking to 112°C under sustained heavy load — normal operating range is 82–95°C. Radiator core checked and is clean. Fan belt tension appears correct. Possible water pump impeller wear or thermostat sticking. Unit not returned to heavy operations until resolved.",
+  "Cab instrumentation display goes blank for 2–5 seconds at random intervals. Occurs approximately every 15–20 minutes of operation. All gauges return to normal after each event. Suspect a loose connector behind the main instrument cluster or a failing display power regulator.",
+  "Significant oil weeping from the main pump casing — not just seepage but active drips forming a pool on the parking pad. Oil is dark and smells burnt. Pump may be running hot. Estimated leak rate: 200–300 mL per hour. Unit removed from service. Fire risk flagged.",
+  "Front left tyre has developed a slow puncture — pressure drops approximately 15 PSI per shift. Visual inspection reveals a screw embedded in the tread at approximately the 4 o'clock position. Tyre can be repaired if puncture is within repair zone. Request tyre repair or replacement.",
+  "Slew ring makes a grinding sound during full left rotation. Right rotation is smooth and quiet. Issue started two days ago and is progressively getting louder. Greasing did not resolve the noise. Suspect debris embedded in the ring gear or damage to the ring teeth.",
+  "Fuel is appearing in the coolant expansion tank — tan-coloured foam observed on the dipstick. Strong smell of diesel in the coolant. Likely head gasket failure or cracked cylinder head. Oil analysis will confirm. Unit isolated and coolant system drained to prevent further contamination.",
+  "Operator reported a severe steering pull to the right when driving at speed. The machine drifts right requiring constant correction. Suspect a hydraulic cylinder imbalance or worn tie rod end on the right side. Steering system also appears to have excessive play at centre.",
+  "Cab door hinge has sheared on the driver side — door only held by the lower hinge. Door cannot be closed securely. Safety risk if door swings open during operation. Operator using seat belt but door latch is non-functional. Hinge replacement required before unit re-enters service.",
+  "Water pump is making a high-pitched squealing noise at startup that reduces after 5–10 minutes of warm-up. Bearing noise is getting progressively worse over the last three shifts. Coolant level is stable — no leaking externally. Pre-failure bearing symptoms. Replacement scheduled.",
 ]
 
 const issueTitles = [
-  "Hydraulic leak detected", "Excessive vibration during operation", "Electrical fault warning",
-  "Brake response inconsistent", "Track wear above acceptable threshold", "Boom control lag reported",
-  "Engine overheating under load", "Cab display intermittently failing",
+  "Hydraulic return line leak — boom pivot area",
+  "Excessive cab and drive train vibration above 1,800 RPM",
+  "Persistent E-450 electrical fault code — cab display resetting",
+  "Left axle service brake delay — safety critical",
+  "Left track shoe wear below minimum spec — replacement needed",
+  "Boom control lag during precision lifting operations",
+  "Engine coolant overtemp under heavy load — water pump suspect",
+  "Intermittent cab display blackout — electrical fault",
+  "Main pump casing oil leak — active drip, fire risk flagged",
+  "Front left tyre slow puncture — screw in tread",
+  "Slew ring grinding noise — full left rotation only",
+  "Fuel contamination in coolant — head gasket suspected",
+  "Severe steering pull to right — tie rod or cylinder imbalance",
+  "Cab driver door hinge sheared — door not latching",
+  "Water pump bearing noise — progressive worsening over 3 shifts",
+  "Operator-reported engine oil pressure warning at idle",
+  "Exhaust emitting black smoke under load — turbo or injector issue",
+  "Rear axle making clunking noise during direction change",
+  "Air filter restriction indicator on — filter not recently serviced",
+  "Windshield crack — not impeding visibility but flagged per safety policy",
 ]
 
-const EQUIPMENT_STATUSES = ["AVAILABLE", "RESERVED", "CHECKED_OUT", "OVERDUE", "DUE_SOON_MAINTENANCE", "IN_MAINTENANCE", "OUT_OF_SERVICE"] as const
-const RENTAL_STATUSES = ["PENDING", "APPROVED", "REJECTED", "RESERVED", "CHECKED_OUT", "RETURNED", "OVERDUE", "CANCELLED"] as const
+const maintenanceTitles = [
+  "Scheduled 250-hour preventive maintenance service",
+  "Scheduled 500-hour preventive maintenance service",
+  "Scheduled 1,000-hour major service and inspection",
+  "Hydraulic cylinder seal replacement — boom assembly",
+  "Engine diagnostic and fault code resolution",
+  "Transmission oil analysis and service",
+  "Boom pivot hydraulic return line repair",
+  "Track replacement — left and right side",
+  "Air conditioning system recharge and compressor replacement",
+  "Swing motor overhaul — thrust washer replacement",
+  "Final drive oil service — both sides",
+  "Engine overhaul — top end and bottom end",
+  "Brake system inspection and fluid flush",
+  "Hydraulic filter bypass investigation and repair",
+  "Battery bank replacement — 3-unit set",
+  "Welding repair — dozer blade stress crack",
+  "Water pump bearing replacement — coolant circuit",
+  "Tyre replacement and wheel alignment check",
+  "Electrical harness repair — cab instrument cluster",
+  "Cooling system flush and thermostat replacement",
+]
+
+const maintenanceDescriptions = [
+  "Performed full preventive maintenance per OEM schedule. Engine oil and filter, hydraulic return filter, fuel primary and secondary filters, and all greasing points serviced. Fluid levels checked and topped up. No deficiencies found.",
+  "Complete 500-hour service performed. All filters replaced, coolant concentration verified, battery load tested (pass), brake adjustment confirmed within spec, and full fluid sample kit submitted to lab for analysis.",
+  "Major 1,000-hour service completed. All engine consumables replaced. Transmission serviced. Undercarriage measured and documented. Hydraulic system flushed and recharged. All safety systems verified — working correctly.",
+  "Boom cylinder removed and taken to workshop. Seals replaced with OEM kit — wiper, rod, and piston seals all replaced. Cylinder honed to remove minor scoring. Reassembled and pressure tested to 3,500 PSI — no leaks. Reinstalled and function tested through full range of motion.",
+  "Ran electronic diagnostic using factory service tool. Found fault code E360 (turbo inlet pressure sensor). Sensor disconnected, cleaned, re-seated — fault remained. Sensor replaced with OEM part. Fault cleared and road test performed under load — no recurrence.",
+  "Transmission oil drained and inspected. Sample from previous service interval showed elevated iron at 38 ppm — above the 25 ppm alert threshold. Magnetic plug showed fine metallic particles consistent with normal clutch wear. Full flush, inspection, and refill completed. Re-sampled and sent to lab.",
+  "Hydraulic return line at boom pivot isolated and removed. Hose replaced with new OEM hose assembly. Fittings cleaned and torqued to spec. System pressure tested — no leaks. Area cleaned. Unit returned to service.",
+  "Full undercarriage replacement completed. Both track chains replaced, front idlers re-surfaced, rear sprockets replaced (wear past 50% on outer face), and track shoes replaced with new standard-duty shoes. All torques verified. Break-in inspection to be carried out at 50 hours.",
+  "Refrigerant recovered, system vacuumed for 45 minutes, and recharged to manufacturer spec (1,100g R134a). Compressor clutch inspected — slipping at engagement. Compressor clutch replaced. Cab temperature tested — achieving 20°C from 38°C ambient in under 8 minutes.",
+  "Swing motor disassembled and inspected. Thrust washers on main shaft measured at 3.2mm — below 4.0mm minimum. Both thrust washers replaced. Motor reassembled and tested through 10 full rotations — smooth and quiet. Swing speed returned to normal.",
+  "Final drive oil drain on both sides at 3,000-hour service interval. Left side sample showed minor metallic content — consistent with normal break-in residue from last undercarriage service. Right side clear. Both refilled to spec. Level confirmed and drain plugs torqued.",
+  "Major engine overhaul performed. Pistons (6 off), rings, cylinder liners, main bearings, and connecting rod bearings replaced. Valve seats re-cut and lapped. Cylinder head pressure tested — no cracks found. Engine reassembled and run in on engine stand per factory 2-hour procedure. No oil or coolant leaks detected.",
+  "Brake system inspection in response to operator concern. Brake pads measured at 4.2mm (minimum 3.0mm) — within limits. Caliper slides cleaned and lubricated. Brake fluid flushed — fluid was dark and moisture-contaminated. New DOT 3 fluid installed. Pedal feel improved significantly.",
+  "Investigated intermittent hydraulic pressure fault logged by operator over 3 shifts. System pressure measured — dropping to 180 bar intermittently from normal 240 bar. Root cause found: loose return filter housing was bypassing under pressure. Housing tightened and O-ring replaced. Fault not reproducible after repair.",
+  "All three main batteries failed load test — capacity below 55%. Batteries removed, terminals and battery tray cleaned of corrosion. Three new 200Ah batteries installed, interconnect cables replaced, and charging system verified. Load test passed at 97% capacity.",
+]
+
+const equipmentUnitNotesSummaries = [
+  "Engine approaching 5,000-hour major service threshold — parts pre-ordered.",
+  "Left boom cylinder replaced 6 months ago — monitor seal condition.",
+  "Returned from extended deployment — full service completed, cleared for redeployment.",
+  "Track tension adjusted last week — re-check at next 50-hour inspection.",
+  "Electrical fault E360 resolved — no recurrence since sensor replacement.",
+  "Cab HVAC serviced — refrigerant recharged, compressor clutch replaced.",
+  "Battery bank replaced — full charge verified, warranty period started.",
+  "Monitor for upcoming 500-hour service interval — due in approximately 2 weeks.",
+  "Undercarriage at 18% wear — well within tolerance. Next check at 1,000 hours.",
+  "Final drive oil sampled last service — minor metallic content noted, within limits.",
+  "Boom control lag investigated — pilot valve cleaned, issue resolved.",
+  "Windshield crack noted — replacement scheduled for next available downtime.",
+  null,
+  null,
+  null,
+]
+
+// ─── Rental reason builder (matches parseNotes format used in AdminRentalsPage) ─
+
+const rentalPurposes = [
+  "Bulk earthworks and overburden removal for phase 3 expansion",
+  "Temporary haul road grading and compaction support",
+  "Pipeline trench excavation and backfill — 2.4 km section",
+  "Concrete placement for pump house foundation slab",
+  "Crane support for heat exchanger module installation",
+  "Dewatering and slurry removal from settling pond",
+  "Fuel and lube servicing support for remote drill sites",
+  "Compaction of subgrade and granular base for new access road",
+  "Material loading at ore crusher for shift change coverage",
+  "Welding and pipe fitting on the compressor station tie-in",
+  "Electrical cable installation support — substation expansion",
+  "Drill-and-blast hole preparation on North Pit bench 7",
+  "Turnaround maintenance support — heavy lift and rigging",
+  "Camp road maintenance and pothole repair",
+  "Tailings dike re-profiling and slope stabilisation",
+  "Sand and aggregate delivery from borrow pit to plant",
+  "Tank farm cleaning and hydro-excavation of buried lines",
+  "Overhaul support for steam plant heat exchangers",
+  "Load-out of equipment at rail transfer terminal",
+  "Site remediation and topsoil spreading — reclamation cell 2",
+]
+
+const rentalExtraNotesOptions = [
+  "Two-person crew will be operating in rotation. Both have valid certifications on file.",
+  "Night shift operations planned — confirm lighting plant is available with this unit.",
+  "Site has 6% grade access road — operator must be experienced on steep terrain.",
+  "Weather delay possible. Operator will shelter equipment in the laydown area if needed.",
+  "HSE site orientation required before equipment release. Supervisor contact: M. Carter.",
+  "Equipment to remain on-site over weekend — security patrol is in place.",
+  "Operator is new to this site. Full site-specific safety induction completed today.",
+  "Equipment will be sharing a work area with a crawler crane — spotter required at all times.",
+  "Client project manager has requested daily operating hour logs be submitted.",
+  "This is a replacement unit — original unit pulled for unscheduled maintenance.",
+  "Work is within 10 metres of buried utility corridor — ground disturbance permit required.",
+  "Cross-charge to project cost code OPS-14C. Budget approval from D. Chen on file.",
+]
+
+const rejectionReasons = [
+  "Unit is already committed to the Tailings Cell 4 project through the requested date range. No equivalent units available in the yard during this window.",
+  "Operator on the request does not have current certification for this equipment type on file. Please resubmit once certification is confirmed with HSE.",
+  "Equipment requires a scheduled 500-hour service before next deployment — it is not available for rental until service is complete.",
+  "Request overlaps with an existing approved rental for the same unit. Requester advised to check the equipment availability calendar.",
+  "Work scope described does not justify high-risk equipment category. Please coordinate with the Site Superintendent for an appropriate equipment substitution.",
+  "Budget approval for this cost code has not been confirmed. Request held pending finance sign-off. Resubmit once approval is received.",
+  "Requested dates fall within the equipment's scheduled refinery turnaround support block — unit is pre-committed and cannot be reallocated.",
+  "Insufficient notice for mobilisation to the remote site. Minimum lead time is 48 hours. Please resubmit with adjusted start date.",
+  "Unit flagged with an open safety defect report. Cannot be released until the maintenance team clears the unit. Estimated clearance: 2–3 business days.",
+]
+
+function buildRentalReason(purpose: string, site: string, extras?: string): string {
+  const parts = [`Purpose: ${purpose}`, `Site: ${site}`]
+  if (extras) parts.push(`Notes: ${extras}`)
+  return parts.join("\n")
+}
+
 const ISSUE_SEVERITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const
 const ISSUE_STATUS_VALUES = ["OPEN", "REVIEWED", "IN_PROGRESS", "RESOLVED"] as const
 const MAINTENANCE_TRIGGERS = ["ROUTINE", "ISSUE_REPORTED", "INSPECTION", "BREAKDOWN", "ADMIN_REQUEST"] as const
 const MAINTENANCE_STATUS_VALUES = ["OPEN", "SCHEDULED", "IN_PROGRESS", "COMPLETED"] as const
-const NOTE_TARGET_TYPES = ["EQUIPMENT_UNIT", "RENTAL", "MAINTENANCE_RECORD", "ISSUE_REPORT"] as const
 
 function randomItem<T>(arr: readonly T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
@@ -223,6 +427,7 @@ function main() {
     const insertMaintenance = db.prepare("INSERT INTO MaintenanceRecord (id, equipmentUnitId, technicianId, status, trigger, issueReportId, title, description, scheduledFor, startedAt, completedAt, nextDueAt, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
     const insertNote = db.prepare("INSERT INTO Note (id, authorId, body, targetType, equipmentUnitId, rentalId, maintenanceRecordId, issueReportId, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
 
+    // ── Categories ────────────────────────────────────────────────────────────
     const createdCategories = new Map<string, string>()
     for (const category of categories) {
       const id = generateId()
@@ -230,6 +435,7 @@ function main() {
       createdCategories.set(category.code, id)
     }
 
+    // ── Locations ─────────────────────────────────────────────────────────────
     const createdLocations: { id: string }[] = []
     for (const location of locations) {
       const id = generateId()
@@ -237,6 +443,7 @@ function main() {
       createdLocations.push({ id })
     }
 
+    // ── Users ─────────────────────────────────────────────────────────────────
     const users: { id: string; role: string; name: string }[] = []
 
     const adminProfiles = [
@@ -256,42 +463,63 @@ function main() {
       users.push({ id, role: "ADMIN", name: adminProfiles[i].name })
     }
 
-    const fieldWorkerNames = [
-      "James Smith", "Maria Garcia", "John Johnson", "Robert Williams",
-      "Michael Brown", "William Jones", "David Miller", "Richard Davis",
-      "Joseph Garcia", "Thomas Rodriguez", "Charles Wilson", "Christopher Martinez",
-      "Daniel Anderson", "Matthew Taylor", "Anthony Thomas", "Mark Hernandez",
-      "Donald Moore", "Steven Martin",
+    const fieldWorkerProfiles = [
+      { name: "James Smith",        position: "Heavy Equipment Operator" },
+      { name: "Maria Garcia",       position: "Site Supervisor" },
+      { name: "John Johnson",       position: "Foreman" },
+      { name: "Robert Williams",    position: "Heavy Equipment Operator" },
+      { name: "Michael Brown",      position: "Laborer" },
+      { name: "William Jones",      position: "Surveyor" },
+      { name: "David Miller",       position: "Site Supervisor" },
+      { name: "Richard Davis",      position: "Heavy Equipment Operator" },
+      { name: "Joseph Garcia",      position: "Foreman" },
+      { name: "Thomas Rodriguez",   position: "Heavy Equipment Operator" },
+      { name: "Charles Wilson",     position: "Laborer" },
+      { name: "Christopher Martinez", position: "Heavy Equipment Operator" },
+      { name: "Daniel Anderson",    position: "Site Supervisor" },
+      { name: "Matthew Taylor",     position: "Surveyor" },
+      { name: "Anthony Thomas",     position: "Foreman" },
+      { name: "Mark Hernandez",     position: "Heavy Equipment Operator" },
+      { name: "Donald Moore",       position: "Heavy Equipment Operator" },
+      { name: "Steven Martin",      position: "Laborer" },
     ]
 
-    for (let i = 0; i < fieldWorkerNames.length; i++) {
+    for (let i = 0; i < fieldWorkerProfiles.length; i++) {
       const id = generateId()
-      insertUser.run(id, fieldWorkerNames[i], `field${i + 1}@equiptrack.local`, DEFAULT_PASSWORD_HASH, "FIELD_WORKER",
+      insertUser.run(id, fieldWorkerProfiles[i].name, `field${i + 1}@equiptrack.local`, DEFAULT_PASSWORD_HASH, "FIELD_WORKER",
         randomItem(departments), `555-020${String(i).padStart(2, "0")}`,
-        randomItem(["Heavy Equipment Operator", "Site Supervisor", "Foreman", "Laborer", "Surveyor"]),
-        1, randomItem(["hardhat", "truck", "clipboard"]))
-      users.push({ id, role: "FIELD_WORKER", name: fieldWorkerNames[i] })
+        fieldWorkerProfiles[i].position, 1, randomItem(["hardhat", "truck", "clipboard"]))
+      users.push({ id, role: "FIELD_WORKER", name: fieldWorkerProfiles[i].name })
     }
 
-    const maintenanceNames = [
-      "Paul Lee", "Kevin Perez", "Brian Thompson", "George White",
-      "Edward Harris", "Ronald Sanchez", "Timothy Clark", "Jason Ramirez",
-      "Jeffrey Lewis", "Ryan Robinson", "Jacob Walker", "Gary Young",
+    const maintenanceProfiles = [
+      { name: "Paul Lee",         position: "Heavy Duty Mechanic" },
+      { name: "Kevin Perez",      position: "Shop Foreman" },
+      { name: "Brian Thompson",   position: "Electrical Technician" },
+      { name: "George White",     position: "Heavy Duty Mechanic" },
+      { name: "Edward Harris",    position: "Welder" },
+      { name: "Ronald Sanchez",   position: "Service Truck Operator" },
+      { name: "Timothy Clark",    position: "Heavy Duty Mechanic" },
+      { name: "Jason Ramirez",    position: "Electrical Technician" },
+      { name: "Jeffrey Lewis",    position: "Heavy Duty Mechanic" },
+      { name: "Ryan Robinson",    position: "Welder" },
+      { name: "Jacob Walker",     position: "Shop Foreman" },
+      { name: "Gary Young",       position: "Service Truck Operator" },
     ]
 
-    for (let i = 0; i < maintenanceNames.length; i++) {
+    for (let i = 0; i < maintenanceProfiles.length; i++) {
       const id = generateId()
-      insertUser.run(id, maintenanceNames[i], `maintenance${i + 1}@equiptrack.local`, DEFAULT_PASSWORD_HASH, "MAINTENANCE",
+      insertUser.run(id, maintenanceProfiles[i].name, `maintenance${i + 1}@equiptrack.local`, DEFAULT_PASSWORD_HASH, "MAINTENANCE",
         "Maintenance", `555-030${String(i).padStart(2, "0")}`,
-        randomItem(["Heavy Duty Mechanic", "Welder", "Electrical Technician", "Service Truck Operator", "Shop Foreman"]),
-        1, randomItem(["wrench", "gear", "hardhat"]))
-      users.push({ id, role: "MAINTENANCE", name: maintenanceNames[i] })
+        maintenanceProfiles[i].position, 1, randomItem(["wrench", "gear", "hardhat"]))
+      users.push({ id, role: "MAINTENANCE", name: maintenanceProfiles[i].name })
     }
 
     const admins = users.filter((u) => u.role === "ADMIN")
     const fieldWorkers = users.filter((u) => u.role === "FIELD_WORKER")
     const maintenanceUsers = users.filter((u) => u.role === "MAINTENANCE")
 
+    // ── Equipment Types ───────────────────────────────────────────────────────
     const createdTypes: { id: string; code: string; defaultMaintenanceDays: number }[] = []
     const usedTypeCodes = new Set<string>()
 
@@ -311,6 +539,7 @@ function main() {
       createdTypes.push({ id, code: typeCode, defaultMaintenanceDays })
     }
 
+    // ── Equipment Units ───────────────────────────────────────────────────────
     const allUnits: { id: string; assetTag: string; equipmentTypeId: string }[] = []
     const usedAssetTags = new Set<string>()
     const usedSerialNumbers = new Set<string>()
@@ -326,11 +555,11 @@ function main() {
 
         let status = "AVAILABLE"
         const roll = Math.random()
-        if (roll < 0.65) status = "AVAILABLE"
-        else if (roll < 0.73) status = "RESERVED"
-        else if (roll < 0.83) status = "CHECKED_OUT"
-        else if (roll < 0.88) status = "DUE_SOON_MAINTENANCE"
-        else if (roll < 0.95) status = "IN_MAINTENANCE"
+        if (roll < 0.60) status = "AVAILABLE"
+        else if (roll < 0.67) status = "RESERVED"
+        else if (roll < 0.78) status = "CHECKED_OUT"
+        else if (roll < 0.83) status = "DUE_SOON_MAINTENANCE"
+        else if (roll < 0.92) status = "IN_MAINTENANCE"
         else status = "OUT_OF_SERVICE"
 
         const assetTag = uniqueWithCounter(`${typeCodeClean}-${String(i).padStart(3, "0")}`, usedAssetTags)
@@ -340,83 +569,187 @@ function main() {
         insertUnit.run(id, assetTag, serialNumber, equipmentType.id, location.id,
           status, randomInt(2012, 2026), randomDateWithinPast(1800).toISOString(),
           lastMaintenanceAt.toISOString(), nextMaintenanceDue.toISOString(),
-          Math.random() < 0.25 ? "Monitor for upcoming service interval." : null)
+          randomItem(equipmentUnitNotesSummaries))
 
         allUnits.push({ id, assetTag, equipmentTypeId: equipmentType.id })
       }
     }
 
+    // ── Rentals ───────────────────────────────────────────────────────────────
+    // Track created rentals and maintenance records for notes
     const createdRentals: { id: string }[] = []
-    for (let i = 0; i < 260; i++) {
-      const unit = randomItem(allUnits)
-      const requester = randomItem(fieldWorkers)
-      const approver = Math.random() < 0.8 ? randomItem(admins) : null
-      const location = randomItem(createdLocations)
+    const createdMaintenanceRecords: { id: string }[] = []
 
-      const requestedStart = randomDateWithinPast(60)
-      const requestedEnd = addDays(requestedStart, randomInt(2, 21))
-
-      let status = "PENDING"
-      const roll = Math.random()
-      if (roll < 0.15) status = "PENDING"
-      else if (roll < 0.22) status = "REJECTED"
-      else if (roll < 0.36) status = "APPROVED"
-      else if (roll < 0.48) status = "RESERVED"
-      else if (roll < 0.72) status = "CHECKED_OUT"
-      else if (roll < 0.92) status = "RETURNED"
-      else status = "OVERDUE"
-
+    // Helper to insert one rental
+    function insertOneRental(
+      unit: { id: string; assetTag: string; equipmentTypeId: string },
+      requester: { id: string; role: string; name: string },
+      approver: { id: string; role: string; name: string } | null,
+      location: { id: string },
+      status: string,
+      requestedStart: Date,
+      requestedEnd: Date,
+      reason: string,
+      site: string,
+    ) {
       const checkedOutBy = (status === "CHECKED_OUT" || status === "RETURNED" || status === "OVERDUE")
         ? randomItem(admins) : null
       const returnedBy = status === "RETURNED" ? randomItem(admins) : null
-
       const rentalId = generateId()
       const now = new Date().toISOString()
 
       insertRental.run(rentalId, unit.id, unit.equipmentTypeId, requester.id,
         approver?.id ?? null, checkedOutBy?.id ?? null, returnedBy?.id ?? null, location.id,
-        status, `Required for ${randomItem(jobSites)} support operations.`, randomItem(jobSites),
+        status, reason, site,
         requestedStart.toISOString(), requestedEnd.toISOString(),
         approver ? requestedStart.toISOString() : null,
         approver ? requestedEnd.toISOString() : null,
-        (status === "CHECKED_OUT" || status === "RETURNED" || status === "OVERDUE") ? requestedStart.toISOString() : null,
+        (status === "CHECKED_OUT" || status === "RETURNED" || status === "OVERDUE")
+          ? requestedStart.toISOString() : null,
         status === "RETURNED" ? requestedEnd.toISOString() : null,
-        status === "REJECTED" ? "Conflicts with existing booking window." : null,
+        status === "REJECTED" ? randomItem(rejectionReasons) : null,
         now, now)
 
       createdRentals.push({ id: rentalId })
 
       insertAuditLog.run(generateId(), "REQUEST_SUBMITTED", requester.id, rentalId, unit.id,
-        null, null, `Rental request submitted for ${unit.assetTag}.`, now)
+        null, null, `Rental request submitted for ${unit.assetTag} by ${requester.name}.`, now)
 
       if (approver) {
         insertAuditLog.run(generateId(),
           status === "REJECTED" ? "REQUEST_REJECTED" : "REQUEST_APPROVED",
           approver.id, rentalId, unit.id, null, null,
-          `Rental ${status.toLowerCase()} by admin.`, now)
+          `Rental ${status.toLowerCase()} by ${approver.name}.`, now)
+      }
+      if (checkedOutBy) {
+        insertAuditLog.run(generateId(), "CHECKED_OUT", checkedOutBy.id, rentalId, unit.id,
+          null, null, `Equipment ${unit.assetTag} checked out by ${checkedOutBy.name}.`, now)
+      }
+      if (returnedBy) {
+        insertAuditLog.run(generateId(), "RETURNED", returnedBy.id, rentalId, unit.id,
+          null, null, `Equipment ${unit.assetTag} returned by ${returnedBy.name}.`, now)
+      }
+
+      return rentalId
+    }
+
+    // ── Batch rental clusters (simulating multi-select requests from new UI) ──
+    // Each batch = same requester, same site, same date window, 2–4 units
+    const batchScenarios: {
+      status: string
+      unitCount: number
+      daysBack: number
+      durationDays: number
+    }[] = [
+      { status: "PENDING",    unitCount: 3, daysBack: 1,  durationDays: 7  },
+      { status: "PENDING",    unitCount: 2, daysBack: 2,  durationDays: 5  },
+      { status: "PENDING",    unitCount: 4, daysBack: 0,  durationDays: 14 },
+      { status: "APPROVED",   unitCount: 3, daysBack: 4,  durationDays: 10 },
+      { status: "APPROVED",   unitCount: 2, daysBack: 5,  durationDays: 7  },
+      { status: "APPROVED",   unitCount: 4, daysBack: 3,  durationDays: 12 },
+      { status: "CHECKED_OUT", unitCount: 3, daysBack: 8,  durationDays: 14 },
+      { status: "CHECKED_OUT", unitCount: 2, daysBack: 10, durationDays: 7  },
+      { status: "CHECKED_OUT", unitCount: 4, daysBack: 6,  durationDays: 21 },
+      { status: "RETURNED",   unitCount: 3, daysBack: 20, durationDays: 10 },
+      { status: "RETURNED",   unitCount: 2, daysBack: 25, durationDays: 7  },
+      { status: "RETURNED",   unitCount: 4, daysBack: 30, durationDays: 14 },
+      { status: "REJECTED",   unitCount: 3, daysBack: 15, durationDays: 7  },
+      { status: "REJECTED",   unitCount: 2, daysBack: 18, durationDays: 5  },
+      { status: "OVERDUE",    unitCount: 2, daysBack: 25, durationDays: 7  },
+      { status: "PENDING",    unitCount: 3, daysBack: 0,  durationDays: 10 },
+      { status: "APPROVED",   unitCount: 3, daysBack: 2,  durationDays: 14 },
+      { status: "CHECKED_OUT", unitCount: 3, daysBack: 12, durationDays: 10 },
+      { status: "RETURNED",   unitCount: 2, daysBack: 40, durationDays: 5  },
+      { status: "PENDING",    unitCount: 4, daysBack: 1,  durationDays: 7  },
+    ]
+
+    for (const batch of batchScenarios) {
+      const requester = randomItem(fieldWorkers)
+      const approver = (batch.status !== "PENDING") ? randomItem(admins) : null
+      const location = randomItem(createdLocations)
+      const site = randomItem(jobSites)
+      const purpose = randomItem(rentalPurposes)
+      const extras = Math.random() < 0.6 ? randomItem(rentalExtraNotesOptions) : undefined
+      const reason = buildRentalReason(purpose, site, extras)
+      const requestedStart = randomDateWithinPast(batch.daysBack)
+      const requestedEnd = addDays(requestedStart, batch.durationDays)
+
+      // Pick distinct units for this batch
+      const usedUnitIds = new Set<string>()
+      for (let k = 0; k < batch.unitCount; k++) {
+        let unit = randomItem(allUnits)
+        let attempts = 0
+        while (usedUnitIds.has(unit.id) && attempts < 20) {
+          unit = randomItem(allUnits)
+          attempts++
+        }
+        usedUnitIds.add(unit.id)
+        insertOneRental(unit, requester, approver, location, batch.status, requestedStart, requestedEnd, reason, site)
       }
     }
 
+    // ── Individual (non-batch) rentals to fill out the data set ──────────────
+    for (let i = 0; i < 200; i++) {
+      const unit = randomItem(allUnits)
+      const requester = randomItem(fieldWorkers)
+      const location = randomItem(createdLocations)
+      const site = randomItem(jobSites)
+      const purpose = randomItem(rentalPurposes)
+      const extras = Math.random() < 0.4 ? randomItem(rentalExtraNotesOptions) : undefined
+      const reason = buildRentalReason(purpose, site, extras)
+
+      let status = "PENDING"
+      const roll = Math.random()
+      if (roll < 0.12) status = "PENDING"
+      else if (roll < 0.20) status = "REJECTED"
+      else if (roll < 0.32) status = "APPROVED"
+      else if (roll < 0.44) status = "RESERVED"
+      else if (roll < 0.68) status = "CHECKED_OUT"
+      else if (roll < 0.90) status = "RETURNED"
+      else status = "OVERDUE"
+
+      const approver = (status !== "PENDING") ? randomItem(admins) : null
+      const requestedStart = randomDateWithinPast(60)
+      const requestedEnd = addDays(requestedStart, randomInt(2, 21))
+
+      insertOneRental(unit, requester, approver, location, status, requestedStart, requestedEnd, reason, site)
+    }
+
+    // ── Issue Reports ─────────────────────────────────────────────────────────
     const createdIssues: { id: string }[] = []
+
+    // Weighted severity distribution — more LOW/MEDIUM than HIGH/CRITICAL
+    const severityWeighted: (typeof ISSUE_SEVERITIES[number])[] = [
+      "LOW", "LOW", "MEDIUM", "MEDIUM", "MEDIUM", "HIGH", "HIGH", "CRITICAL",
+    ]
+
     for (let i = 0; i < 180; i++) {
       const unit = randomItem(allUnits)
-      const reporter = randomItem(fieldWorkers)
-      const severity = randomItem(ISSUE_SEVERITIES)
+      const reporter = randomItem([...fieldWorkers, ...maintenanceUsers])
+      const severity = randomItem(severityWeighted)
       const status = randomItem(ISSUE_STATUS_VALUES)
       const issueId = generateId()
       const reportedAt = randomDateWithinPast(120)
 
-      insertIssue.run(issueId, unit.id, reporter.id, randomItem(issueTitles),
-        "Reported from field operations. Requires inspection and disposition.",
+      // Build a richer description that matches what the MaintenanceReportPage captures
+      const baseDescription = randomItem(issueDescriptionBodies)
+      const techAddendum = Math.random() < 0.4
+        ? ` Severity assessed as ${severity} by reporting ${reporter.role === "MAINTENANCE" ? "technician" : "operator"} ${reporter.name}.`
+        : ""
+
+      insertIssue.run(issueId, unit.id, reporter.id,
+        randomItem(issueTitles),
+        baseDescription + techAddendum,
         severity, status, reportedAt.toISOString(),
         status === "RESOLVED" ? randomDateWithinPast(30).toISOString() : null)
 
       createdIssues.push({ id: issueId })
 
       insertAuditLog.run(generateId(), "ISSUE_REPORTED", reporter.id, null, unit.id,
-        null, issueId, `Issue reported against ${unit.assetTag}.`, new Date().toISOString())
+        null, issueId, `Issue reported against ${unit.assetTag} by ${reporter.name}.`, reportedAt.toISOString())
     }
 
+    // ── Maintenance Records ───────────────────────────────────────────────────
     for (let i = 0; i < 320; i++) {
       const unit = randomItem(allUnits)
       const tech = Math.random() < 0.85 ? randomItem(maintenanceUsers) : null
@@ -438,45 +771,71 @@ function main() {
       const now = new Date().toISOString()
 
       insertMaintenance.run(recordId, unit.id, tech?.id ?? null, status, trigger,
-        issueReportId, `${trigger.replace("_", " ")} maintenance`,
-        "Inspection, servicing, and corrective work as required.",
+        issueReportId,
+        randomItem(maintenanceTitles),
+        randomItem(maintenanceDescriptions),
         addDays(createdAt, randomInt(1, 14)).toISOString(),
         startedAt?.toISOString() ?? null, completedAt?.toISOString() ?? null,
         completedAt ? addDays(completedAt, randomItem([30, 60, 90, 120])).toISOString() : null,
         createdAt.toISOString(), now)
 
+      createdMaintenanceRecords.push({ id: recordId })
+
       insertAuditLog.run(generateId(),
         status === "COMPLETED" ? "MAINTENANCE_COMPLETED" : "MAINTENANCE_OPENED",
         tech?.id ?? null, null, unit.id, recordId, null,
-        `Maintenance record ${status.toLowerCase()} for equipment unit.`, now)
+        `Maintenance record ${status.toLowerCase()} for ${unit.assetTag}${tech ? ` — assigned to ${tech.name}` : ""}.`, now)
     }
 
-    const sampleRentals = createdRentals.slice(0, 100)
-    const sampleIssues = createdIssues.slice(0, 100)
+    // ── Notes ─────────────────────────────────────────────────────────────────
+    // Equipment unit notes
+    for (let i = 0; i < 120; i++) {
+      const unit = randomItem(allUnits)
+      const author = randomItem([...users, ...maintenanceUsers])
+      const daysAgo = randomInt(0, 90)
+      const noteDate = new Date()
+      noteDate.setDate(noteDate.getDate() - daysAgo)
+      insertNote.run(generateId(), author.id, randomItem(equipmentNoteBodies),
+        "EQUIPMENT_UNIT", unit.id, null, null, null, noteDate.toISOString())
+    }
 
-    for (let i = 0; i < 300; i++) {
-      const author = randomItem(users)
-      const targetPick = randomInt(1, 4)
-      const now = new Date().toISOString()
+    // Rental notes
+    const sampleRentals = createdRentals.slice(0, 120)
+    for (let i = 0; i < 100; i++) {
+      if (!sampleRentals.length) break
+      const rental = randomItem(sampleRentals)
+      const author = randomItem([...admins, ...fieldWorkers])
+      const daysAgo = randomInt(0, 60)
+      const noteDate = new Date()
+      noteDate.setDate(noteDate.getDate() - daysAgo)
+      insertNote.run(generateId(), author.id, randomItem(rentalNoteBodies),
+        "RENTAL", null, rental.id, null, null, noteDate.toISOString())
+    }
 
-      if (targetPick === 1) {
-        const unit = randomItem(allUnits)
-        insertNote.run(generateId(), author.id, randomItem(noteBodies), "EQUIPMENT_UNIT",
-          unit.id, null, null, null, now)
-      } else if (targetPick === 2 && sampleRentals.length) {
-        const rental = randomItem(sampleRentals)
-        insertNote.run(generateId(), author.id, randomItem(noteBodies), "RENTAL",
-          null, rental.id, null, null, now)
-      } else if (targetPick === 3) {
-        // Skip maintenance record notes for simplicity - no easy lookup without IDs stored
-        const unit = randomItem(allUnits)
-        insertNote.run(generateId(), author.id, randomItem(noteBodies), "EQUIPMENT_UNIT",
-          unit.id, null, null, null, now)
-      } else if (sampleIssues.length) {
-        const issue = randomItem(sampleIssues)
-        insertNote.run(generateId(), author.id, randomItem(noteBodies), "ISSUE_REPORT",
-          null, null, null, issue.id, now)
-      }
+    // Maintenance record notes
+    const sampleMaintenance = createdMaintenanceRecords.slice(0, 120)
+    for (let i = 0; i < 100; i++) {
+      if (!sampleMaintenance.length) break
+      const record = randomItem(sampleMaintenance)
+      const author = randomItem(maintenanceUsers)
+      const daysAgo = randomInt(0, 90)
+      const noteDate = new Date()
+      noteDate.setDate(noteDate.getDate() - daysAgo)
+      insertNote.run(generateId(), author.id, randomItem(maintenanceNoteBodies),
+        "MAINTENANCE_RECORD", null, null, record.id, null, noteDate.toISOString())
+    }
+
+    // Issue report notes
+    const sampleIssues = createdIssues.slice(0, 120)
+    for (let i = 0; i < 100; i++) {
+      if (!sampleIssues.length) break
+      const issue = randomItem(sampleIssues)
+      const author = randomItem([...maintenanceUsers, ...fieldWorkers])
+      const daysAgo = randomInt(0, 60)
+      const noteDate = new Date()
+      noteDate.setDate(noteDate.getDate() - daysAgo)
+      insertNote.run(generateId(), author.id, randomItem([...maintenanceNoteBodies, ...equipmentNoteBodies]),
+        "ISSUE_REPORT", null, null, null, issue.id, noteDate.toISOString())
     }
   })
 

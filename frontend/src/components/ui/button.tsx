@@ -11,10 +11,10 @@ const buttonVariants = cva(
         default:
           'bg-[rgb(var(--brand-navy-rgb))] text-white hover:bg-[rgb(var(--brand-navy-dark-rgb))]',
         success: 'bg-emerald-600 text-white hover:bg-emerald-700',
-        outline: 'border border-slate-300 bg-white text-slate-900 hover:bg-slate-100',
-        ghost: 'text-slate-700 hover:bg-slate-100 hover:text-slate-900',
+        outline: 'border border-slate-300 bg-white text-slate-900 hover:bg-slate-100 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100 dark:hover:bg-slate-600',
+        ghost: 'text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-slate-100',
         destructive: 'bg-red-600 text-white hover:bg-red-700',
-        secondary: 'bg-slate-100 text-slate-900 hover:bg-slate-200',
+        secondary: 'bg-slate-100 text-slate-900 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600',
       },
       size: {
         default: 'h-10 px-4 py-2',

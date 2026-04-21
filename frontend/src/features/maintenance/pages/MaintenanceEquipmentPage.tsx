@@ -32,17 +32,17 @@ function derivePriority(nextServiceDueDate?: string): Priority {
 }
 
 const PRIORITY_META: Record<Priority, { label: string; pill: string; dot: string }> = {
-  overdue:   { label: 'Overdue',   pill: 'text-red-700 bg-red-50 border-red-200',         dot: 'bg-red-500'    },
-  critical:  { label: 'Critical',  pill: 'text-orange-700 bg-orange-50 border-orange-200', dot: 'bg-orange-400' },
-  upcoming:  { label: 'Upcoming',  pill: 'text-amber-700 bg-amber-50 border-amber-200',   dot: 'bg-amber-400'  },
-  scheduled: { label: 'Scheduled', pill: 'text-blue-700 bg-blue-50 border-blue-200',       dot: 'bg-blue-400'   },
+  overdue:   { label: 'Overdue',   pill: 'text-red-700 bg-red-50 border-red-200 dark:text-red-300 dark:bg-red-900/40 dark:border-red-800',                 dot: 'bg-red-500 dark:bg-red-400'       },
+  critical:  { label: 'Critical',  pill: 'text-orange-700 bg-orange-50 border-orange-200 dark:text-orange-300 dark:bg-orange-900/40 dark:border-orange-800', dot: 'bg-orange-400 dark:bg-orange-300'  },
+  upcoming:  { label: 'Upcoming',  pill: 'text-amber-700 bg-amber-50 border-amber-200 dark:text-amber-300 dark:bg-amber-900/40 dark:border-amber-800',       dot: 'bg-amber-400 dark:bg-amber-300'    },
+  scheduled: { label: 'Scheduled', pill: 'text-blue-700 bg-blue-50 border-blue-200 dark:text-blue-300 dark:bg-blue-900/40 dark:border-blue-800',             dot: 'bg-blue-400 dark:bg-blue-300'      },
 }
 
 const SEVERITY_META: Record<IssueSeverity, { label: string; pill: string; dot: string }> = {
-  LOW:      { label: 'Low',      pill: 'text-blue-700 bg-blue-50 border-blue-200',       dot: 'bg-blue-400'    },
-  MEDIUM:   { label: 'Medium',   pill: 'text-amber-700 bg-amber-50 border-amber-200',    dot: 'bg-amber-400'   },
-  HIGH:     { label: 'High',     pill: 'text-orange-700 bg-orange-50 border-orange-200', dot: 'bg-orange-400'  },
-  CRITICAL: { label: 'Critical', pill: 'text-red-700 bg-red-50 border-red-200',          dot: 'bg-red-500'     },
+  LOW:      { label: 'Low',      pill: 'text-blue-700 bg-blue-50 border-blue-200 dark:text-blue-300 dark:bg-blue-900/40 dark:border-blue-800',         dot: 'bg-blue-400 dark:bg-blue-300'      },
+  MEDIUM:   { label: 'Medium',   pill: 'text-amber-700 bg-amber-50 border-amber-200 dark:text-amber-300 dark:bg-amber-900/40 dark:border-amber-800',     dot: 'bg-amber-400 dark:bg-amber-300'    },
+  HIGH:     { label: 'High',     pill: 'text-orange-700 bg-orange-50 border-orange-200 dark:text-orange-300 dark:bg-orange-900/40 dark:border-orange-800', dot: 'bg-orange-400 dark:bg-orange-300'  },
+  CRITICAL: { label: 'Critical', pill: 'text-red-700 bg-red-50 border-red-200 dark:text-red-300 dark:bg-red-900/40 dark:border-red-800',                 dot: 'bg-red-500 dark:bg-red-400'        },
 }
 
 const priorityOptions: Array<{ label: string; value: Priority | 'all' }> = [
@@ -120,12 +120,12 @@ export default function MaintenanceEquipmentPage() {
       {
         accessorKey: 'name',
         header: 'Equipment',
-        cell: ({ row }) => <p className="font-semibold text-slate-800">{row.original.name}</p>,
+        cell: ({ row }) => <p className="font-semibold text-slate-800 dark:text-slate-200">{row.original.name}</p>,
       },
       {
         accessorKey: 'category',
         header: 'Category',
-        cell: ({ row }) => <span className="text-sm text-slate-600">{row.original.category}</span>,
+        cell: ({ row }) => <span className="text-sm text-slate-600 dark:text-slate-400">{row.original.category}</span>,
       },
       {
         id: 'priority',
@@ -151,7 +151,7 @@ export default function MaintenanceEquipmentPage() {
             : `Sev: ${SEVERITY_META[severityFilter as IssueSeverity]?.label}`
           return (
             <button type="button" onClick={() => setSeverityFilter(nextVal)}
-              className={`flex items-center gap-1 text-[11px] font-semibold uppercase tracking-widest transition-colors ${severityFilter !== 'all' ? 'text-slate-900' : 'text-slate-500 hover:text-slate-900'}`}>
+              className={`flex items-center gap-1 text-[11px] font-semibold uppercase tracking-widest transition-colors ${severityFilter !== 'all' ? 'text-slate-900 dark:text-slate-100' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'}`}>
               {label}
               {severityFilter !== 'all' && <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-slate-900" />}
             </button>
@@ -178,7 +178,7 @@ export default function MaintenanceEquipmentPage() {
       {
         accessorKey: 'nextServiceDueDate',
         header: 'Due date',
-        cell: ({ row }) => <span className="text-sm text-slate-600">{formatDate(row.original.nextServiceDueDate)}</span>,
+        cell: ({ row }) => <span className="text-sm text-slate-600 dark:text-slate-400">{formatDate(row.original.nextServiceDueDate)}</span>,
       },
       {
         id: 'actions',
@@ -212,7 +212,7 @@ export default function MaintenanceEquipmentPage() {
 
   return (
     <div className="space-y-6">
-      <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">
+      <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 transition-colors">
         <ArrowLeft className="h-3.5 w-3.5" />
         Back
       </button>
@@ -220,8 +220,8 @@ export default function MaintenanceEquipmentPage() {
       <PageHeader title="Maintenance Queue" subtitle="Items due in the next 14 days or already overdue" />
 
       {/* ── Filters ──────────────────────────────────────────── */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 bg-slate-50 px-4 py-2.5">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 shadow-sm">
+        <div className="border-b border-slate-100 bg-slate-50 dark:bg-slate-700/50 dark:border-slate-700 px-4 py-2.5">
           <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Filters</p>
         </div>
         <div className="flex flex-wrap gap-x-8 gap-y-4 p-4">
@@ -231,7 +231,7 @@ export default function MaintenanceEquipmentPage() {
             <div className="flex flex-wrap gap-1.5">
               {statusOptions.map((o) => (
                 <button key={o.value} onClick={() => setStatusFilter(o.value)}
-                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${statusFilter === o.value ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-400'}`}>
+                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${statusFilter === o.value ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-400 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-600'}`}>
                   {o.label}
                 </button>
               ))}
@@ -243,7 +243,7 @@ export default function MaintenanceEquipmentPage() {
             <div className="flex flex-wrap gap-1.5">
               {priorityOptions.map((o) => (
                 <button key={o.value} onClick={() => setPriorityFilter(o.value)}
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium transition-colors ${priorityFilter === o.value ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-400'}`}>
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium transition-colors ${priorityFilter === o.value ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-400 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-600'}`}>
                   {o.value !== 'all' && PRIORITY_META[o.value as Priority] && (
                     <span className={`h-1.5 w-1.5 rounded-full ${priorityFilter === o.value ? 'bg-white/70' : PRIORITY_META[o.value as Priority].dot}`} />
                   )}
@@ -281,14 +281,14 @@ export default function MaintenanceEquipmentPage() {
           {selectedItem && (
             <div className="space-y-4">
               {/* Info card */}
-              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 space-y-1.5">
+              <div className="rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 px-4 py-3 space-y-1.5">
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Equipment</p>
-                  <p className="text-sm font-semibold text-slate-800">{selectedItem.name}</p>
+                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{selectedItem.name}</p>
                 </div>
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Configured interval</p>
-                  <p className="text-sm text-slate-600">
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
                     {selectedItem.maintenanceIntervalDays ? `${selectedItem.maintenanceIntervalDays} days` : '—'}
                   </p>
                 </div>
@@ -306,7 +306,7 @@ export default function MaintenanceEquipmentPage() {
                     type="date"
                     value={manualNextDueDate}
                     onChange={(e) => setManualNextDueDate(e.target.value)}
-                    className="w-full h-10 rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors"
+                    className="w-full h-10 rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100"
                   />
                 </div>
               </div>

@@ -80,7 +80,7 @@ export default function ApproveRentalDialog({
           ) : isError ? (
             <ErrorState error={error} onRetry={() => refetch()} title="Could not load units" />
           ) : data?.noUnitsAvailable ? (
-            <div className="rounded-md bg-slate-100 p-4 text-sm text-slate-800">
+            <div className="rounded-md bg-slate-100 dark:bg-slate-700 p-4 text-sm text-slate-800 dark:text-slate-200">
               No units are currently available for this equipment type during the requested dates.
             </div>
           ) : (
@@ -104,7 +104,7 @@ export default function ApproveRentalDialog({
           )}
         </div>
 
-        <div className="flex justify-end gap-2 pt-4 border-t border-slate-200">
+        <div className="flex justify-end gap-2 pt-4 border-t border-slate-200 dark:border-slate-700">
           <Button onClick={onClose} variant="secondary">
             Cancel
           </Button>

@@ -9,7 +9,7 @@ import { Textarea } from '../../../components/ui/textarea'
 import type { CreateEquipmentDTO, Equipment, EquipmentStatus } from '../../../types/equipment'
 
 const dateCls =
-  'w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors'
+  'w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100'
 
 const schema = z.object({
   name: z.string().trim().min(2, 'Name must be at least 2 characters.'),

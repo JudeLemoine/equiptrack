@@ -110,7 +110,7 @@ export default function AdminEquipmentPage() {
     <div className="space-y-6">
       <button
         onClick={() => navigate(-1)}
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
         Back
@@ -128,13 +128,13 @@ export default function AdminEquipmentPage() {
       />
 
       {/* ── Filters ──────────────────────────────────────────── */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-2.5">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 shadow-sm">
+        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 dark:bg-slate-700/50 dark:border-slate-700 px-4 py-2.5">
           <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Filters</p>
           {(search || statusFilter !== 'all') && (
             <button
               onClick={() => { setSearch(''); setStatusFilter('all') }}
-              className="text-[11px] font-semibold text-slate-400 hover:text-slate-700 transition-colors"
+              className="text-[11px] font-semibold text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
             >
               Clear all
             </button>
@@ -151,7 +151,7 @@ export default function AdminEquipmentPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search equipment by name…"
-                className="w-full h-9 rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors"
+                className="w-full h-9 rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-colors dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100 dark:placeholder:text-slate-500"
               />
             </div>
           </div>
@@ -166,7 +166,7 @@ export default function AdminEquipmentPage() {
                   className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
                     statusFilter === opt.value
                       ? 'bg-slate-900 text-white'
-                      : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-400'
+                      : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-400 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-600'
                   }`}
                 >
                   {opt.label}

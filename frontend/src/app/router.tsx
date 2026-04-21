@@ -8,16 +8,19 @@ import AdminEquipmentPage from '../features/admin/pages/AdminEquipmentPage'
 import AdminEquipmentDetailPage from '../features/admin/pages/AdminEquipmentDetailPage'
 import AdminRentalsPage from '../features/admin/pages/AdminRentalsPage'
 import AdminUsersPage from '../features/admin/pages/AdminUsersPage'
+import AdminIssuesPage from '../features/admin/pages/AdminIssuesPage'
 import FieldDashboardPage from '../features/field/pages/FieldDashboardPage'
 import FieldEquipmentPage from '../features/field/pages/FieldEquipmentPage'
 import FieldEquipmentDetailPage from '../features/field/pages/FieldEquipmentDetailPage'
 import FieldRentalsPage from '../features/field/pages/FieldRentalsPage'
 import FieldIssuesPage from '../features/field/pages/FieldIssuesPage'
+import FieldRequestPage from '../features/field/pages/FieldRequestPage'
 import MaintenanceDashboardPage from '../features/maintenance/pages/MaintenanceDashboardPage'
 import MaintenanceEquipmentPage from '../features/maintenance/pages/MaintenanceEquipmentPage'
 import MaintenanceEquipmentDetailPage from '../features/maintenance/pages/MaintenanceEquipmentDetailPage'
 import MaintenanceAllEquipmentPage from '../features/maintenance/pages/MaintenanceAllEquipmentPage'
 import MaintenanceIssuesPage from '../features/maintenance/pages/MaintenanceIssuesPage'
+import MaintenanceReportPage from '../features/maintenance/pages/MaintenanceReportPage'
 import UserProfilePage from '../features/user/pages/UserProfilePage'
 import CalendarPage from '../features/calendar/CalendarPage'
 import QRScannerPage from '../features/equipment/pages/QRScannerPage'
@@ -51,6 +54,7 @@ function AppRoutes() {
             <Route element={<AdminEquipmentDetailPage />} path="/admin/equipment/:id" />
             <Route element={<AdminRentalsPage />} path="/admin/rentals" />
             <Route element={<AdminUsersPage />} path="/admin/users" />
+            <Route element={<AdminIssuesPage />} path="/admin/issues" />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['field']} />}>
@@ -59,6 +63,7 @@ function AppRoutes() {
             <Route element={<FieldEquipmentDetailPage />} path="/field/equipment/:id" />
             <Route element={<FieldRentalsPage />} path="/field/rentals" />
             <Route element={<FieldIssuesPage />} path="/field/reports" />
+            <Route element={<FieldRequestPage />} path="/field/request" />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['maintenance']} />}>
@@ -67,6 +72,7 @@ function AppRoutes() {
             <Route element={<MaintenanceAllEquipmentPage />} path="/maintenance/equipment" />
             <Route element={<MaintenanceEquipmentDetailPage />} path="/maintenance/equipment/:id" />
             <Route element={<MaintenanceIssuesPage />} path="/maintenance/issues" />
+            <Route element={<MaintenanceReportPage />} path="/maintenance/report" />
           </Route>
         </Route>
       </Route>

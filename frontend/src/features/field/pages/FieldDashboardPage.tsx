@@ -1,10 +1,24 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
-import { ClipboardList, Hammer, Package, ChevronRight, CheckCircle2 } from 'lucide-react'
+import {
+  ClipboardList,
+  Hammer,
+  Package,
+  ChevronRight,
+  CheckCircle2,
+  BookOpen,
+  Info,
+  HardHat,
+  SlidersHorizontal,
+  Send,
+} from 'lucide-react'
 import ErrorState from '../../../components/ErrorState'
 import Loader from '../../../components/Loader'
+import PersonalizableWidget from '../../../components/PersonalizableWidget'
 import { getSession } from '../../../lib/auth'
 import { getFieldSummary } from '../../../services/dashboardService'
+import { useDashboardLayout, type WidgetDef } from '../../../hooks/useDashboardLayout'
 
 function getGreeting() {
   const h = new Date().getHours()
@@ -14,33 +28,23 @@ function getGreeting() {
 }
 
 const HOW_IT_WORKS = [
-  {
-    step: '01',
-    title: 'Browse Equipment',
-    desc: 'Explore the full catalog and find the right gear for your job.',
-    icon: Package,
-    accent: 'text-emerald-600',
-    iconBg: 'bg-emerald-50',
-    to: '/field/equipment',
-  },
-  {
-    step: '02',
-    title: 'Submit a Request',
-    desc: 'Choose your dates and send a rental request for admin review.',
-    icon: ClipboardList,
-    accent: 'text-blue-600',
-    iconBg: 'bg-blue-50',
-    to: '/field/rentals',
-  },
-  {
-    step: '03',
-    title: 'Pick Up & Return',
-    desc: 'Once approved, check out the equipment and return it when done.',
-    icon: CheckCircle2,
-    accent: 'text-violet-600',
-    iconBg: 'bg-violet-50',
-    to: '/field/rentals',
-  },
+  { step: '01', title: 'Browse Equipment', desc: 'Explore the full catalog and find the right gear for your job.', icon: Package,      iconBg: 'bg-slate-100', to: '/field/equipment' },
+  { step: '02', title: 'Submit a Request', desc: 'Choose your dates and send a rental request for admin review.',   icon: ClipboardList, iconBg: 'bg-slate-100', to: '/field/rentals'   },
+  { step: '03', title: 'Pick Up & Return', desc: 'Once approved, check out the equipment and return it when done.', icon: CheckCircle2,  iconBg: 'bg-slate-100', to: '/field/rentals'   },
+]
+
+const WIDGETS: WidgetDef[] = [
+  // ── Row 1: primary actions + key numbers ────────────────────
+  { id: 'action-request',       label: 'Request Equipment',    size: 'card', defaultVisible: true,  description: 'Shortcut to start a new equipment rental request.'               },
+  { id: 'metric-pending',       label: 'My Pending Requests',  size: 'card', defaultVisible: true,  description: 'Number of your requests currently awaiting admin approval.'         },
+  { id: 'metric-active',        label: 'My Active Rentals',    size: 'card', defaultVisible: true,  description: 'Equipment currently assigned and checked out to you.'                },
+  // ── Row 2: quick links + tip ────────────────────────────────
+  { id: 'link-equipment',       label: 'Equipment Catalog',    size: 'card', defaultVisible: true,  description: 'Quick link to browse and request available equipment.'             },
+  { id: 'link-rentals',         label: 'My Requests',          size: 'card', defaultVisible: true,  description: 'Quick link to track your active and pending rental requests.'      },
+  { id: 'tip-rental-policy',    label: 'Rental Policy Tips',   size: 'card', defaultVisible: true,  description: 'Key reminders about equipment care and return expectations.'        },
+  // ── Off by default ───────────────────────────────────────────
+  { id: 'how-it-works',         label: 'How It Works',         size: 'wide', defaultVisible: false, description: 'Three-step guide: Browse → Request → Pick Up.'                     },
+  { id: 'tip-getting-started',  label: 'Getting Started',      size: 'card', defaultVisible: false, description: 'Helpful tips for new field users submitting their first request.'   },
 ]
 
 export default function FieldDashboardPage() {
@@ -48,6 +52,15 @@ export default function FieldDashboardPage() {
   const session = getSession()
   const userId = session?.user.id ?? ''
   const firstName = (session?.user.name ?? 'there').split(' ')[0]
+
+  const [personalizing, setPersonalizing] = useState(false)
+  const [draggedId, setDraggedId] = useState<string | null>(null)
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
+
+  const { orderedWidgets, isVisible, toggleVisible, reset, reorderTo } =
+    useDashboardLayout('field', userId, WIDGETS)
+
+  function handleReset() { reset(); setPersonalizing(false) }
 
   const summaryQuery = useQuery({
     enabled: Boolean(userId),
@@ -66,15 +79,182 @@ export default function FieldDashboardPage() {
     )
   }
 
-  const quickLinks = [
-    { title: 'Equipment Availability', desc: 'Browse and request ready equipment',  to: '/field/equipment', icon: Package,      accent: 'text-emerald-600', iconBg: 'bg-emerald-50' },
-    { title: 'My Requests',            desc: 'Track active and pending rentals',    to: '/field/rentals',   icon: ClipboardList, accent: 'text-blue-600',   iconBg: 'bg-blue-50'   },
-  ]
+  const RENDER: Record<string, React.ReactNode> = {
 
-  const metrics = [
-    { title: 'My Pending Requests', value: summaryQuery.data.myPendingRequests, icon: ClipboardList, desc: 'Requests waiting for admin approval',        border: 'border-l-orange-500', color: 'text-orange-600', to: '/field/rentals', state: { statusFilter: 'pending' } },
-    { title: 'My Active Rentals',   value: summaryQuery.data.myActiveRentals,   icon: Hammer,        desc: 'Equipment currently assigned to your jobs',  border: 'border-l-blue-500',   color: 'text-blue-600',   to: '/field/rentals', state: { statusFilter: 'active'  } },
-  ]
+    'action-request': (
+      <button
+        onClick={() => navigate('/field/request')}
+        className="group relative w-full h-full overflow-hidden rounded-xl border border-emerald-200 dark:border-emerald-800/60 bg-gradient-to-br from-emerald-50 to-emerald-100/40 dark:from-emerald-900/30 dark:to-emerald-900/10 px-5 py-5 text-left hover:shadow-md hover:border-emerald-300 dark:hover:border-emerald-700 transition-all"
+      >
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500 shadow-sm">
+            <Send className="h-5 w-5 text-white" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-emerald-800 dark:text-emerald-200">Request Equipment</p>
+            <p className="mt-0.5 text-xs text-emerald-600/80 dark:text-emerald-400/80 leading-relaxed">Pick from available gear and submit a rental request in seconds.</p>
+          </div>
+        </div>
+        <div className="mt-4 flex items-center justify-between">
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm group-hover:bg-emerald-600 transition-colors">
+            <Send className="h-3 w-3" />
+            Start a Request
+          </span>
+          <ChevronRight className="h-4 w-4 text-emerald-400 dark:text-emerald-600 transition-transform group-hover:translate-x-0.5" />
+        </div>
+      </button>
+    ),
+
+    'link-equipment': (
+      <Link to="/field/equipment"
+        className="group flex h-full items-center gap-4 rounded-xl border border-slate-200 bg-white px-5 py-4 hover:border-slate-300 hover:shadow-md dark:bg-slate-800 dark:border-slate-700 dark:hover:border-slate-600">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-700">
+          <Package className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Equipment Availability</p>
+            <HardHat className="h-3 w-3 text-slate-300 dark:text-slate-500" />
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Browse and request ready equipment</p>
+        </div>
+        <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 transition-colors group-hover:text-slate-500" />
+      </Link>
+    ),
+
+    'link-rentals': (
+      <Link to="/field/rentals"
+        className="group flex h-full items-center gap-4 rounded-xl border border-slate-200 bg-white px-5 py-4 hover:border-slate-300 hover:shadow-md dark:bg-slate-800 dark:border-slate-700 dark:hover:border-slate-600">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-700">
+          <ClipboardList className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">My Requests</p>
+            <HardHat className="h-3 w-3 text-slate-300 dark:text-slate-500" />
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Track active and pending rentals</p>
+        </div>
+        <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 transition-colors group-hover:text-slate-500" />
+      </Link>
+    ),
+
+    'metric-pending': (
+      <button onClick={() => navigate('/field/rentals', { state: { statusFilter: 'pending' } })}
+        className="group w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 rounded-xl">
+        <div className="metric-card h-full rounded-xl border border-slate-200 border-l-4 border-l-slate-300 bg-white px-5 py-5 group-hover:border-slate-300 group-hover:shadow-md dark:bg-slate-800 dark:border-slate-700 dark:border-l-slate-600">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">My Pending Requests</p>
+              <HardHat className="h-3 w-3 text-slate-300 dark:text-slate-600" />
+            </div>
+            <ClipboardList className="h-4 w-4 text-slate-400" />
+          </div>
+          <p className="anim-count-pop text-3xl font-bold text-slate-900 dark:text-slate-100">{summaryQuery.data.myPendingRequests}</p>
+          <p className="mt-1 text-xs text-slate-400">Requests waiting for admin approval</p>
+          <p className="mt-3 text-[10px] font-semibold uppercase tracking-wide text-slate-300 transition-colors group-hover:text-slate-500">View details →</p>
+        </div>
+      </button>
+    ),
+
+    'metric-active': (
+      <button onClick={() => navigate('/field/rentals', { state: { statusFilter: 'active' } })}
+        className="group w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 rounded-xl">
+        <div className="metric-card h-full rounded-xl border border-slate-200 border-l-4 border-l-slate-300 bg-white px-5 py-5 group-hover:border-slate-300 group-hover:shadow-md dark:bg-slate-800 dark:border-slate-700 dark:border-l-slate-600">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">My Active Rentals</p>
+              <HardHat className="h-3 w-3 text-slate-300 dark:text-slate-600" />
+            </div>
+            <Hammer className="h-4 w-4 text-slate-400" />
+          </div>
+          <p className="anim-count-pop text-3xl font-bold text-slate-900 dark:text-slate-100">{summaryQuery.data.myActiveRentals}</p>
+          <p className="mt-1 text-xs text-slate-400">Equipment currently assigned to your jobs</p>
+          <p className="mt-3 text-[10px] font-semibold uppercase tracking-wide text-slate-300 transition-colors group-hover:text-slate-500">View details →</p>
+        </div>
+      </button>
+    ),
+
+    'how-it-works': (
+      <div>
+        <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-slate-400">How It Works</p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {HOW_IT_WORKS.map((s, i) => (
+            <Link key={s.step} to={s.to}
+              className="group relative flex flex-col gap-3 rounded-xl border border-slate-200 bg-white px-5 py-5 hover:border-slate-300 hover:shadow-md dark:bg-slate-800 dark:border-slate-700 dark:hover:border-slate-600 anim-fade-up"
+              style={{ animationDelay: `${0.05 + i * 0.07}s` }}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${s.iconBg} dark:bg-slate-700`}>
+                  <s.icon className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                </div>
+                <span className="text-[11px] font-bold uppercase tracking-widest text-slate-300">{s.step}</span>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{s.title}</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">{s.desc}</p>
+              </div>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-300 transition-colors group-hover:text-slate-500">Get started →</p>
+            </Link>
+          ))}
+        </div>
+      </div>
+    ),
+
+    'tip-rental-policy': (
+      <div className="h-full rounded-xl border border-slate-200 bg-white px-5 py-5 dark:bg-slate-800 dark:border-slate-700">
+        <div className="mb-3 flex items-center gap-2.5">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-700">
+            <Info className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Rental Policy Reminders</p>
+            <HardHat className="h-3 w-3 text-slate-300 dark:text-slate-600" />
+          </div>
+        </div>
+        <ul className="space-y-2">
+          {[
+            'Inspect equipment before use and report any damage immediately.',
+            'Return equipment by the agreed end date to avoid delays.',
+            'Keep gear clean and stored securely when not in use.',
+            'Contact admin if you need to extend a rental period.',
+          ].map((tip) => (
+            <li key={tip} className="flex items-start gap-2 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+              {tip}
+            </li>
+          ))}
+        </ul>
+      </div>
+    ),
+
+    'tip-getting-started': (
+      <div className="h-full rounded-xl border border-slate-200 bg-white px-5 py-5 dark:bg-slate-800 dark:border-slate-700">
+        <div className="mb-3 flex items-center gap-2.5">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-700">
+            <BookOpen className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Getting Started</p>
+            <HardHat className="h-3 w-3 text-slate-300 dark:text-slate-600" />
+          </div>
+        </div>
+        <ul className="space-y-2">
+          {[
+            "Head to Equipment Availability to browse what's ready to rent.",
+            'Click any item to view details, then submit a rental request.',
+            "You'll be notified once an admin approves your request.",
+            'Use the QR scanner to quickly look up equipment on-site.',
+          ].map((tip) => (
+            <li key={tip} className="flex items-start gap-2 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300 dark:bg-slate-500" />
+              {tip}
+            </li>
+          ))}
+        </ul>
+      </div>
+    ),
+  }
 
   return (
     <div className="space-y-7">
@@ -87,110 +267,100 @@ export default function FieldDashboardPage() {
         <div className="hero-blob pointer-events-none absolute -right-14 -top-14 h-64 w-64 rounded-full bg-white/10" />
         <div className="hero-blob-2 pointer-events-none absolute right-20 -bottom-12 h-40 w-40 rounded-full bg-white/5" />
         <div className="hero-blob pointer-events-none absolute -left-10 top-1/2 h-32 w-32 -translate-y-1/2 rounded-full bg-white/5" style={{ animationDelay: '3s' }} />
-
         <div className="relative z-10 flex items-center justify-between gap-4">
           <div>
-            <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-emerald-200">
-              {getGreeting()}
-            </p>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-emerald-200">{getGreeting()}</p>
             <h1 className="text-2xl font-bold text-white">{firstName}!</h1>
-            <p className="mt-1.5 text-sm text-emerald-100/80">
-              Monitor your requests and access available equipment.
-            </p>
+            <p className="mt-1.5 text-sm text-emerald-100/80">Monitor your requests and access available equipment.</p>
           </div>
-          <span
-            className="hidden shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold sm:flex"
-            style={{ background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.88)' }}
-          >
+          <span className="hidden shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold sm:flex"
+            style={{ background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.88)' }}>
             <Package className="h-3 w-3" />
             Field User
           </span>
         </div>
       </div>
 
-      {/* ── Quick Access ─────────────────────────────────────── */}
-      <div className="anim-fade-up" style={{ animationDelay: '0.08s' }}>
-        <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Quick Access</p>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {quickLinks.map((link) => (
-            <Link
-              key={link.to}
-              to={link.to}
-              className="group flex items-center gap-4 rounded-xl border border-slate-200 bg-white px-5 py-4 hover:border-slate-300 hover:shadow-md"
-            >
-              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${link.iconBg}`}>
-                <link.icon className={`h-5 w-5 ${link.accent}`} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-slate-800">{link.title}</p>
-                <p className="text-xs text-slate-500">{link.desc}</p>
-              </div>
-              <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 transition-colors group-hover:text-slate-500" />
-            </Link>
-          ))}
-        </div>
-      </div>
-
-      {/* ── My Activity ───────────────────────────────────────── */}
-      <div className="anim-fade-up" style={{ animationDelay: '0.16s' }}>
-        <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-slate-400">My Activity</p>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {metrics.map((m, i) => (
-            <button
-              key={m.title}
-              onClick={() => navigate(m.to, { state: m.state })}
-              className="group text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 rounded-xl anim-fade-up"
-              style={{ animationDelay: `${0.18 + i * 0.07}s` }}
-            >
-              <div className={`metric-card h-full rounded-xl border border-slate-200 border-l-4 ${m.border} bg-white px-5 py-5 group-hover:border-slate-300 group-hover:shadow-md`}>
-                <div className="mb-3 flex items-center justify-between">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{m.title}</p>
-                  <m.icon className={`h-4 w-4 ${m.color} opacity-50`} />
-                </div>
-                <p className={`anim-count-pop text-3xl font-bold ${m.color}`} style={{ animationDelay: `${0.28 + i * 0.07}s` }}>{m.value}</p>
-                <p className="mt-1 text-xs text-slate-400">{m.desc}</p>
-                <p className="mt-3 text-[10px] font-semibold uppercase tracking-wide text-slate-300 transition-colors group-hover:text-slate-500">
-                  View details →
-                </p>
-              </div>
+      {/* ── Personalize toggle ────────────────────────────────── */}
+      <div className="flex items-center justify-end gap-2 -mt-3">
+        {personalizing && (
+          <>
+            <span className="text-xs text-slate-500">Drag to reorder · ✕ to hide</span>
+            <button onClick={handleReset} className="text-xs font-medium text-slate-400 hover:text-red-500 transition-colors">
+              Reset to defaults
             </button>
-          ))}
-        </div>
+          </>
+        )}
+        <button
+          onClick={() => setPersonalizing(v => !v)}
+          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all ${
+            personalizing
+              ? 'border-emerald-400 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+              : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700 hover:shadow-sm dark:bg-slate-800 dark:border-slate-600 dark:text-slate-400'
+          }`}
+        >
+          <SlidersHorizontal className="h-3.5 w-3.5" />
+          {personalizing ? 'Done' : 'Personalize'}
+        </button>
       </div>
 
-      {/* ── How It Works ─────────────────────────────────────── */}
-      <div className="anim-fade-up" style={{ animationDelay: '0.28s' }}>
-        <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-slate-400">How It Works</p>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {HOW_IT_WORKS.map((s, i) => (
-            <Link
-              key={s.step}
-              to={s.to}
-              className="group relative flex flex-col gap-3 rounded-xl border border-slate-200 bg-white px-5 py-5 hover:border-slate-300 hover:shadow-md anim-fade-up"
-              style={{ animationDelay: `${0.3 + i * 0.07}s` }}
-            >
-              {/* Step connector line */}
-              {i < HOW_IT_WORKS.length - 1 && (
-                <div className="pointer-events-none absolute right-0 top-1/2 hidden -translate-y-1/2 translate-x-full items-center sm:flex" style={{ width: '12px' }}>
-                  <div className="h-px w-full bg-slate-200" />
+      {/* ── Per-card responsive grid ──────────────────────────── */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {orderedWidgets
+          .filter((w) => isVisible(w.id))
+          .map((w) => {
+            return (
+              <PersonalizableWidget
+                key={w.id}
+                id={w.id}
+                label={w.label}
+                personalizing={personalizing}
+                isDragOver={dragOverId === w.id}
+                onRemove={() => toggleVisible(w.id)}
+                onDragStart={() => setDraggedId(w.id)}
+                onDragOver={(e) => { e.preventDefault(); setDragOverId(w.id) }}
+                onDrop={() => { if (draggedId && draggedId !== w.id) { reorderTo(draggedId, w.id) }; setDraggedId(null); setDragOverId(null) }}
+                onDragEnd={() => { setDraggedId(null); setDragOverId(null) }}
+                sizeClass={w.size === 'wide' ? 'col-span-full' : ''}
+              >
+                {RENDER[w.id]}
+              </PersonalizableWidget>
+            )
+          })}
+
+        {/* Add New tile — always shown in personalize mode */}
+        {personalizing && (() => {
+          const hidden = orderedWidgets.filter((w) => !isVisible(w.id))
+          return (
+            <div className="flex flex-col rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-600 bg-transparent overflow-hidden">
+              {hidden.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-1.5 px-4 py-8 text-center">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-dashed border-slate-200 dark:border-slate-600 text-slate-300 dark:text-slate-600 text-xl font-light">+</span>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">All widgets visible</p>
                 </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 px-4 pt-4 pb-2">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-slate-300 dark:border-slate-500 text-slate-400 dark:text-slate-500 text-sm font-semibold leading-none">+</span>
+                    <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Add Widget</p>
+                  </div>
+                  <div className="flex flex-col gap-1.5 px-4 pb-4">
+                    {hidden.map((w) => (
+                      <button key={w.id} onClick={() => toggleVisible(w.id)}
+                        className="flex items-center gap-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2.5 text-left hover:border-slate-300 dark:hover:border-slate-500 hover:shadow-sm transition-all group">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-500 text-xs font-bold group-hover:bg-emerald-50 dark:group-hover:bg-emerald-900/30 group-hover:text-emerald-500 transition-colors">+</span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate">{w.label}</p>
+                          {w.description && <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate mt-0.5">{w.description}</p>}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </>
               )}
-              <div className="flex items-center gap-3">
-                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${s.iconBg}`}>
-                  <s.icon className={`h-4 w-4 ${s.accent}`} />
-                </div>
-                <span className="text-[11px] font-bold uppercase tracking-widest text-slate-300">{s.step}</span>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-slate-800">{s.title}</p>
-                <p className="mt-1 text-xs leading-relaxed text-slate-500">{s.desc}</p>
-              </div>
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-300 transition-colors group-hover:text-slate-500">
-                Get started →
-              </p>
-            </Link>
-          ))}
-        </div>
+            </div>
+          )
+        })()}
       </div>
 
     </div>

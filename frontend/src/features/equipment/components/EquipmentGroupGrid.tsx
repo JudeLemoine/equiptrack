@@ -31,18 +31,18 @@ export type EquipmentGroupGridProps = {
 
 const PILL_STYLES = {
   available: {
-    wrap: 'text-emerald-700 bg-emerald-50 border-emerald-100',
-    dot: 'bg-emerald-500',
+    wrap: 'text-emerald-700 bg-emerald-50 border-emerald-100 dark:text-emerald-300 dark:bg-emerald-900/40 dark:border-emerald-800',
+    dot: 'bg-emerald-500 dark:bg-emerald-400',
     label: 'Available',
   },
   in_use: {
-    wrap: 'text-amber-700 bg-amber-50 border-amber-100',
-    dot: 'bg-amber-500',
+    wrap: 'text-blue-700 bg-blue-50 border-blue-100 dark:text-blue-300 dark:bg-blue-900/40 dark:border-blue-800',
+    dot: 'bg-blue-500 dark:bg-blue-400',
     label: 'In Use',
   },
   maintenance: {
-    wrap: 'text-red-700 bg-red-50 border-red-100',
-    dot: 'bg-red-500',
+    wrap: 'text-amber-700 bg-amber-50 border-amber-100 dark:text-amber-300 dark:bg-amber-900/40 dark:border-amber-800',
+    dot: 'bg-amber-500 dark:bg-amber-400',
     label: 'Maintenance',
   },
 } as const
@@ -72,19 +72,19 @@ function GroupTile({
   return (
     <button
       onClick={onClick}
-      className="w-full text-left bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-slate-300 transition-all duration-150 p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 group"
+      className="w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600 transition-all duration-150 p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 group"
     >
       {/* Name + count + chevron */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <h3 className="font-semibold text-slate-900 text-sm leading-snug line-clamp-2 group-hover:text-blue-700 transition-colors">
+          <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm leading-snug line-clamp-2 group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors">
             {group.name}
           </h3>
-          <p className="text-xs text-slate-500 mt-0.5 truncate">{group.category}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">{group.category}</p>
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
-          <span className="min-w-[22px] text-center text-[11px] font-bold text-slate-600 bg-slate-100 rounded-full px-2 py-0.5">
+          <span className="min-w-[22px] text-center text-[11px] font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 rounded-full px-2 py-0.5">
             {group.items.length}
           </span>
           <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-blue-500 transition-colors" />
@@ -124,15 +124,15 @@ function GroupDialog({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-lg w-full p-0 overflow-hidden gap-0">
         {/* Header */}
-        <DialogHeader className="px-5 pt-5 pb-4 border-b border-slate-100">
+        <DialogHeader className="px-5 pt-5 pb-4 border-b border-slate-100 dark:border-slate-700">
           <div className="flex items-start justify-between gap-3 pr-6">
             <div className="min-w-0">
-              <DialogTitle className="text-base font-semibold text-slate-900 leading-snug">
+              <DialogTitle className="text-base font-semibold text-slate-900 dark:text-slate-100 leading-snug">
                 {group.name}
               </DialogTitle>
-              <p className="text-xs text-slate-500 mt-0.5">{group.category}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{group.category}</p>
             </div>
-            <span className="shrink-0 text-xs font-bold text-slate-600 bg-slate-100 rounded-full px-2.5 py-1 mt-0.5">
+            <span className="shrink-0 text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 rounded-full px-2.5 py-1 mt-0.5">
               {group.items.length} {group.items.length === 1 ? 'unit' : 'units'}
             </span>
           </div>
@@ -150,13 +150,13 @@ function GroupDialog({
           {group.items.map((item, idx) => (
             <div
               key={item.id}
-              className={`flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors ${
-                idx < group.items.length - 1 ? 'border-b border-slate-100' : ''
+              className={`flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${
+                idx < group.items.length - 1 ? 'border-b border-slate-100 dark:border-slate-700' : ''
               }`}
             >
               {/* Asset info */}
               <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-mono text-slate-400 leading-tight truncate">
+                <p className="text-[11px] font-mono text-slate-400 dark:text-slate-500 leading-tight truncate">
                   {item.qrCode}
                 </p>
                 <div className="mt-1">
@@ -224,7 +224,7 @@ export default function EquipmentGroupGrid({
 
   if (groups.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-400">
+      <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-400 dark:text-slate-500">
         <PackageSearch className="h-10 w-10 opacity-40" />
         <p className="text-sm font-medium">No equipment matches your filters</p>
         <p className="text-xs">Try broadening your search or changing filters.</p>

@@ -32,9 +32,9 @@ function MobileAccordionRow<TData>({ row }: { row: Row<TData> }) {
   const otherCells = row.getVisibleCells().slice(1)
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+    <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden dark:bg-slate-800 dark:border-slate-700">
       <button
-        className="flex w-full items-center justify-between px-4 py-3.5 text-left font-medium text-slate-900 hover:bg-slate-50 transition-colors"
+        className="flex w-full items-center justify-between px-4 py-3.5 text-left font-medium text-slate-900 hover:bg-slate-50 transition-colors dark:text-slate-100 dark:hover:bg-slate-700/50"
         onClick={() => setExpanded(!expanded)}
         type="button"
       >
@@ -46,7 +46,7 @@ function MobileAccordionRow<TData>({ row }: { row: Row<TData> }) {
         )}
       </button>
       {expanded && (
-        <div className="space-y-3 border-t border-slate-100 bg-slate-50/50 p-4">
+        <div className="space-y-3 border-t border-slate-100 bg-slate-50/50 p-4 dark:border-slate-700 dark:bg-slate-700/30">
           {otherCells.map((cell) => {
             const header =
               typeof cell.column.columnDef.header === 'string'
@@ -54,10 +54,10 @@ function MobileAccordionRow<TData>({ row }: { row: Row<TData> }) {
                 : cell.column.id
             return (
               <div className="flex flex-col gap-1" key={cell.id}>
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
                   {header}
                 </span>
-                <div className="text-sm text-slate-800">
+                <div className="text-sm text-slate-800 dark:text-slate-200">
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
                 </div>
               </div>
@@ -100,11 +100,11 @@ export default function DataTable<TData>({
   const hasRows = table.getRowModel().rows.length > 0
 
   const paginationControls = paginationEnabled && table.getPageCount() > 1 && (
-    <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3">
-      <p className="text-sm text-slate-500">
-        Page <span className="font-semibold text-slate-800">{table.getState().pagination.pageIndex + 1}</span> of{' '}
-        <span className="font-semibold text-slate-800">{table.getPageCount()}</span>
-        <span className="ml-2 text-slate-400 text-xs">({data.length} total)</span>
+    <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 dark:bg-slate-800 dark:border-slate-700">
+      <p className="text-sm text-slate-500 dark:text-slate-400">
+        Page <span className="font-semibold text-slate-800 dark:text-slate-200">{table.getState().pagination.pageIndex + 1}</span> of{' '}
+        <span className="font-semibold text-slate-800 dark:text-slate-200">{table.getPageCount()}</span>
+        <span className="ml-2 text-slate-400 text-xs dark:text-slate-500">({data.length} total)</span>
       </p>
       <div className="flex items-center gap-2">
         <Button
@@ -146,19 +146,19 @@ export default function DataTable<TData>({
       )}
 
       {/* Desktop table */}
-      <div className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm md:block">
+      <div className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm md:block dark:bg-slate-800 dark:border-slate-700">
         <div className="w-full overflow-x-auto">
           <Table className="min-w-[720px]">
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id} className="bg-slate-50 hover:bg-slate-50 border-b border-slate-200">
+                <TableRow key={headerGroup.id} className="bg-slate-50 hover:bg-slate-50 border-b border-slate-200 dark:bg-slate-700/50 dark:hover:bg-slate-700/50 dark:border-slate-700">
                   {headerGroup.headers.map((header) => {
                     const canSort = header.column.getCanSort()
                     return (
                       <TableHead key={header.id} className="h-11 px-4 py-2">
                         {header.isPlaceholder ? null : canSort ? (
                           <button
-                            className="flex items-center gap-1.5 text-left font-semibold uppercase tracking-widest text-[11px] text-slate-500 hover:text-slate-900 transition-colors"
+                            className="flex items-center gap-1.5 text-left font-semibold uppercase tracking-widest text-[11px] text-slate-500 hover:text-slate-900 transition-colors dark:text-slate-400 dark:hover:text-slate-100"
                             onClick={header.column.getToggleSortingHandler()}
                             type="button"
                           >
@@ -172,7 +172,7 @@ export default function DataTable<TData>({
                             )}
                           </button>
                         ) : (
-                          <span className="font-semibold uppercase tracking-widest text-[11px] text-slate-500">
+                          <span className="font-semibold uppercase tracking-widest text-[11px] text-slate-500 dark:text-slate-400">
                             {flexRender(header.column.columnDef.header, header.getContext())}
                           </span>
                         )}
@@ -187,7 +187,7 @@ export default function DataTable<TData>({
                 table.getRowModel().rows.map((row, i) => (
                   <TableRow
                     key={row.id}
-                    className={`border-b border-slate-100 hover:bg-slate-50/80 transition-colors ${i % 2 === 1 ? 'bg-slate-50/30' : ''}`}
+                    className={`border-b border-slate-100 hover:bg-slate-50/80 transition-colors dark:border-slate-700 dark:hover:bg-slate-700/40 ${i % 2 === 1 ? 'bg-slate-50/30 dark:bg-slate-700/20' : ''}`}
                   >
                     {row.getVisibleCells().map((cell) => (
                       <TableCell key={cell.id} className="px-4 py-3">
@@ -215,7 +215,7 @@ export default function DataTable<TData>({
             <MobileAccordionRow key={row.id} row={row} />
           ))
         ) : (
-          <div className="rounded-xl border border-slate-200 bg-white py-12">
+          <div className="rounded-xl border border-slate-200 bg-white py-12 dark:bg-slate-800 dark:border-slate-700">
             <EmptyState description={emptyDescription} title={emptyTitle} />
           </div>
         )}

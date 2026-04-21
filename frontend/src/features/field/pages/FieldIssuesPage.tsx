@@ -21,18 +21,18 @@ const SEVERITY_RANK: Record<string, number>     = { CRITICAL: 0, HIGH: 1, MEDIUM
 const ISSUE_STATUS_RANK: Record<string, number> = { OPEN: 0, IN_PROGRESS: 1, REVIEWED: 2, RESOLVED: 3, CLOSED: 4 }
 
 const SEVERITY_META: Record<string, { label: string; pill: string; dot: string }> = {
-  LOW:      { label: 'Low',      pill: 'text-blue-700 bg-blue-50 border-blue-200',       dot: 'bg-blue-400'   },
-  MEDIUM:   { label: 'Medium',   pill: 'text-amber-700 bg-amber-50 border-amber-200',    dot: 'bg-amber-400'  },
-  HIGH:     { label: 'High',     pill: 'text-orange-700 bg-orange-50 border-orange-200', dot: 'bg-orange-400' },
-  CRITICAL: { label: 'Critical', pill: 'text-red-700 bg-red-50 border-red-200',          dot: 'bg-red-500'    },
+  LOW:      { label: 'Low',      pill: 'text-blue-700 bg-blue-50 border-blue-200 dark:text-blue-300 dark:bg-blue-900/40 dark:border-blue-800',         dot: 'bg-blue-400 dark:bg-blue-300'      },
+  MEDIUM:   { label: 'Medium',   pill: 'text-amber-700 bg-amber-50 border-amber-200 dark:text-amber-300 dark:bg-amber-900/40 dark:border-amber-800',     dot: 'bg-amber-400 dark:bg-amber-300'    },
+  HIGH:     { label: 'High',     pill: 'text-orange-700 bg-orange-50 border-orange-200 dark:text-orange-300 dark:bg-orange-900/40 dark:border-orange-800', dot: 'bg-orange-400 dark:bg-orange-300'  },
+  CRITICAL: { label: 'Critical', pill: 'text-red-700 bg-red-50 border-red-200 dark:text-red-300 dark:bg-red-900/40 dark:border-red-800',                 dot: 'bg-red-500 dark:bg-red-400'        },
 }
 
 const STATUS_META: Record<string, { label: string; pill: string; dot: string }> = {
-  OPEN:        { label: 'Open',        pill: 'text-red-700 bg-red-50 border-red-200',           dot: 'bg-red-500'    },
-  REVIEWED:    { label: 'Reviewed',    pill: 'text-amber-700 bg-amber-50 border-amber-200',     dot: 'bg-amber-400'  },
-  IN_PROGRESS: { label: 'In Progress', pill: 'text-blue-700 bg-blue-50 border-blue-200',        dot: 'bg-blue-400'   },
-  RESOLVED:    { label: 'Resolved',    pill: 'text-emerald-700 bg-emerald-50 border-emerald-200', dot: 'bg-emerald-500' },
-  CLOSED:      { label: 'Closed',      pill: 'text-slate-600 bg-slate-50 border-slate-200',     dot: 'bg-slate-400'  },
+  OPEN:        { label: 'Open',        pill: 'text-red-700 bg-red-50 border-red-200 dark:text-red-300 dark:bg-red-900/40 dark:border-red-800',                       dot: 'bg-red-500 dark:bg-red-400'        },
+  REVIEWED:    { label: 'Reviewed',    pill: 'text-amber-700 bg-amber-50 border-amber-200 dark:text-amber-300 dark:bg-amber-900/40 dark:border-amber-800',             dot: 'bg-amber-400 dark:bg-amber-300'    },
+  IN_PROGRESS: { label: 'In Progress', pill: 'text-blue-700 bg-blue-50 border-blue-200 dark:text-blue-300 dark:bg-blue-900/40 dark:border-blue-800',                   dot: 'bg-blue-400 dark:bg-blue-300'      },
+  RESOLVED:    { label: 'Resolved',    pill: 'text-emerald-700 bg-emerald-50 border-emerald-200 dark:text-emerald-300 dark:bg-emerald-900/40 dark:border-emerald-800', dot: 'bg-emerald-500 dark:bg-emerald-400' },
+  CLOSED:      { label: 'Closed',      pill: 'text-slate-600 bg-slate-50 border-slate-200 dark:text-slate-400 dark:bg-slate-700/50 dark:border-slate-600',             dot: 'bg-slate-400'                      },
 }
 
 const statusOptions: Array<{ label: string; value: IssueStatus | 'all' }> = [
@@ -100,7 +100,7 @@ export default function FieldIssuesPage() {
         header: 'Issue',
         cell: ({ row }) => (
           <div>
-            <p className="font-semibold text-slate-800">{row.original.title}</p>
+            <p className="font-semibold text-slate-800 dark:text-slate-200">{row.original.title}</p>
             {row.original.description && (
               <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{row.original.description}</p>
             )}
@@ -164,8 +164,8 @@ export default function FieldIssuesPage() {
       <PageHeader title="My Reports" subtitle="Equipment issues you've submitted" />
 
       {/* Filters */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 bg-slate-50 px-4 py-2.5">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 shadow-sm">
+        <div className="border-b border-slate-100 bg-slate-50 dark:bg-slate-700/50 dark:border-slate-700 px-4 py-2.5">
           <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Filters</p>
         </div>
         <div className="flex flex-wrap gap-x-8 gap-y-4 p-4">
@@ -174,7 +174,7 @@ export default function FieldIssuesPage() {
             <div className="flex flex-wrap gap-1.5">
               {statusOptions.map((o) => (
                 <button key={o.value} onClick={() => setStatus(o.value)}
-                  className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition-colors ${status === o.value ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-400'}`}
+                  className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition-colors ${status === o.value ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-400 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-600'}`}
                 >
                   {o.value !== 'all' && STATUS_META[o.value] && (
                     <span className={`h-1.5 w-1.5 rounded-full ${status === o.value ? 'bg-white/70' : STATUS_META[o.value].dot}`} />
@@ -189,7 +189,7 @@ export default function FieldIssuesPage() {
             <div className="flex flex-wrap gap-1.5">
               {severityOptions.map((o) => (
                 <button key={o.value} onClick={() => setSeverity(o.value)}
-                  className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition-colors ${severity === o.value ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-400'}`}
+                  className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition-colors ${severity === o.value ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-400 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-600'}`}
                 >
                   {o.value !== 'all' && SEVERITY_META[o.value] && (
                     <span className={`h-1.5 w-1.5 rounded-full ${severity === o.value ? 'bg-white/70' : SEVERITY_META[o.value].dot}`} />

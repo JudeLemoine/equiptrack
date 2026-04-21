@@ -17,7 +17,7 @@ export default function EmptyState({
   return (
     <Card className="border-dashed">
       <CardHeader className="items-center text-center">
-        {icon ? <div className="rounded-full bg-slate-100 p-3">{icon}</div> : null}
+        {icon ? <div className="rounded-full bg-slate-100 dark:bg-slate-700 p-3">{icon}</div> : null}
         <CardTitle>{title}</CardTitle>
         {description ? <CardDescription>{description}</CardDescription> : null}
       </CardHeader>

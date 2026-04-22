@@ -375,7 +375,7 @@ function RoleTopBar({ onLogout, onImpersonate, onMenuOpen }: { onLogout: () => v
     queryKey: ['current-user-avatar', realSession?.user?.id],
     queryFn: async () => {
       if (!realSession?.user?.id) return null
-      const user = await getUser(realSession.user.id)
+      const user = await getUser(realSession.user.id, { silent: true })
       if (user && realSession) {
         setSession({ ...realSession, user: { ...realSession.user, avatarUrl: user.avatarUrl ?? undefined, isAvatarIcon: user.isAvatarIcon } })
       }

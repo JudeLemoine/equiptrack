@@ -17,8 +17,8 @@ export function listUsers(params?: ListUsersParams): Promise<User[]> {
   return apiClient.get<User[]>(`/api/users${queryString ? `?${queryString}` : ''}`)
 }
 
-export function getUser(id: string): Promise<User> {
-  return apiClient.get<User>(`/api/users/${id}`)
+export function getUser(id: string, options?: { silent?: boolean }): Promise<User> {
+  return apiClient.get<User>(`/api/users/${id}`, options)
 }
 
 export type UpdateUserPayload = {

@@ -30,7 +30,7 @@ export default function PersonalizableWidget({
   return (
     <div
       className={[
-        'relative',
+        'relative h-full [&>*]:h-full',
         sizeClass,
         personalizing
           ? `cursor-grab rounded-xl outline outline-2 transition-all ${

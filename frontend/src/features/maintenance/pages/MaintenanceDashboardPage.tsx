@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   ClipboardList,
   SlidersHorizontal,
+  QrCode,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import DataTable from '../../../components/DataTable'
@@ -41,15 +42,17 @@ function getGreeting() {
 }
 
 const WIDGETS: WidgetDef[] = [
-  // ── Row 1: key service numbers ──────────────────────────────
+  // ── Row 1: action shortcuts ──────────────────────────────────
+  { id: 'action-report',         label: 'Report Equipment Issue',size: 'card', defaultVisible: true,  description: 'Shortcut to log a new maintenance issue from the dashboard.'     },
+  { id: 'action-scan-qr',        label: 'Scan QR Code',          size: 'card', defaultVisible: true,  description: 'Open the QR scanner to instantly look up any equipment unit.'    },
+  // ── Row 2: key service numbers ──────────────────────────────
   { id: 'metric-in-maintenance', label: 'In Maintenance',        size: 'card', defaultVisible: true,  description: 'Equipment units currently in the service queue.'                },
   { id: 'metric-critical',       label: 'Critical Issues',       size: 'card', defaultVisible: true,  description: 'Number of open issues flagged as critical severity.'             },
   { id: 'metric-open-total',     label: 'Total Open Issues',     size: 'card', defaultVisible: true,  description: 'Total count of all open issue reports across the fleet.'         },
-  // ── Row 2: primary actions ──────────────────────────────────
-  { id: 'action-report',         label: 'Report Equipment Issue',size: 'card', defaultVisible: true,  description: 'Shortcut to log a new maintenance issue from the dashboard.'     },
+  // ── Row 3: quick links ───────────────────────────────────────
   { id: 'link-queue',            label: 'Maintenance Queue',     size: 'card', defaultVisible: true,  description: 'Quick link to the maintenance service queue.'                    },
   { id: 'link-issues',           label: 'Issue Reports',         size: 'card', defaultVisible: true,  description: 'Quick link to view and manage all reported issues.'              },
-  // ── Row 3: live queue ───────────────────────────────────────
+  // ── Row 4: live queue ───────────────────────────────────────
   { id: 'issue-queue',           label: 'Reported Issues Queue', size: 'wide', defaultVisible: true,  description: 'Live table of open issues with severity filter and breakdown.'   },
   // ── Off by default ───────────────────────────────────────────
   { id: 'metric-available',      label: 'Available',             size: 'card', defaultVisible: false, description: 'Equipment units ready to be rented out.'                        },
@@ -198,7 +201,7 @@ export default function MaintenanceDashboardPage() {
             <Wrench className="h-4 w-4 text-slate-400" />
           </div>
           <p className="anim-count-pop text-3xl font-bold text-slate-900 dark:text-slate-100">{summaryQuery.data.maintenanceEquipment}</p>
-          <p className="mt-1 text-xs text-slate-400">Currently in the service queue</p>
+          <p className="mt-1 text-xs text-slate-400 hidden sm:block">Currently in the service queue</p>
           <p className="mt-3 text-[10px] font-semibold uppercase tracking-wide text-slate-300 transition-colors group-hover:text-slate-500">View details →</p>
         </div>
       </button>
@@ -216,7 +219,7 @@ export default function MaintenanceDashboardPage() {
             <CheckCircle2 className="h-4 w-4 text-slate-400" />
           </div>
           <p className="anim-count-pop text-3xl font-bold text-slate-900 dark:text-slate-100">{summaryQuery.data.availableEquipment}</p>
-          <p className="mt-1 text-xs text-slate-400">Ready to be rented</p>
+          <p className="mt-1 text-xs text-slate-400 hidden sm:block">Ready to be rented</p>
           <p className="mt-3 text-[10px] font-semibold uppercase tracking-wide text-slate-300 transition-colors group-hover:text-slate-500">View details →</p>
         </div>
       </button>
@@ -234,7 +237,7 @@ export default function MaintenanceDashboardPage() {
             <Activity className="h-4 w-4 text-slate-400" />
           </div>
           <p className="anim-count-pop text-3xl font-bold text-slate-900 dark:text-slate-100">{summaryQuery.data.inUseEquipment}</p>
-          <p className="mt-1 text-xs text-slate-400">Assigned to active rentals</p>
+          <p className="mt-1 text-xs text-slate-400 hidden sm:block">Assigned to active rentals</p>
           <p className="mt-3 text-[10px] font-semibold uppercase tracking-wide text-slate-300 transition-colors group-hover:text-slate-500">View details →</p>
         </div>
       </button>
@@ -250,7 +253,7 @@ export default function MaintenanceDashboardPage() {
           <AlertCircle className="h-4 w-4 text-slate-400" />
         </div>
         <p className="anim-count-pop text-3xl font-bold text-slate-900 dark:text-slate-100">{severityCounts.CRITICAL}</p>
-        <p className="mt-1 text-xs text-slate-400">Open issues flagged as critical</p>
+        <p className="mt-1 text-xs text-slate-400 hidden sm:block">Open issues flagged as critical</p>
         {severityCounts.CRITICAL > 0
           ? <p className="mt-3 text-[10px] font-semibold uppercase tracking-wide text-red-400">Requires immediate attention</p>
           : <p className="mt-3 text-[10px] font-semibold uppercase tracking-wide text-slate-300">All clear</p>}
@@ -267,7 +270,7 @@ export default function MaintenanceDashboardPage() {
           <ClipboardList className="h-4 w-4 text-slate-400" />
         </div>
         <p className="anim-count-pop text-3xl font-bold text-slate-900 dark:text-slate-100">{totalOpenIssues}</p>
-        <p className="mt-1 text-xs text-slate-400">All open issue reports fleet-wide</p>
+        <p className="mt-1 text-xs text-slate-400 hidden sm:block">All open issue reports fleet-wide</p>
         <div className="mt-3 flex flex-wrap gap-2">
           {(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as const).filter(s => severityCounts[s] > 0).map(sev => (
             <span key={sev} className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${SEVERITY_STYLES[sev].pill}`}>
@@ -291,7 +294,7 @@ export default function MaintenanceDashboardPage() {
             <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Maintenance Queue</p>
             <Wrench className="h-3 w-3 text-slate-300 dark:text-slate-600" />
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Review and resolve service requests</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">Review and resolve service requests</p>
         </div>
         <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 transition-colors group-hover:text-slate-500" />
       </button>
@@ -308,7 +311,7 @@ export default function MaintenanceDashboardPage() {
             <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">All Equipment</p>
             <Wrench className="h-3 w-3 text-slate-300 dark:text-slate-600" />
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Browse fleet status and history</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">Browse fleet status and history</p>
         </div>
         <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 transition-colors group-hover:text-slate-500" />
       </button>
@@ -325,15 +328,39 @@ export default function MaintenanceDashboardPage() {
             <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Issue Reports</p>
             <Wrench className="h-3 w-3 text-slate-300 dark:text-slate-600" />
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400">View and manage all reported issues</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">View and manage all reported issues</p>
         </div>
         <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 transition-colors group-hover:text-slate-500" />
       </button>
     ),
 
+    'action-scan-qr': (
+      <button
+        onClick={() => navigate('/scan')}
+        className="group relative w-full h-full overflow-hidden rounded-xl border border-blue-200 dark:border-blue-800/60 bg-gradient-to-br from-blue-50 to-blue-100/40 dark:from-blue-900/30 dark:to-blue-900/10 px-5 py-5 text-left hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all"
+      >
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500 shadow-sm">
+            <QrCode className="h-5 w-5 text-white" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-blue-800 dark:text-blue-200">Scan QR Code</p>
+            <p className="mt-0.5 text-xs text-blue-600/80 dark:text-blue-400/80 leading-relaxed hidden sm:block">Instantly look up any equipment unit by scanning its QR tag.</p>
+          </div>
+        </div>
+        <div className="mt-4 flex items-center justify-between">
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm group-hover:bg-blue-600 transition-colors">
+            <QrCode className="h-3 w-3" />
+            Open Scanner
+          </span>
+          <ChevronRight className="h-4 w-4 text-blue-400 dark:text-blue-600 transition-transform group-hover:translate-x-0.5" />
+        </div>
+      </button>
+    ),
+
     'action-report': (
       <button
-        onClick={() => navigate('/maintenance/report')}
+        onClick={() => navigate('/report')}
         className="group relative w-full h-full overflow-hidden rounded-xl border border-amber-200 dark:border-amber-800/60 bg-gradient-to-br from-amber-50 to-amber-100/40 dark:from-amber-900/30 dark:to-amber-900/10 px-5 py-5 text-left hover:shadow-md hover:border-amber-300 dark:hover:border-amber-700 transition-all"
       >
         <div className="flex items-start gap-3">
@@ -342,7 +369,7 @@ export default function MaintenanceDashboardPage() {
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-bold text-amber-800 dark:text-amber-200">Report Equipment Issue</p>
-            <p className="mt-0.5 text-xs text-amber-600/80 dark:text-amber-400/80 leading-relaxed">Find equipment in the fleet and file a new maintenance report.</p>
+            <p className="mt-0.5 text-xs text-amber-600/80 dark:text-amber-400/80 leading-relaxed hidden sm:block">Find equipment in the fleet and file a new maintenance report.</p>
           </div>
         </div>
         <div className="mt-4 flex items-center justify-between">
@@ -479,7 +506,7 @@ export default function MaintenanceDashboardPage() {
       </div>
 
       {/* ── Per-card responsive grid ──────────────────────────── */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2 sm:gap-4 xl:grid-cols-3">
         {orderedWidgets
           .filter((w) => isVisible(w.id))
           .map((w) => {

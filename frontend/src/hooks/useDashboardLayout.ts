@@ -69,7 +69,7 @@ export function useDashboardLayout(
   reorderTo: (fromId: string, toId: string) => void
   swap: (currentId: string, newId: string) => void
 } {
-  const storageKey = `et-dash-${role}-${userId}`
+  const storageKey = `et-dash-v4-${role}-${userId}`
 
   const [stored, setStored] = useState<StoredItem[]>(() =>
     readFromStorage(storageKey),

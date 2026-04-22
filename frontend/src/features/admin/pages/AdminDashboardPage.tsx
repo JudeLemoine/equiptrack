@@ -15,6 +15,7 @@ import {
   SlidersHorizontal,
   Shield,
   Send,
+  QrCode,
 } from 'lucide-react'
 import ErrorState from '../../../components/ErrorState'
 import Loader from '../../../components/Loader'
@@ -33,22 +34,24 @@ function getGreeting() {
 const WIDGETS: WidgetDef[] = [
   // ── Row 1: full-width health overview ───────────────────────
   { id: 'fleet-health',       label: 'Fleet Health',          size: 'wide', defaultVisible: true,  description: 'Segmented bar showing available / in-use / maintenance split.'  },
-  // ── Row 2: most-actioned numbers ────────────────────────────
+  // ── Row 2: key numbers ───────────────────────────────────────
   { id: 'metric-pending',     label: 'Pending Requests',      size: 'card', defaultVisible: true,  description: 'Rental requests awaiting admin approval.'                         },
   { id: 'metric-active',      label: 'Active Rentals',        size: 'card', defaultVisible: true,  description: 'Ongoing equipment rentals across the fleet.'                      },
   { id: 'metric-available',   label: 'Available',             size: 'card', defaultVisible: true,  description: 'Equipment units currently ready for rental.'                      },
-  // ── Row 3: quick-action links ───────────────────────────────
   { id: 'metric-maintenance', label: 'Maintenance',           size: 'card', defaultVisible: true,  description: 'Equipment units currently being serviced.'                        },
+  // ── Row 3: quick links ───────────────────────────────────────
   { id: 'link-rentals',       label: 'Rentals Shortcut',      size: 'card', defaultVisible: true,  description: 'Quick link to review and approve rental requests.'                 },
   { id: 'link-equipment',     label: 'Equipment Shortcut',    size: 'card', defaultVisible: true,  description: 'Quick link to manage the equipment inventory.'                    },
+  // ── Row 4: action shortcuts ──────────────────────────────────
+  { id: 'action-request',     label: 'Request Equipment',     size: 'card', defaultVisible: true,  description: 'Browse available equipment and submit a rental request.'           },
+  { id: 'action-report',      label: 'Report Equipment Issue',size: 'card', defaultVisible: true,  description: 'File a new maintenance issue report on any equipment unit.'      },
+  { id: 'action-scan-qr',     label: 'Scan QR Code',          size: 'card', defaultVisible: true,  description: 'Open the QR scanner to instantly look up any equipment unit.'    },
   // ── Off by default ───────────────────────────────────────────
   { id: 'metric-total',       label: 'Total Equipment',       size: 'card', defaultVisible: false, description: 'Count of all tracked assets in the system.'                      },
   { id: 'metric-in-use',      label: 'In Use',                size: 'card', defaultVisible: false, description: 'Equipment units currently rented out.'                            },
   { id: 'metric-utilization', label: 'Utilization Rate',      size: 'card', defaultVisible: false, description: 'Percentage of the fleet currently rented out.'                    },
   { id: 'metric-downtime',    label: 'Downtime Rate',         size: 'card', defaultVisible: false, description: 'Percentage of the fleet currently in maintenance.'                 },
   { id: 'link-users',         label: 'Users Shortcut',        size: 'card', defaultVisible: false, description: 'Quick link to manage team members and access.'                    },
-  { id: 'action-request',     label: 'Request Equipment',     size: 'card', defaultVisible: false, description: 'Browse available equipment and submit a rental request.'           },
-  { id: 'action-report',      label: 'Report Equipment Issue',size: 'card', defaultVisible: false, description: 'File a new maintenance issue report on any equipment unit.'      },
 ]
 
 export default function AdminDashboardPage() {
@@ -147,7 +150,7 @@ export default function AdminDashboardPage() {
             <Package className="h-4 w-4 text-slate-400" />
           </div>
           <p className="anim-count-pop text-3xl font-bold text-slate-900 dark:text-slate-100">{d.totalEquipment}</p>
-          <p className="mt-1 text-xs text-slate-400">All tracked assets</p>
+          <p className="mt-1 text-xs text-slate-400 hidden sm:block">All tracked assets</p>
           <p className="mt-3 text-[10px] font-semibold uppercase tracking-wide text-slate-300 transition-colors group-hover:text-slate-500">View details →</p>
         </div>
       </button>
@@ -165,7 +168,7 @@ export default function AdminDashboardPage() {
             <CheckCircle2 className="h-4 w-4 text-slate-400" />
           </div>
           <p className="anim-count-pop text-3xl font-bold text-slate-900 dark:text-slate-100">{d.byStatus.available}</p>
-          <p className="mt-1 text-xs text-slate-400">Ready for rental</p>
+          <p className="mt-1 text-xs text-slate-400 hidden sm:block">Ready for rental</p>
           <p className="mt-3 text-[10px] font-semibold uppercase tracking-wide text-slate-300 transition-colors group-hover:text-slate-500">View details →</p>
         </div>
       </button>
@@ -183,7 +186,7 @@ export default function AdminDashboardPage() {
             <Activity className="h-4 w-4 text-slate-400" />
           </div>
           <p className="anim-count-pop text-3xl font-bold text-slate-900 dark:text-slate-100">{d.byStatus.in_use}</p>
-          <p className="mt-1 text-xs text-slate-400">Currently rented out</p>
+          <p className="mt-1 text-xs text-slate-400 hidden sm:block">Currently rented out</p>
           <p className="mt-3 text-[10px] font-semibold uppercase tracking-wide text-slate-300 transition-colors group-hover:text-slate-500">View details →</p>
         </div>
       </button>
@@ -201,7 +204,7 @@ export default function AdminDashboardPage() {
             <Wrench className="h-4 w-4 text-slate-400" />
           </div>
           <p className="anim-count-pop text-3xl font-bold text-slate-900 dark:text-slate-100">{d.byStatus.maintenance}</p>
-          <p className="mt-1 text-xs text-slate-400">Needs servicing</p>
+          <p className="mt-1 text-xs text-slate-400 hidden sm:block">Needs servicing</p>
           <p className="mt-3 text-[10px] font-semibold uppercase tracking-wide text-slate-300 transition-colors group-hover:text-slate-500">View details →</p>
         </div>
       </button>
@@ -219,7 +222,7 @@ export default function AdminDashboardPage() {
             <Clock3 className="h-4 w-4 text-slate-400" />
           </div>
           <p className="anim-count-pop text-3xl font-bold text-slate-900 dark:text-slate-100">{d.pendingRentalRequests}</p>
-          <p className="mt-1 text-xs text-slate-400">Awaiting admin action</p>
+          <p className="mt-1 text-xs text-slate-400 hidden sm:block">Awaiting admin action</p>
           <p className="mt-3 text-[10px] font-semibold uppercase tracking-wide text-slate-300 transition-colors group-hover:text-slate-500">View details →</p>
         </div>
       </button>
@@ -237,7 +240,7 @@ export default function AdminDashboardPage() {
             <Activity className="h-4 w-4 text-slate-400" />
           </div>
           <p className="anim-count-pop text-3xl font-bold text-slate-900 dark:text-slate-100">{d.activeRentals}</p>
-          <p className="mt-1 text-xs text-slate-400">Ongoing equipment use</p>
+          <p className="mt-1 text-xs text-slate-400 hidden sm:block">Ongoing equipment use</p>
           <p className="mt-3 text-[10px] font-semibold uppercase tracking-wide text-slate-300 transition-colors group-hover:text-slate-500">View details →</p>
         </div>
       </button>
@@ -253,7 +256,7 @@ export default function AdminDashboardPage() {
           <TrendingUp className="h-4 w-4 text-slate-400" />
         </div>
         <p className="anim-count-pop text-3xl font-bold text-slate-900 dark:text-slate-100">{utilizationPct}%</p>
-        <p className="mt-1 text-xs text-slate-400">of fleet currently in use</p>
+        <p className="mt-1 text-xs text-slate-400 hidden sm:block">of fleet currently in use</p>
         <div className="mt-3 h-1.5 w-full rounded-full bg-slate-100">
           <div className="h-1.5 rounded-full bg-slate-400 transition-all duration-700" style={{ width: `${utilizationPct}%` }} />
         </div>
@@ -271,7 +274,7 @@ export default function AdminDashboardPage() {
           <AlertTriangle className="h-4 w-4 text-slate-400" />
         </div>
         <p className="anim-count-pop text-3xl font-bold text-slate-900 dark:text-slate-100">{downtimePct}%</p>
-        <p className="mt-1 text-xs text-slate-400">of fleet currently in maintenance</p>
+        <p className="mt-1 text-xs text-slate-400 hidden sm:block">of fleet currently in maintenance</p>
         <div className="mt-3 h-1.5 w-full rounded-full bg-slate-100">
           <div className="h-1.5 rounded-full bg-slate-400 transition-all duration-700" style={{ width: `${downtimePct}%` }} />
         </div>
@@ -291,16 +294,40 @@ export default function AdminDashboardPage() {
               <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{link.title}</p>
               <Shield className="h-3 w-3 text-slate-300" />
             </div>
-            <p className="text-xs text-slate-500">{link.desc}</p>
+            <p className="text-xs text-slate-500 hidden sm:block">{link.desc}</p>
           </div>
           <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 transition-colors group-hover:text-slate-500" />
         </Link>,
       ])
     ),
 
+    'action-scan-qr': (
+      <button
+        onClick={() => navigate('/scan')}
+        className="group relative w-full h-full overflow-hidden rounded-xl border border-blue-200 dark:border-blue-800/60 bg-gradient-to-br from-blue-50 to-blue-100/40 dark:from-blue-900/30 dark:to-blue-900/10 px-5 py-5 text-left hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all"
+      >
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500 shadow-sm">
+            <QrCode className="h-5 w-5 text-white" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-blue-800 dark:text-blue-200">Scan QR Code</p>
+            <p className="mt-0.5 text-xs text-blue-600/80 dark:text-blue-400/80 leading-relaxed hidden sm:block">Instantly look up any equipment unit by scanning its QR tag.</p>
+          </div>
+        </div>
+        <div className="mt-4 flex items-center justify-between">
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm group-hover:bg-blue-600 transition-colors">
+            <QrCode className="h-3 w-3" />
+            Open Scanner
+          </span>
+          <ChevronRight className="h-4 w-4 text-blue-400 dark:text-blue-600 transition-transform group-hover:translate-x-0.5" />
+        </div>
+      </button>
+    ),
+
     'action-request': (
       <button
-        onClick={() => navigate('/field/request')}
+        onClick={() => navigate('/request')}
         className="group relative w-full h-full overflow-hidden rounded-xl border border-emerald-200 dark:border-emerald-800/60 bg-gradient-to-br from-emerald-50 to-emerald-100/40 dark:from-emerald-900/30 dark:to-emerald-900/10 px-5 py-5 text-left hover:shadow-md hover:border-emerald-300 dark:hover:border-emerald-700 transition-all"
       >
         <div className="flex items-start gap-3">
@@ -309,7 +336,7 @@ export default function AdminDashboardPage() {
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-bold text-emerald-800 dark:text-emerald-200">Request Equipment</p>
-            <p className="mt-0.5 text-xs text-emerald-600/80 dark:text-emerald-400/80 leading-relaxed">Browse available gear and submit a rental request.</p>
+            <p className="mt-0.5 text-xs text-emerald-600/80 dark:text-emerald-400/80 leading-relaxed hidden sm:block">Browse available gear and submit a rental request.</p>
           </div>
         </div>
         <div className="mt-4 flex items-center justify-between">
@@ -324,7 +351,7 @@ export default function AdminDashboardPage() {
 
     'action-report': (
       <button
-        onClick={() => navigate('/maintenance/report')}
+        onClick={() => navigate('/report')}
         className="group relative w-full h-full overflow-hidden rounded-xl border border-amber-200 dark:border-amber-800/60 bg-gradient-to-br from-amber-50 to-amber-100/40 dark:from-amber-900/30 dark:to-amber-900/10 px-5 py-5 text-left hover:shadow-md hover:border-amber-300 dark:hover:border-amber-700 transition-all"
       >
         <div className="flex items-start gap-3">
@@ -333,7 +360,7 @@ export default function AdminDashboardPage() {
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-bold text-amber-800 dark:text-amber-200">Report Equipment Issue</p>
-            <p className="mt-0.5 text-xs text-amber-600/80 dark:text-amber-400/80 leading-relaxed">Log a new maintenance issue on any fleet unit.</p>
+            <p className="mt-0.5 text-xs text-amber-600/80 dark:text-amber-400/80 leading-relaxed hidden sm:block">Log a new maintenance issue on any fleet unit.</p>
           </div>
         </div>
         <div className="mt-4 flex items-center justify-between">
@@ -396,7 +423,7 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* ── Per-card responsive grid ──────────────────────────── */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2 sm:gap-4 xl:grid-cols-3">
         {orderedWidgets
           .filter((w) => isVisible(w.id))
           .map((w) => {

@@ -7,11 +7,11 @@ import {
   Package,
   ChevronRight,
   CheckCircle2,
-  BookOpen,
-  Info,
   HardHat,
   SlidersHorizontal,
   Send,
+  QrCode,
+  AlertTriangle,
 } from 'lucide-react'
 import ErrorState from '../../../components/ErrorState'
 import Loader from '../../../components/Loader'
@@ -34,17 +34,18 @@ const HOW_IT_WORKS = [
 ]
 
 const WIDGETS: WidgetDef[] = [
-  // ── Row 1: primary actions + key numbers ────────────────────
-  { id: 'action-request',       label: 'Request Equipment',    size: 'card', defaultVisible: true,  description: 'Shortcut to start a new equipment rental request.'               },
-  { id: 'metric-pending',       label: 'My Pending Requests',  size: 'card', defaultVisible: true,  description: 'Number of your requests currently awaiting admin approval.'         },
-  { id: 'metric-active',        label: 'My Active Rentals',    size: 'card', defaultVisible: true,  description: 'Equipment currently assigned and checked out to you.'                },
-  // ── Row 2: quick links + tip ────────────────────────────────
-  { id: 'link-equipment',       label: 'Equipment Catalog',    size: 'card', defaultVisible: true,  description: 'Quick link to browse and request available equipment.'             },
-  { id: 'link-rentals',         label: 'My Requests',          size: 'card', defaultVisible: true,  description: 'Quick link to track your active and pending rental requests.'      },
-  { id: 'tip-rental-policy',    label: 'Rental Policy Tips',   size: 'card', defaultVisible: true,  description: 'Key reminders about equipment care and return expectations.'        },
+  // ── Row 1: action shortcuts ──────────────────────────────────
+  { id: 'action-request',  label: 'Request Equipment',     size: 'card', defaultVisible: true,  description: 'Shortcut to start a new equipment rental request.'          },
+  { id: 'action-report',   label: 'Report Equipment Issue',size: 'card', defaultVisible: true,  description: 'File a new maintenance issue report on any equipment unit.' },
+  { id: 'action-scan-qr',  label: 'Scan QR Code',          size: 'card', defaultVisible: true,  description: 'Open the QR scanner to instantly look up any equipment unit.'},
+  // ── Row 2: metrics ───────────────────────────────────────────
+  { id: 'metric-pending',  label: 'My Pending Requests',   size: 'card', defaultVisible: true,  description: 'Number of your requests currently awaiting admin approval.'  },
+  { id: 'metric-active',   label: 'My Active Rentals',     size: 'card', defaultVisible: true,  description: 'Equipment currently assigned and checked out to you.'         },
+  // ── Row 3: quick links ───────────────────────────────────────
+  { id: 'link-equipment',  label: 'Equipment Catalog',     size: 'card', defaultVisible: true,  description: 'Quick link to browse and request available equipment.'        },
+  { id: 'link-rentals',    label: 'My Requests',           size: 'card', defaultVisible: true,  description: 'Quick link to track your active and pending rental requests.' },
   // ── Off by default ───────────────────────────────────────────
-  { id: 'how-it-works',         label: 'How It Works',         size: 'wide', defaultVisible: false, description: 'Three-step guide: Browse → Request → Pick Up.'                     },
-  { id: 'tip-getting-started',  label: 'Getting Started',      size: 'card', defaultVisible: false, description: 'Helpful tips for new field users submitting their first request.'   },
+  { id: 'how-it-works',    label: 'How It Works',          size: 'wide', defaultVisible: false, description: 'Three-step guide: Browse → Request → Pick Up.'               },
 ]
 
 export default function FieldDashboardPage() {
@@ -81,9 +82,57 @@ export default function FieldDashboardPage() {
 
   const RENDER: Record<string, React.ReactNode> = {
 
+    'action-scan-qr': (
+      <button
+        onClick={() => navigate('/scan')}
+        className="group relative w-full h-full overflow-hidden rounded-xl border border-blue-200 dark:border-blue-800/60 bg-gradient-to-br from-blue-50 to-blue-100/40 dark:from-blue-900/30 dark:to-blue-900/10 px-5 py-5 text-left hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all"
+      >
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500 shadow-sm">
+            <QrCode className="h-5 w-5 text-white" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-blue-800 dark:text-blue-200">Scan QR Code</p>
+            <p className="mt-0.5 text-xs text-blue-600/80 dark:text-blue-400/80 leading-relaxed hidden sm:block">Instantly look up any equipment unit by scanning its QR tag.</p>
+          </div>
+        </div>
+        <div className="mt-4 flex items-center justify-between">
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm group-hover:bg-blue-600 transition-colors">
+            <QrCode className="h-3 w-3" />
+            Open Scanner
+          </span>
+          <ChevronRight className="h-4 w-4 text-blue-400 dark:text-blue-600 transition-transform group-hover:translate-x-0.5" />
+        </div>
+      </button>
+    ),
+
+    'action-report': (
+      <button
+        onClick={() => navigate('/report')}
+        className="group relative w-full h-full overflow-hidden rounded-xl border border-amber-200 dark:border-amber-800/60 bg-gradient-to-br from-amber-50 to-amber-100/40 dark:from-amber-900/30 dark:to-amber-900/10 px-5 py-5 text-left hover:shadow-md hover:border-amber-300 dark:hover:border-amber-700 transition-all"
+      >
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 shadow-sm">
+            <AlertTriangle className="h-5 w-5 text-white" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-amber-800 dark:text-amber-200">Report Equipment Issue</p>
+            <p className="mt-0.5 text-xs text-amber-600/80 dark:text-amber-400/80 leading-relaxed hidden sm:block">Log a new maintenance issue on any fleet unit.</p>
+          </div>
+        </div>
+        <div className="mt-4 flex items-center justify-between">
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm group-hover:bg-amber-600 transition-colors">
+            <AlertTriangle className="h-3 w-3" />
+            File a Report
+          </span>
+          <ChevronRight className="h-4 w-4 text-amber-400 dark:text-amber-600 transition-transform group-hover:translate-x-0.5" />
+        </div>
+      </button>
+    ),
+
     'action-request': (
       <button
-        onClick={() => navigate('/field/request')}
+        onClick={() => navigate('/request')}
         className="group relative w-full h-full overflow-hidden rounded-xl border border-emerald-200 dark:border-emerald-800/60 bg-gradient-to-br from-emerald-50 to-emerald-100/40 dark:from-emerald-900/30 dark:to-emerald-900/10 px-5 py-5 text-left hover:shadow-md hover:border-emerald-300 dark:hover:border-emerald-700 transition-all"
       >
         <div className="flex items-start gap-3">
@@ -92,7 +141,7 @@ export default function FieldDashboardPage() {
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-bold text-emerald-800 dark:text-emerald-200">Request Equipment</p>
-            <p className="mt-0.5 text-xs text-emerald-600/80 dark:text-emerald-400/80 leading-relaxed">Pick from available gear and submit a rental request in seconds.</p>
+            <p className="mt-0.5 text-xs text-emerald-600/80 dark:text-emerald-400/80 leading-relaxed hidden sm:block">Pick from available gear and submit a rental request in seconds.</p>
           </div>
         </div>
         <div className="mt-4 flex items-center justify-between">
@@ -116,7 +165,7 @@ export default function FieldDashboardPage() {
             <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Equipment Availability</p>
             <HardHat className="h-3 w-3 text-slate-300 dark:text-slate-500" />
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Browse and request ready equipment</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">Browse and request ready equipment</p>
         </div>
         <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 transition-colors group-hover:text-slate-500" />
       </Link>
@@ -133,7 +182,7 @@ export default function FieldDashboardPage() {
             <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">My Requests</p>
             <HardHat className="h-3 w-3 text-slate-300 dark:text-slate-500" />
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Track active and pending rentals</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">Track active and pending rentals</p>
         </div>
         <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 transition-colors group-hover:text-slate-500" />
       </Link>
@@ -151,7 +200,7 @@ export default function FieldDashboardPage() {
             <ClipboardList className="h-4 w-4 text-slate-400" />
           </div>
           <p className="anim-count-pop text-3xl font-bold text-slate-900 dark:text-slate-100">{summaryQuery.data.myPendingRequests}</p>
-          <p className="mt-1 text-xs text-slate-400">Requests waiting for admin approval</p>
+          <p className="mt-1 text-xs text-slate-400 hidden sm:block">Requests waiting for admin approval</p>
           <p className="mt-3 text-[10px] font-semibold uppercase tracking-wide text-slate-300 transition-colors group-hover:text-slate-500">View details →</p>
         </div>
       </button>
@@ -169,7 +218,7 @@ export default function FieldDashboardPage() {
             <Hammer className="h-4 w-4 text-slate-400" />
           </div>
           <p className="anim-count-pop text-3xl font-bold text-slate-900 dark:text-slate-100">{summaryQuery.data.myActiveRentals}</p>
-          <p className="mt-1 text-xs text-slate-400">Equipment currently assigned to your jobs</p>
+          <p className="mt-1 text-xs text-slate-400 hidden sm:block">Equipment currently assigned to your jobs</p>
           <p className="mt-3 text-[10px] font-semibold uppercase tracking-wide text-slate-300 transition-colors group-hover:text-slate-500">View details →</p>
         </div>
       </button>
@@ -201,63 +250,10 @@ export default function FieldDashboardPage() {
       </div>
     ),
 
-    'tip-rental-policy': (
-      <div className="h-full rounded-xl border border-slate-200 bg-white px-5 py-5 dark:bg-slate-800 dark:border-slate-700">
-        <div className="mb-3 flex items-center gap-2.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-700">
-            <Info className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-          </div>
-          <div className="flex items-center gap-1.5">
-            <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Rental Policy Reminders</p>
-            <HardHat className="h-3 w-3 text-slate-300 dark:text-slate-600" />
-          </div>
-        </div>
-        <ul className="space-y-2">
-          {[
-            'Inspect equipment before use and report any damage immediately.',
-            'Return equipment by the agreed end date to avoid delays.',
-            'Keep gear clean and stored securely when not in use.',
-            'Contact admin if you need to extend a rental period.',
-          ].map((tip) => (
-            <li key={tip} className="flex items-start gap-2 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-              <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
-              {tip}
-            </li>
-          ))}
-        </ul>
-      </div>
-    ),
-
-    'tip-getting-started': (
-      <div className="h-full rounded-xl border border-slate-200 bg-white px-5 py-5 dark:bg-slate-800 dark:border-slate-700">
-        <div className="mb-3 flex items-center gap-2.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-700">
-            <BookOpen className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-          </div>
-          <div className="flex items-center gap-1.5">
-            <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Getting Started</p>
-            <HardHat className="h-3 w-3 text-slate-300 dark:text-slate-600" />
-          </div>
-        </div>
-        <ul className="space-y-2">
-          {[
-            "Head to Equipment Availability to browse what's ready to rent.",
-            'Click any item to view details, then submit a rental request.',
-            "You'll be notified once an admin approves your request.",
-            'Use the QR scanner to quickly look up equipment on-site.',
-          ].map((tip) => (
-            <li key={tip} className="flex items-start gap-2 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300 dark:bg-slate-500" />
-              {tip}
-            </li>
-          ))}
-        </ul>
-      </div>
-    ),
   }
 
   return (
-    <div className="space-y-7">
+    <div className="flex flex-col min-h-[calc(100vh-8rem)] space-y-7">
 
       {/* ── Hero Banner ──────────────────────────────────────── */}
       <div
@@ -305,7 +301,7 @@ export default function FieldDashboardPage() {
       </div>
 
       {/* ── Per-card responsive grid ──────────────────────────── */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2 sm:gap-4 xl:grid-cols-3">
         {orderedWidgets
           .filter((w) => isVisible(w.id))
           .map((w) => {
@@ -361,6 +357,18 @@ export default function FieldDashboardPage() {
             </div>
           )
         })()}
+      </div>
+
+      {/* ── Rental policy reminders ───────────────────────────── */}
+      <div className="flex flex-col gap-1 px-1 items-center text-center mt-auto pt-8">
+        {[
+          'Inspect equipment before use and report any damage immediately.',
+          'Return equipment by the agreed end date to avoid delays.',
+          'Keep gear clean and stored securely when not in use.',
+          'Contact admin if you need to extend a rental period.',
+        ].map((tip) => (
+          <p key={tip} className="text-[11px] text-slate-400 dark:text-slate-600">{tip}</p>
+        ))}
       </div>
 
     </div>

@@ -25,6 +25,7 @@ import {
   QrCode,
   Moon,
   Send,
+  Menu,
 } from 'lucide-react'
 import { useDarkMode } from '../hooks/useDarkMode'
 import { useQuery } from '@tanstack/react-query'
@@ -352,7 +353,7 @@ function useLiveClock() {
   return { date, time }
 }
 
-function RoleTopBar({ onLogout, onImpersonate }: { onLogout: () => void; onImpersonate?: () => void }) {
+function RoleTopBar({ onLogout, onImpersonate, onMenuOpen }: { onLogout: () => void; onImpersonate?: () => void; onMenuOpen?: () => void }) {
   const navigate = useNavigate()
   const { effectiveRole, effectiveSession } = useImpersonation()
   const role = (effectiveRole ?? 'field') as keyof typeof ROLE_THEME
@@ -391,7 +392,14 @@ function RoleTopBar({ onLogout, onImpersonate }: { onLogout: () => void; onImper
     <>
     {calendarOpen && <div className="fixed inset-0 z-40" onClick={() => setCalendarOpen(false)} />}
     <header className="sticky top-0 z-50 w-full flex items-center px-4 h-12 shadow-sm" style={{ background: theme.bg, borderBottom: `1px solid ${theme.border}` }}>
-      <div className="flex-1 flex items-center">
+      <div className="flex-1 flex items-center gap-2">
+        <button
+          onClick={onMenuOpen}
+          className="sm:hidden flex items-center justify-center w-8 h-8 rounded hover:bg-white/10 transition-colors text-white"
+          aria-label="Open menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
         <Link to="/" className="flex items-center gap-2 shrink-0">
           <img alt="EquipTrack icon" className="h-7 w-7 rounded object-contain" src={iconColor} />
           <span className="font-bold text-sm tracking-wide text-white hidden sm:block">
@@ -509,28 +517,82 @@ type NavItem = { label: string; to: string; icon: React.ElementType }
 
 const ROLE_NAV: Record<string, NavItem[]> = {
   admin: [
-    { label: 'Dashboard', to: '/admin/dashboard', icon: LayoutDashboard },
-    { label: 'Equipment', to: '/admin/equipment', icon: Boxes },
-    { label: 'Rentals', to: '/admin/rentals', icon: ClipboardList },
-    { label: 'Issue Reports', to: '/admin/issues', icon: AlertCircle },
-    { label: 'Users', to: '/admin/users', icon: Users },
-    { label: 'Scan QR', to: '/scan', icon: QrCode },
+    { label: 'Dashboard',    to: '/admin/dashboard', icon: LayoutDashboard },
+    { label: 'Equipment',    to: '/admin/equipment',  icon: Boxes },
+    { label: 'Rentals',      to: '/admin/rentals',    icon: ClipboardList },
+    { label: 'Issue Reports',to: '/admin/issues',     icon: AlertCircle },
+    { label: 'Users',        to: '/admin/users',      icon: Users },
+    { label: 'Request',      to: '/request',          icon: Send },
+    { label: 'Report Issue', to: '/report',           icon: AlertTriangle },
+    { label: 'Scan QR',      to: '/scan',             icon: QrCode },
   ],
   field: [
     { label: 'Dashboard',   to: '/field/dashboard', icon: LayoutDashboard },
     { label: 'Equipment',   to: '/field/equipment',  icon: Boxes },
-    { label: 'Request',     to: '/field/request',    icon: Send },
+    { label: 'Request',     to: '/request',          icon: Send },
     { label: 'My Rentals',  to: '/field/rentals',    icon: ClipboardList },
     { label: 'My Reports',  to: '/field/reports',    icon: AlertCircle },
+    { label: 'Report Issue',to: '/report',           icon: AlertTriangle },
     { label: 'Scan QR',     to: '/scan',             icon: QrCode },
   ],
   maintenance: [
-    { label: 'Dashboard', to: '/maintenance/dashboard', icon: LayoutDashboard },
-    { label: 'Service Queue', to: '/maintenance/queue', icon: ListChecks },
-    { label: 'All Equipment', to: '/maintenance/equipment', icon: Boxes },
-    { label: 'Issue Reports', to: '/maintenance/issues', icon: AlertCircle },
-    { label: 'Scan QR', to: '/scan', icon: QrCode },
+    { label: 'Dashboard',    to: '/maintenance/dashboard', icon: LayoutDashboard },
+    { label: 'Service Queue',to: '/maintenance/queue',     icon: ListChecks },
+    { label: 'All Equipment',to: '/maintenance/equipment', icon: Boxes },
+    { label: 'Issue Reports',to: '/maintenance/issues',    icon: AlertCircle },
+    { label: 'Request',      to: '/request',               icon: Send },
+    { label: 'Report Issue', to: '/report',                icon: AlertTriangle },
+    { label: 'Scan QR',      to: '/scan',                  icon: QrCode },
   ],
+}
+
+function MobileSidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { effectiveRole } = useImpersonation()
+  const role = (effectiveRole ?? 'field') as keyof typeof ROLE_THEME
+  const theme = ROLE_THEME[role] ?? ROLE_THEME.field
+  const items = ROLE_NAV[role] ?? []
+
+  return (
+    <>
+      <div
+        className={`fixed inset-0 z-40 bg-black/50 transition-opacity sm:hidden ${open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        onClick={onClose}
+      />
+      <div
+        className="fixed top-0 left-0 z-50 h-full w-64 shadow-2xl transition-transform duration-300 sm:hidden flex flex-col"
+        style={{ background: theme.bg, transform: open ? 'translateX(0)' : 'translateX(-100%)' }}
+      >
+        <div className="flex items-center justify-between px-4 h-12 shrink-0" style={{ borderBottom: `1px solid ${theme.border}` }}>
+          <div className="flex items-center gap-2">
+            <img alt="EquipTrack icon" className="h-7 w-7 rounded object-contain" src={iconColor} />
+            <span className="font-bold text-sm tracking-wide text-white">
+              Equip<span style={{ color: 'rgb(var(--brand-yellow-rgb))' }}>Track</span>
+            </span>
+          </div>
+          <button onClick={onClose} className="text-white/70 hover:text-white transition-colors" aria-label="Close menu">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <nav className="py-2 overflow-y-auto flex-1">
+          {items.map(({ label, to, icon: Icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              onClick={onClose}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-5 py-3 text-sm font-medium transition-colors ${
+                  isActive ? 'text-white bg-white/15' : 'text-white/70 hover:text-white hover:bg-white/10'
+                }`
+              }
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              {label}
+            </NavLink>
+          ))}
+        </nav>
+      </div>
+    </>
+  )
 }
 
 function SecondaryNavWrapper() {
@@ -578,6 +640,7 @@ export default function AppLayout() {
   const realRole = getSession()?.user?.role
 
   const [showImpersonateDialog, setShowImpersonateDialog] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   function handleLogout() {
     clearSession()
@@ -610,9 +673,14 @@ export default function AppLayout() {
       <RoleTopBar
         onLogout={impersonation.active ? handleStopImpersonation : handleLogout}
         onImpersonate={realRole === 'admin' && !impersonation.active ? () => setShowImpersonateDialog(true) : undefined}
+        onMenuOpen={() => setSidebarOpen(true)}
       />
 
-      <SecondaryNavWrapper />
+      <MobileSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+      <div className="hidden sm:block">
+        <SecondaryNavWrapper />
+      </div>
 
       <main className="mx-auto w-full max-w-7xl p-4 md:p-8">
         <ErrorBoundary>

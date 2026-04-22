@@ -47,6 +47,8 @@ function AppRoutes() {
           <Route element={<UserProfilePage />} path="/profile/:id?" />
           <Route element={<CalendarPage />} path="/calendar" />
           <Route element={<QRScannerPage />} path="/scan" />
+          <Route element={<FieldRequestPage />} path="/request" />
+          <Route element={<MaintenanceReportPage />} path="/report" />
 
           <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
             <Route element={<AdminDashboardPage />} path="/admin/dashboard" />
